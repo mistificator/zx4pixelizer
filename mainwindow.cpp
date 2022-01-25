@@ -4,6 +4,8 @@
 #include <QPainter>
 #include <QResizeEvent>
 #include <QInputDialog>
+#include <QFileDialog>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -557,5 +559,50 @@ void MainWindow::on_actionResize_image_triggered()
     }
 
     update();
+}
+
+
+void MainWindow::on_actionImport_triggered()
+{
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", QString(), "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
+    QImage src_img(filename);
+
+    QImage img(src_img.scaled(grid_x, grid_y, Qt::KeepAspectRatioByExpanding, Qt::FastTransformation).size(), src_img.format());
+    img.fill(Qt::black);
+    for (int y = 0; y < src_img.height(); y++)
+    {
+        for (int x = 0; x < src_img.width(); x++)
+        {
+            int ix = x * img.width() / src_img.width();
+            int iy = y * img.height() / src_img.height();
+            QColor old_px = img.pixelColor(ix, iy).toHsl();
+            QColor new_px = src_img.pixelColor(x, y).toHsl();
+            QColor px = new_px.hslSaturation() > old_px.hslSaturation() ? new_px : old_px;
+            px.setHsl(
+                        qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
+                        qMax<int>(qMin<int>(((px.hslSaturation() + 4) / 8) * 8, 255), 0),
+                        qMax<int>(qMin<int>(((px.lightness() + 4) / 8) * 8, 255), 0),
+                        qMax<int>(qMin<int>(((px.alpha() + 4) / 8) * 8, 255), 0));
+            img.setPixelColor(ix, iy, px.toRgb());
+        }
+    }
+
+    QVector<QRgb> color_table;
+    foreach (QColor color, colors())
+    {
+        color_table << color.rgb();
+    }
+
+    img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+
+    QLabel * w = new QLabel();
+    w->setScaledContents(true);
+    w->setPixmap(QPixmap::fromImage(img));
+    w->resize(4 * img.width(), 4 * img.height());
+    w->show();
 }
 

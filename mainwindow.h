@@ -31,6 +31,8 @@ private slots:
 
     void on_actionResize_image_triggered();
 
+    void on_actionImport_triggered();
+
 private:
     Ui::MainWindow *ui;
 
