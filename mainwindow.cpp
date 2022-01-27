@@ -6,6 +6,7 @@
 #include <QInputDialog>
 #include <QFileDialog>
 #include <QDebug>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -52,7 +53,7 @@ MainWindow::MainWindow(QWidget *parent)
     for (int i = 0; i < ui->baseColor->count(); i++)
     {
         QPixmap px(32, 32);
-        px.fill(color_table[(ZxColorEnum)(i + 8)]);
+        px.fill(color_table[static_cast<ZxColorEnum>(i + 8)]);
         ui->baseColor->setItemIcon(i, px);
     }
 
@@ -72,6 +73,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->menuWindow->addAction(ui->dockPreview->toggleViewAction());
 
     on_baseColor_activated(0);
+    ui->palettes->setCurrentItem(ui->palettes->item(1821));
+    ui->palettes->setStyleSheet("QListWidget::item:selected { background: rgb(100, 255, 100); }");
 }
 
 MainWindow::~MainWindow()
@@ -79,28 +82,39 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::showEvent(QShowEvent *)
+{
+}
 
-void MainWindow::on_baseColor_activated(int index)
+void MainWindow::resizeEvent(QResizeEvent *)
+{
+    ui->palettes->scrollToItem(ui->palettes->currentItem(), QAbstractItemView::PositionAtCenter);
+}
+
+void MainWindow::on_baseColor_activated(int c0i)
 {
     int row = qMax(ui->palettes->currentIndex().row(), 0);
     int col = qMax(ui->palettes->currentIndex().column(), 0);
     ui->palettes->clear();
-    for (int i = 0; i < 8; i++)
+    int color_num = 0;
+    for (int c1i = 0; c1i < 8; c1i++)
     {
-        for (int k = 0; k < 8; k++)
+        for (int c2i = 0; c2i < 8; c2i++)
         {
-            for (int m = 0; m < 8; m++)
+            for (int c3i = 0; c3i < 8; c3i++)
             {
-                for (int b1 = 0; b1 < 2; b1++)
+                for (int b0 = 0; b0 < 2; b0++)
                 {
-                    for (int b2 = 0; b2 < 2; b2++)
+                    for (int b1 = 0; b1 < 2; b1++)
                     {
+                        color_num++;
+
                         QColor c[4];
                         ZxColorEnum z[4];
-                        c[0] = color_table[z[0] = (ZxColorEnum)(index + 8 * b1)];
-                        c[1] = color_table[z[1] = (ZxColorEnum)(i + 8 * b1)];
-                        c[2] = color_table[z[2] = (ZxColorEnum)(k + 8 * b2)];
-                        c[3] = color_table[z[3] = (ZxColorEnum)(m + 8 * b2)];
+                        c[0] = color_table[z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0)];
+                        c[1] = color_table[z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0)];
+                        c[2] = color_table[z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1)];
+                        c[3] = color_table[z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1)];
 
                         QPixmap px(64, 64);
                         QPainter p(& px);
@@ -112,7 +126,7 @@ void MainWindow::on_baseColor_activated(int index)
 
                         QListWidgetItem * item = new QListWidgetItem();
                         item->setData(Qt::UserRole, QVariantList() << m[0] << m[1] << m[2] << m[3]);
-                        item->setToolTip((QStringList() << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
+                        item->setToolTip((QStringList() << QString("#%1").arg(color_num) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
                         item->setIcon(px);
                         ui->palettes->addItem(item);
                     }
@@ -243,6 +257,35 @@ void MainWindow::eraseDot(int x, int y)
     image.alpha_layer[y][x] = 0;
 }
 
+void MainWindow::drawBrush(int x, int y)
+{
+    drawDot(x - 1, y - 2);
+    drawDot(x, y - 2);
+    drawDot(x + 1, y - 2);
+
+    drawDot(x - 2, y - 1);
+    drawDot(x - 1, y - 1);
+    drawDot(x, y - 1);
+    drawDot(x + 1, y - 1);
+    drawDot(x + 2, y - 1);
+
+    drawDot(x - 2, y);
+    drawDot(x - 1, y);
+    drawDot(x, y);
+    drawDot(x + 1, y);
+    drawDot(x + 2, y);
+
+    drawDot(x - 2, y + 1);
+    drawDot(x - 1, y + 1);
+    drawDot(x, y + 1);
+    drawDot(x + 1, y + 1);
+    drawDot(x + 2, y + 1);
+
+    drawDot(x - 1, y + 2);
+    drawDot(x, y + 2);
+    drawDot(x + 1, y + 2);
+}
+
 void MainWindow::moveImage(int dx, int dy)
 {
     for (int my = 0; my < grid_y; my++)
@@ -301,31 +344,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     else
                     if (ui->actionBrush->isChecked())
                     {
-                        drawDot(x - 1, y - 2);
-                        drawDot(x, y - 2);
-                        drawDot(x + 1, y - 2);
-
-                        drawDot(x - 2, y - 1);
-                        drawDot(x - 1, y - 1);
-                        drawDot(x, y - 1);
-                        drawDot(x + 1, y - 1);
-                        drawDot(x + 2, y - 1);
-
-                        drawDot(x - 2, y);
-                        drawDot(x - 1, y);
-                        drawDot(x, y);
-                        drawDot(x + 1, y);
-                        drawDot(x + 2, y);
-
-                        drawDot(x - 2, y + 1);
-                        drawDot(x - 1, y + 1);
-                        drawDot(x, y + 1);
-                        drawDot(x + 1, y + 1);
-                        drawDot(x + 2, y + 1);
-
-                        drawDot(x - 1, y + 2);
-                        drawDot(x, y + 2);
-                        drawDot(x + 1, y + 2);
+                        drawBrush(x, y);
                     }
                     else
                     if (ui->actionMove->isChecked())
@@ -564,15 +583,20 @@ void MainWindow::on_actionResize_image_triggered()
 
 void MainWindow::on_actionImport_triggered()
 {
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", QString(), "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
     if (filename.isEmpty())
     {
         return;
     }
-    QImage src_img(filename);
+    QImage src_img(filename);    
+    if (src_img.isNull())
+    {
+        QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
+        return;
+    }
 
-    QImage img(src_img.scaled(grid_x, grid_y, Qt::KeepAspectRatioByExpanding, Qt::FastTransformation).size(), src_img.format());
-    img.fill(Qt::black);
+    QImage img(src_img.scaled(grid_x, grid_y, Qt::KeepAspectRatioByExpanding, Qt::FastTransformation).size(), QImage::Format_ARGB32);
+    img.fill(QColor(0, 0, 0, 0));
     for (int y = 0; y < src_img.height(); y++)
     {
         for (int x = 0; x < src_img.width(); x++)
@@ -591,10 +615,36 @@ void MainWindow::on_actionImport_triggered()
         }
     }
 
+
     QVector<QRgb> color_table;
     foreach (QColor color, colors())
     {
         color_table << color.rgb();
+    }
+
+    QImage tmp_img = img;
+
+    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+    QRgb alpha_pixel;
+    if (!src_alpha_channel)
+    {
+        alpha_pixel = img.pixel(0, 0);
+        color_table << alpha_pixel;
+    }
+    else
+    {
+        alpha_pixel = color_table.first() & 0x00FFFFFF;
+        color_table << alpha_pixel;
+        for (int y = 0; y < img.height(); y++)
+        {
+            for (int x = 0; x < img.width(); x++)
+            {
+                if (qAlpha(img.pixel(x, y)) < 128)
+                {
+                    img.setPixel(x, y, alpha_pixel);
+                }
+            }
+        }
     }
 
     img = img.convertToFormat(QImage::Format_Indexed8, color_table);
@@ -604,5 +654,80 @@ void MainWindow::on_actionImport_triggered()
     w->setPixmap(QPixmap::fromImage(img));
     w->resize(4 * img.width(), 4 * img.height());
     w->show();
+
+    if (!src_alpha_channel)
+    {
+        alpha_pixel = img.pixel(0, 0);
+        for (int y = 0; y < img.height(); y++)
+        {
+            for (int x = 0; x < img.width(); x++)
+            {
+                if (img.pixel(x, y) == alpha_pixel)
+                {
+                    img.setPixel(x, y, 4); // alpha_pixel index
+                }
+            }
+        }
+    }
+    else
+    {
+        for (int y = 0; y < img.height(); y++)
+        {
+            for (int x = 0; x < img.width(); x++)
+            {
+                if (img.pixel(x, y) == alpha_pixel)
+                {
+                    if (qAlpha(tmp_img.pixel(x, y)) != 0)
+                    {
+                        img.setPixel(x, y, 0); // restore color
+                    }
+                    else
+                    {
+                        img.setPixel(x, y, 4); // alpha_pixel index
+                    }
+                }
+            }
+        }
+    }
+    color_table.last() = qRgba(0, 0, 0, 0);
+    img.setColorTable(color_table);
+
+    grid_x = img.width();
+    grid_y = img.height();
+    ui->actionNew->trigger();
+
+    for (int y = 0; y < img.height(); y++)
+    {
+        for (int x = 0; x < img.width(); x++)
+        {
+            int idx = color_table.indexOf(img.pixel(x, y));
+            if (idx >= 0 && idx < 4)
+            {
+                current_color = idx;
+                drawDot(x, y);
+            }
+        }
+    }
+    ui->canvas->update();
+
+/*
+    QLabel * w = new QLabel();
+    w->setScaledContents(true);
+    w->setPixmap(QPixmap::fromImage(img));
+    w->resize(4 * img.width(), 4 * img.height());
+    w->show();
+*/
 }
 
+
+void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
+{
+    on_palettes_itemSelectionChanged();
+}
+
+void MainWindow::on_actionNew_triggered()
+{
+    image = Zx4Image();
+    resizeGrid();
+    update();
+}
