@@ -50,6 +50,7 @@ private:
     struct Zx4Image
     {
         QVector<QVector<char>> color_layer0, color_layer1, alpha_layer;
+        bool isNull() const { return color_layer0.isEmpty() || color_layer1.isEmpty() || alpha_layer.isEmpty(); }
     };
     Zx4Image image, stored_image;
     QPoint old_grid_pos;

@@ -71,6 +71,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->menuWindow->addAction(ui->dockPalette->toggleViewAction());
     ui->menuWindow->addAction(ui->dockDrawTools->toggleViewAction());
     ui->menuWindow->addAction(ui->dockPreview->toggleViewAction());
+    ui->menuWindow->addAction(ui->dockSource->toggleViewAction());
+    tabifyDockWidget(ui->dockPreview, ui->dockSource);
+    ui->dockPreview->raise();
 
     on_baseColor_activated(0);
     ui->palettes->setCurrentItem(ui->palettes->item(1821));
@@ -383,13 +386,24 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
         switch (ev->type())
         {
             case QEvent::Paint:
+            if (!image.isNull())
             {               
                 int step = qMin(ui->preview->width() / grid_x, ui->preview->height() / grid_y);
                 int side_x = step * grid_x;
                 int side_y = step * grid_y;
 
+                QList<QColor> c = colors();
+                QImage pattern(2 * step, 2 * step, QImage::Format_RGB32);
+                QPainter pp(& pattern);
+                for (int y = 0; y < 2; y++)
+                {
+                    for (int x = 0; x < 2; x++)
+                    {
+                        pp.fillRect(x * step, y * step, step, step, c[y * 2 + x]);
+                    }
+                }
                 QPainter p(ui->preview);
-                p.fillRect(0, 0, side_x, side_y, Qt::black);
+                p.fillRect(0, 0, side_x, side_y, pattern);
                 drawPixels(& p, step);
             }
             break;
@@ -595,7 +609,22 @@ void MainWindow::on_actionImport_triggered()
         return;
     }
 
-    QImage img(src_img.scaled(grid_x, grid_y, Qt::KeepAspectRatioByExpanding, Qt::FastTransformation).size(), QImage::Format_ARGB32);
+    int alpha_q = QMessageBox::question(this,
+                                        "Alpha channel",
+                                        "Import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey",
+                                        "Use alpha channel", "Don't use alpha channel", "Cancel import");
+    if (alpha_q == 2)
+    {
+        return;
+    }
+
+    QImage src_img2(qMax(src_img.width(), src_img.height()), qMax(src_img.width(), src_img.height()), QImage::Format_ARGB32);
+    src_img2.fill(0);
+    QPainter sp(& src_img2);
+    sp.drawImage(0, 0, src_img);
+    ui->sourceImage->setPixmap(QPixmap::fromImage(src_img2).scaled(qMax(ui->preview->width(), ui->preview->height()), qMax(ui->preview->width(), ui->preview->height()), Qt::KeepAspectRatio, Qt::FastTransformation));
+
+    QImage img(src_img.scaled(grid_x, grid_y, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
     img.fill(QColor(0, 0, 0, 0));
     for (int y = 0; y < src_img.height(); y++)
     {
@@ -610,7 +639,7 @@ void MainWindow::on_actionImport_triggered()
                         qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
                         qMax<int>(qMin<int>(((px.hslSaturation() + 4) / 8) * 8, 255), 0),
                         qMax<int>(qMin<int>(((px.lightness() + 4) / 8) * 8, 255), 0),
-                        qMax<int>(qMin<int>(((px.alpha() + 4) / 8) * 8, 255), 0));
+                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
             img.setPixelColor(ix, iy, px.toRgb());
         }
     }
@@ -622,75 +651,56 @@ void MainWindow::on_actionImport_triggered()
         color_table << color.rgb();
     }
 
-    QImage tmp_img = img;
-
-    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
-    QRgb alpha_pixel;
-    if (!src_alpha_channel)
+    if (alpha_q == 0)
     {
-        alpha_pixel = img.pixel(0, 0);
-        color_table << alpha_pixel;
-    }
-    else
-    {
-        alpha_pixel = color_table.first() & 0x00FFFFFF;
-        color_table << alpha_pixel;
-        for (int y = 0; y < img.height(); y++)
+        bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+        QRgb alpha_pixel;
         {
-            for (int x = 0; x < img.width(); x++)
+            if (!src_alpha_channel)
             {
-                if (qAlpha(img.pixel(x, y)) < 128)
-                {
-                    img.setPixel(x, y, alpha_pixel);
-                }
+                alpha_pixel = img.pixel(0, 0);
+                color_table << alpha_pixel;
             }
-        }
-    }
-
-    img = img.convertToFormat(QImage::Format_Indexed8, color_table);
-
-    QLabel * w = new QLabel();
-    w->setScaledContents(true);
-    w->setPixmap(QPixmap::fromImage(img));
-    w->resize(4 * img.width(), 4 * img.height());
-    w->show();
-
-    if (!src_alpha_channel)
-    {
-        alpha_pixel = img.pixel(0, 0);
-        for (int y = 0; y < img.height(); y++)
-        {
-            for (int x = 0; x < img.width(); x++)
+            else
             {
-                if (img.pixel(x, y) == alpha_pixel)
+                alpha_pixel = color_table.first() & 0x00FFFFFF; // duplicate color with full opacity
+                color_table << alpha_pixel;
+                for (int y = 0; y < img.height(); y++)
                 {
-                    img.setPixel(x, y, 4); // alpha_pixel index
-                }
-            }
-        }
-    }
-    else
-    {
-        for (int y = 0; y < img.height(); y++)
-        {
-            for (int x = 0; x < img.width(); x++)
-            {
-                if (img.pixel(x, y) == alpha_pixel)
-                {
-                    if (qAlpha(tmp_img.pixel(x, y)) != 0)
+                    for (int x = 0; x < img.width(); x++)
                     {
-                        img.setPixel(x, y, 0); // restore color
+                        if (qAlpha(img.pixel(x, y)) < 128)
+                        {
+                            img.setPixel(x, y, alpha_pixel);
+                        }
                     }
-                    else
+                }
+            }
+        }
+
+        img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+
+        if (!src_alpha_channel)
+        {
+            alpha_pixel = img.pixel(0, 0);
+            for (int y = 0; y < img.height(); y++)
+            {
+                for (int x = 0; x < img.width(); x++)
+                {
+                    if (img.pixel(x, y) == alpha_pixel)
                     {
                         img.setPixel(x, y, 4); // alpha_pixel index
                     }
                 }
             }
         }
+        color_table.last() = qRgba(0, 0, 0, 0);
+        img.setColorTable(color_table);
     }
-    color_table.last() = qRgba(0, 0, 0, 0);
-    img.setColorTable(color_table);
+    else
+    {
+        img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+    }
 
     grid_x = img.width();
     grid_y = img.height();
