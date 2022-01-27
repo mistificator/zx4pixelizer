@@ -21,7 +21,6 @@ private slots:
     void drawGrid();
     void updateColorArea();
 
-    void on_baseColor_activated(int index);
     void on_actionQuit_triggered();
     void on_palettes_itemSelectionChanged();
     void on_color00_clicked();
@@ -43,7 +42,7 @@ private:
 
     bool eventFilter(QObject *, QEvent *);
 
-    int grid_x = 32, grid_y = 32;
+    int grid_x = 64, grid_y = 64;
     int current_color = 0;
     QList<QColor> colors() const;
 
@@ -54,6 +53,7 @@ private:
     };
     Zx4Image image, stored_image;
     QPoint old_grid_pos;
+    QImage src_imp_image;
 
     void drawPixels(QPainter * p, int step);
     void drawDot(int x, int y);
@@ -61,6 +61,7 @@ private:
     void eraseDot(int x, int y);
     void moveImage(int dx, int dy);
     void resizeGrid();
+    void createPalettes();
 
     void showEvent(QShowEvent *);
     void resizeEvent(QResizeEvent *);

@@ -111,57 +111,7 @@
    </attribute>
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QGridLayout" name="gridLayout_3">
-     <item row="1" column="2">
-      <widget class="QComboBox" name="baseColor">
-       <property name="iconSize">
-        <size>
-         <width>32</width>
-         <height>32</height>
-        </size>
-       </property>
-       <item>
-        <property name="text">
-         <string>Black</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Blue</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Red</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Magenta</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Green</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Cyan</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Yellow</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>White</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-     <item row="2" column="2">
+     <item row="0" column="2">
       <widget class="QListWidget" name="palettes">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -210,13 +160,6 @@
        </property>
        <property name="uniformItemSizes">
         <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="2">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Base color</string>
        </property>
       </widget>
      </item>

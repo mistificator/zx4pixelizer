@@ -15,6 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     ui->canvas->installEventFilter(this);
     ui->preview->installEventFilter(this);
+    ui->sourceImage->installEventFilter(this);
 
     color_table[ZxBlack] =          Qt::black;
     color_table[ZxBlue] =           Qt::darkBlue;
@@ -50,13 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
     color_name[ZxBrightYellow] =   "Bright yellow";
     color_name[ZxBrightWhite] =    "Bright white";
 
-    for (int i = 0; i < ui->baseColor->count(); i++)
-    {
-        QPixmap px(32, 32);
-        px.fill(color_table[static_cast<ZxColorEnum>(i + 8)]);
-        ui->baseColor->setItemIcon(i, px);
-    }
-
     QActionGroup * ag = new QActionGroup(this);
     ag->setExclusive(true);
     ag->addAction(ui->actionPencil);
@@ -75,14 +69,63 @@ MainWindow::MainWindow(QWidget *parent)
     tabifyDockWidget(ui->dockPreview, ui->dockSource);
     ui->dockPreview->raise();
 
-    on_baseColor_activated(0);
-    ui->palettes->setCurrentItem(ui->palettes->item(1821));
+    createPalettes();
+    ui->palettes->setCurrentItem(ui->palettes->item(1006 - 1));
     ui->palettes->setStyleSheet("QListWidget::item:selected { background: rgb(100, 255, 100); }");
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::createPalettes()
+{
+    int color_num = 0;
+    for (int c0i = 0; c0i < 8; c0i++)
+    {
+        for (int c1i = c0i; c1i < 8; c1i++)
+        {
+            for (int c2i = 0; c2i < 8; c2i++)
+            {
+                for (int c3i = c2i; c3i < 8; c3i++)
+                {
+                    if (c0i == c1i && c2i == c3i)
+                    {
+                        continue;
+                    }
+                    for (int b0 = 0; b0 < 2; b0++)
+                    {
+                        for (int b1 = 0; b1 < 2; b1++)
+                        {
+                            color_num++;
+
+                            QColor c[4];
+                            ZxColorEnum z[4];
+                            c[0] = color_table[z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0)];
+                            c[1] = color_table[z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0)];
+                            c[2] = color_table[z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1)];
+                            c[3] = color_table[z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1)];
+
+                            QPixmap px(64, 64);
+                            QPainter p(& px);
+                            QColor m[4];
+                            p.fillRect(0, 0, px.width() / 2, px.height() / 2,                               m[0] = QColor::fromRgb((c[0].red() + c[2].red()) / 2, (c[0].green() + c[2].green()) / 2, (c[0].blue() + c[2].blue()) / 2));
+                            p.fillRect(px.width() / 2, 0, px.width() / 2, px.height() / 2,                  m[1] = QColor::fromRgb((c[0].red() + c[3].red()) / 2, (c[0].green() + c[3].green()) / 2, (c[0].blue() + c[3].blue()) / 2));
+                            p.fillRect(0, px.height() / 2, px.width() / 2, px.height() / 2,                 m[2] = QColor::fromRgb((c[1].red() + c[2].red()) / 2, (c[1].green() + c[2].green()) / 2, (c[1].blue() + c[2].blue()) / 2));
+                            p.fillRect(px.width() / 2, px.height() / 2, px.width() / 2, px.height() / 2,    m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2));
+
+                            QListWidgetItem * item = new QListWidgetItem();
+                            item->setData(Qt::UserRole, QVariantList() << m[0] << m[1] << m[2] << m[3]);
+                            item->setToolTip((QStringList() << QString("#%1").arg(color_num) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
+                            item->setIcon(px);
+                            ui->palettes->addItem(item);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void MainWindow::showEvent(QShowEvent *)
@@ -93,54 +136,6 @@ void MainWindow::resizeEvent(QResizeEvent *)
 {
     ui->palettes->scrollToItem(ui->palettes->currentItem(), QAbstractItemView::PositionAtCenter);
 }
-
-void MainWindow::on_baseColor_activated(int c0i)
-{
-    int row = qMax(ui->palettes->currentIndex().row(), 0);
-    int col = qMax(ui->palettes->currentIndex().column(), 0);
-    ui->palettes->clear();
-    int color_num = 0;
-    for (int c1i = 0; c1i < 8; c1i++)
-    {
-        for (int c2i = 0; c2i < 8; c2i++)
-        {
-            for (int c3i = 0; c3i < 8; c3i++)
-            {
-                for (int b0 = 0; b0 < 2; b0++)
-                {
-                    for (int b1 = 0; b1 < 2; b1++)
-                    {
-                        color_num++;
-
-                        QColor c[4];
-                        ZxColorEnum z[4];
-                        c[0] = color_table[z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0)];
-                        c[1] = color_table[z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0)];
-                        c[2] = color_table[z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1)];
-                        c[3] = color_table[z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1)];
-
-                        QPixmap px(64, 64);
-                        QPainter p(& px);
-                        QColor m[4];
-                        p.fillRect(0, 0, px.width() / 2, px.height() / 2,                               m[0] = QColor::fromRgb((c[0].red() + c[2].red()) / 2, (c[0].green() + c[2].green()) / 2, (c[0].blue() + c[2].blue()) / 2));
-                        p.fillRect(px.width() / 2, 0, px.width() / 2, px.height() / 2,                  m[1] = QColor::fromRgb((c[0].red() + c[3].red()) / 2, (c[0].green() + c[3].green()) / 2, (c[0].blue() + c[3].blue()) / 2));
-                        p.fillRect(0, px.height() / 2, px.width() / 2, px.height() / 2,                 m[2] = QColor::fromRgb((c[1].red() + c[2].red()) / 2, (c[1].green() + c[2].green()) / 2, (c[1].blue() + c[2].blue()) / 2));
-                        p.fillRect(px.width() / 2, px.height() / 2, px.width() / 2, px.height() / 2,    m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2));
-
-                        QListWidgetItem * item = new QListWidgetItem();
-                        item->setData(Qt::UserRole, QVariantList() << m[0] << m[1] << m[2] << m[3]);
-                        item->setToolTip((QStringList() << QString("#%1").arg(color_num) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
-                        item->setIcon(px);
-                        ui->palettes->addItem(item);
-                    }
-                }
-            }
-        }
-    }
-    ui->palettes->setCurrentIndex(ui->palettes->model()->index(row, col));
-    on_palettes_itemSelectionChanged();
-}
-
 
 void MainWindow::on_actionQuit_triggered()
 {
@@ -201,13 +196,14 @@ void MainWindow::drawGrid()
     int step = qMin((ui->canvas->width() - 1) / grid_x, (ui->canvas->height() - 1) / grid_y);
     int side_x = step * grid_x;
     int side_y = step * grid_y;
+    QColor grid_color(55, 55, 55);
     QPainter p(ui->canvas);
     p.fillRect(ui->canvas->rect(), Qt::black);
-    p.fillRect(ui->canvas->rect(), QBrush(Qt::gray, Qt::Dense6Pattern));
+    p.fillRect(ui->canvas->rect(), QBrush(grid_color, Qt::Dense6Pattern));
 
     drawPixels(& p, step);
 
-    p.setPen(Qt::gray);
+    p.setPen(grid_color);
     for (int y = 0; y <= grid_y; y++)
     {
         p.drawLine(0, y * step, side_x, y * step);
@@ -217,6 +213,7 @@ void MainWindow::drawGrid()
         p.drawLine(x * step, 0, x * step, side_y);
     }
     QMetaObject::invokeMethod(ui->preview, "update", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(ui->sourceImage, "update", Qt::QueuedConnection);
 }
 
 void MainWindow::drawDot(int x, int y)
@@ -386,25 +383,45 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
         switch (ev->type())
         {
             case QEvent::Paint:
-            if (!image.isNull())
+            if (!image.isNull() && image.alpha_layer.count() == grid_y)
             {               
                 int step = qMin(ui->preview->width() / grid_x, ui->preview->height() / grid_y);
                 int side_x = step * grid_x;
                 int side_y = step * grid_y;
 
                 QList<QColor> c = colors();
-                QImage pattern(2 * step, 2 * step, QImage::Format_RGB32);
+                QImage pattern(4 * step, 4 * step, QImage::Format_RGB32);
                 QPainter pp(& pattern);
-                for (int y = 0; y < 2; y++)
+                QList<int> idx = QList<int>() << 0 << 3 << 2 << 1 <<
+                                                 1 << 0 << 3 << 2 <<
+                                                 2 << 1 << 0 << 3 <<
+                                                 3 << 2 << 1 << 0;
+                for (int i = 0; i < idx.count(); i++)
                 {
-                    for (int x = 0; x < 2; x++)
-                    {
-                        pp.fillRect(x * step, y * step, step, step, c[y * 2 + x]);
-                    }
+                    pp.fillRect((i % 4) * step, (i / 4) * step, step, step, c[idx[i]]);
                 }
                 QPainter p(ui->preview);
                 p.fillRect(0, 0, side_x, side_y, pattern);
                 drawPixels(& p, step);
+            }
+            break;
+            default:
+            break;
+        }
+    }
+    else
+    if (o == ui->sourceImage)
+    {
+        switch (ev->type())
+        {
+            case QEvent::Paint:
+            if (!src_imp_image.isNull())
+            {
+                int step = qMin(ui->sourceImage->width() / grid_x, ui->sourceImage->height() / grid_y);
+                int side_x = step * grid_x;
+                int side_y = step * grid_y;
+                QPainter p(ui->sourceImage);
+                p.drawImage(0, 0, src_imp_image.scaled(side_x, side_y));
             }
             break;
             default:
@@ -602,8 +619,8 @@ void MainWindow::on_actionImport_triggered()
     {
         return;
     }
-    QImage src_img(filename);    
-    if (src_img.isNull())
+    src_imp_image = QImage(filename);
+    if (src_imp_image.isNull())
     {
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
         return;
@@ -615,25 +632,21 @@ void MainWindow::on_actionImport_triggered()
                                         "Use alpha channel", "Don't use alpha channel", "Cancel import");
     if (alpha_q == 2)
     {
+        src_imp_image = QImage();
         return;
     }
 
-    QImage src_img2(qMax(src_img.width(), src_img.height()), qMax(src_img.width(), src_img.height()), QImage::Format_ARGB32);
-    src_img2.fill(0);
-    QPainter sp(& src_img2);
-    sp.drawImage(0, 0, src_img);
-    ui->sourceImage->setPixmap(QPixmap::fromImage(src_img2).scaled(qMax(ui->preview->width(), ui->preview->height()), qMax(ui->preview->width(), ui->preview->height()), Qt::KeepAspectRatio, Qt::FastTransformation));
-
-    QImage img(src_img.scaled(grid_x, grid_y, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
+    src_imp_image = src_imp_image.convertToFormat(QImage::Format_ARGB32);
+    QImage img(src_imp_image.scaled(grid_x, grid_y, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
     img.fill(QColor(0, 0, 0, 0));
-    for (int y = 0; y < src_img.height(); y++)
+    for (int y = 0; y < src_imp_image.height(); y++)
     {
-        for (int x = 0; x < src_img.width(); x++)
+        for (int x = 0; x < src_imp_image.width(); x++)
         {
-            int ix = x * img.width() / src_img.width();
-            int iy = y * img.height() / src_img.height();
+            int ix = x * img.width() / src_imp_image.width();
+            int iy = y * img.height() / src_imp_image.height();
             QColor old_px = img.pixelColor(ix, iy).toHsl();
-            QColor new_px = src_img.pixelColor(x, y).toHsl();
+            QColor new_px = src_imp_image.pixelColor(x, y).toHsl();
             QColor px = new_px.hslSaturation() > old_px.hslSaturation() ? new_px : old_px;
             px.setHsl(
                         qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
