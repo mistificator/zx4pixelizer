@@ -98,8 +98,6 @@ void MainWindow::createPalettes()
                     {
                         for (int b1 = 0; b1 < 2; b1++)
                         {
-                            color_num++;
-
                             QColor c[4];
                             ZxColorEnum z[4];
                             c[0] = color_table[z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0)];
@@ -118,9 +116,11 @@ void MainWindow::createPalettes()
                             QListWidgetItem * item = new QListWidgetItem();
                             palettes << (QList<QColor>() << m[0] << m[1] << m[2] << m[3]);
                             item->setData(Qt::UserRole, color_num);
-                            item->setToolTip((QStringList() << QString("#%1").arg(color_num) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
+                            item->setToolTip((QStringList() << QString("#%1").arg(color_num + 1) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
                             item->setIcon(px);
                             ui->palettes->addItem(item);
+
+                            color_num++;
                         }
                     }
                 }
@@ -612,6 +612,37 @@ void MainWindow::on_actionResize_image_triggered()
     update();
 }
 
+QImage MainWindow::scaleImage(QImage img, int w, int h) const
+{
+    QImage out(img.convertToFormat(QImage::Format_ARGB32).scaled(w, h, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
+    out.fill(QColor(0, 0, 0, 0));
+    for (int y = 0; y < img.height(); y++)
+    {
+        for (int x = 0; x < img.width(); x++)
+        {
+            int ix = x * out.width() / img.width();
+            int iy = y * out.height() / img.height();
+            QColor old_px = out.pixelColor(ix, iy).toHsl();
+            QColor new_px = img.pixelColor(x, y).toHsl();
+            QColor px = new_px.hslSaturation() > old_px.hslSaturation() ? new_px : old_px;
+#if 0
+            px.setHsl(
+                        qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
+                        qMax<int>(qMin<int>(((px.hslSaturation() + 4) / 8) * 8, 255), 0),
+                        qMax<int>(qMin<int>(((px.lightness() + 4) / 8) * 8, 255), 0),
+                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
+#else
+            px.setHsl(
+                        px.hslHue(),
+                        px.hslSaturation(),
+                        px.lightness(),
+                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
+#endif
+            out.setPixelColor(ix, iy, px.toRgb());
+        }
+    }
+    return out;
+}
 
 void MainWindow::on_actionImport_triggered()
 {
@@ -638,38 +669,12 @@ void MainWindow::on_actionImport_triggered()
     }
 
     src_imp_image = src_imp_image.convertToFormat(QImage::Format_ARGB32);
-    QImage img(src_imp_image.scaled(grid_x, grid_y, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
-    img.fill(QColor(0, 0, 0, 0));
-    for (int y = 0; y < src_imp_image.height(); y++)
-    {
-        for (int x = 0; x < src_imp_image.width(); x++)
-        {
-            int ix = x * img.width() / src_imp_image.width();
-            int iy = y * img.height() / src_imp_image.height();
-            QColor old_px = img.pixelColor(ix, iy).toHsl();
-            QColor new_px = src_imp_image.pixelColor(x, y).toHsl();
-            QColor px = new_px.hslSaturation() > old_px.hslSaturation() ? new_px : old_px;
-#if 0
-            px.setHsl(
-                        qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
-                        qMax<int>(qMin<int>(((px.hslSaturation() + 4) / 8) * 8, 255), 0),
-                        qMax<int>(qMin<int>(((px.lightness() + 4) / 8) * 8, 255), 0),
-                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
-#else
-            px.setHsl(
-                        px.hslHue(),
-                        px.hslSaturation(),
-                        px.lightness(),
-                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
-#endif
-            img.setPixelColor(ix, iy, px.toRgb());
-        }
-    }
+    QImage img = scaleImage(src_imp_image, grid_x, grid_y);
 
     bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
 
     QMultiMap<int, QColor> color_distrib;
-    QImage detect_colors_img = img.convertToFormat(QImage::Format_Indexed8);
+    QImage detect_colors_img = scaleImage(src_imp_image, 192, 192).convertToFormat(QImage::Format_Indexed8); // kind of hack
     QByteArray ba = QByteArray::fromRawData(reinterpret_cast<const char *>(detect_colors_img.constBits()), detect_colors_img.width() * detect_colors_img.height());
     for (int i = 0; i < detect_colors_img.colorTable().count(); i++)
     {
@@ -705,7 +710,7 @@ void MainWindow::on_actionImport_triggered()
     for (int i = 0; i < palettes.count(); i++)
     {
         QList<QColor> pal = palettes[i];
-        if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3])
+        if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3] || pal[1] == pal[2])
         {
             continue;
         }

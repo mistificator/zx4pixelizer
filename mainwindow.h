@@ -63,6 +63,7 @@ private:
     void moveImage(int dx, int dy);
     void resizeGrid();
     void createPalettes();
+    QImage scaleImage(QImage img, int w, int h) const;
 
     void showEvent(QShowEvent *);
     void resizeEvent(QResizeEvent *);
