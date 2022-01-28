@@ -418,10 +418,19 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
             if (!src_imp_image.isNull())
             {
                 int step = qMin(ui->sourceImage->width() / grid_x, ui->sourceImage->height() / grid_y);
+
                 int side_x = step * grid_x;
                 int side_y = step * grid_y;
+                if (src_imp_image.width() < src_imp_image.height())
+                {
+                    side_x = src_imp_image.width() * side_x / src_imp_image.height();
+                }
+                else
+                {
+                    side_y = src_imp_image.height() * side_y / src_imp_image.width();
+                }
                 QPainter p(ui->sourceImage);
-                p.drawImage(0, 0, src_imp_image.scaled(side_x, side_y));
+                p.drawImage((step * grid_x - side_x) / 2, (step * grid_y - side_y) / 2, src_imp_image.scaled(side_x, side_y));
             }
             break;
             default:
@@ -648,11 +657,19 @@ void MainWindow::on_actionImport_triggered()
             QColor old_px = img.pixelColor(ix, iy).toHsl();
             QColor new_px = src_imp_image.pixelColor(x, y).toHsl();
             QColor px = new_px.hslSaturation() > old_px.hslSaturation() ? new_px : old_px;
+#if 0
             px.setHsl(
                         qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
                         qMax<int>(qMin<int>(((px.hslSaturation() + 4) / 8) * 8, 255), 0),
                         qMax<int>(qMin<int>(((px.lightness() + 4) / 8) * 8, 255), 0),
                         new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
+#else
+            px.setHsl(
+                        px.hslHue(),
+                        px.hslSaturation(),
+                        px.lightness(),
+                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
+#endif
             img.setPixelColor(ix, iy, px.toRgb());
         }
     }
@@ -715,10 +732,12 @@ void MainWindow::on_actionImport_triggered()
         img = img.convertToFormat(QImage::Format_Indexed8, color_table);
     }
 
-    grid_x = img.width();
-    grid_y = img.height();
+    grid_x = qMax(img.width(), grid_x);
+    grid_y = qMax(img.height(), grid_y);
     ui->actionNew->trigger();
 
+    int x_offs = (grid_x - img.width()) / 2;
+    int y_offs = (grid_y - img.height()) / 2;
     for (int y = 0; y < img.height(); y++)
     {
         for (int x = 0; x < img.width(); x++)
@@ -727,19 +746,19 @@ void MainWindow::on_actionImport_triggered()
             if (idx >= 0 && idx < 4)
             {
                 current_color = idx;
-                drawDot(x, y);
+                drawDot(x_offs + x, y_offs + y);
             }
         }
     }
     ui->canvas->update();
 
-/*
+#if 0
     QLabel * w = new QLabel();
     w->setScaledContents(true);
     w->setPixmap(QPixmap::fromImage(img));
     w->resize(4 * img.width(), 4 * img.height());
     w->show();
-*/
+#endif
 }
 
 
