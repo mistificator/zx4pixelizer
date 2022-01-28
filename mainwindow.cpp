@@ -116,7 +116,8 @@ void MainWindow::createPalettes()
                             p.fillRect(px.width() / 2, px.height() / 2, px.width() / 2, px.height() / 2,    m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2));
 
                             QListWidgetItem * item = new QListWidgetItem();
-                            item->setData(Qt::UserRole, QVariantList() << m[0] << m[1] << m[2] << m[3]);
+                            palettes << (QList<QColor>() << m[0] << m[1] << m[2] << m[3]);
+                            item->setData(Qt::UserRole, color_num);
                             item->setToolTip((QStringList() << QString("#%1").arg(color_num) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
                             item->setIcon(px);
                             ui->palettes->addItem(item);
@@ -448,16 +449,7 @@ QList<QColor> MainWindow::colors() const
     {
         return list;
     }
-    QVariantList v = item->data(Qt::UserRole).toList();
-    if (v.isEmpty() || v.count() != 4)
-    {
-        return list;
-    }
-    list[0] = v.takeFirst().value<QColor>();
-    list[1] = v.takeFirst().value<QColor>();
-    list[2] = v.takeFirst().value<QColor>();
-    list[3] = v.takeFirst().value<QColor>();
-    return list;
+    return palettes.at(item->data(Qt::UserRole).toInt());
 }
 
 void MainWindow::on_palettes_itemSelectionChanged()
@@ -674,6 +666,82 @@ void MainWindow::on_actionImport_triggered()
         }
     }
 
+    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+
+    QMultiMap<int, QColor> color_distrib;
+    QImage detect_colors_img = img.convertToFormat(QImage::Format_Indexed8);
+    QByteArray ba = QByteArray::fromRawData(reinterpret_cast<const char *>(detect_colors_img.constBits()), detect_colors_img.width() * detect_colors_img.height());
+    for (int i = 0; i < detect_colors_img.colorTable().count(); i++)
+    {
+        color_distrib.insert(ba.count(static_cast<char>(i)), detect_colors_img.colorTable().at(i));
+    }
+
+    int k = 0;
+    QList<QColor> color_distrib4;
+    for (auto i = color_distrib.begin(); i != color_distrib.end() && k < 4;)
+    {
+        if (!src_alpha_channel)
+        {
+            if (i.value() == detect_colors_img.pixel(0, 0))
+            {
+                i = color_distrib.erase(i);
+                continue;
+            }
+        }
+        else
+        {
+            if (i.value().alpha() < 128)
+            {
+                i = color_distrib.erase(i);
+                continue;
+            }
+        }
+        color_distrib4 << i.value();
+        ++i;
+        ++k;
+    }
+
+    QMultiMap<int, int> dist;
+    for (int i = 0; i < palettes.count(); i++)
+    {
+        QList<QColor> pal = palettes[i];
+        if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3])
+        {
+            continue;
+        }
+        int d = 0;
+        foreach (QColor p, pal)
+        {
+            QColor p_hsl = p.toHsl();
+            int p_h = p_hsl.hslHue();
+            int p_s = p_hsl.hslSaturation();
+            int p_l = p_hsl.lightness();
+            foreach(QColor c, color_distrib4)
+            {
+                QColor c_hsl = c.toHsl();
+                int c_h = c_hsl.hslHue();
+                int c_s = c_hsl.hslSaturation();
+                int c_l = c_hsl.lightness();
+                if (p_h < c_h)
+                {
+                    p_h += 360;
+                }
+                int _d = p_h - c_h;
+                if (_d > 180)
+                {
+                    _d = 360 - _d;
+                }
+                if (qAbs(p_s - c_s) + qAbs(p_l - c_l) > 96)
+                {
+                    _d += 90;
+                }
+                d += _d;
+            }
+        }
+        dist.insert(d, i);
+    }
+
+    ui->palettes->setCurrentItem(ui->palettes->item(dist.first()));
 
     QVector<QRgb> color_table;
     foreach (QColor color, colors())
@@ -681,35 +749,35 @@ void MainWindow::on_actionImport_triggered()
         color_table << color.rgb();
     }
 
+    QRgb alpha_pixel;
     if (alpha_q == 0)
     {
-        bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
-        QRgb alpha_pixel;
+        if (!src_alpha_channel)
         {
-            if (!src_alpha_channel)
+            alpha_pixel = img.pixel(0, 0);
+        }
+        else
+        {
+            alpha_pixel = color_table.first() & 0x00FFFFFF; // duplicate color with full opacity
+            for (int y = 0; y < img.height(); y++)
             {
-                alpha_pixel = img.pixel(0, 0);
-                color_table << alpha_pixel;
-            }
-            else
-            {
-                alpha_pixel = color_table.first() & 0x00FFFFFF; // duplicate color with full opacity
-                color_table << alpha_pixel;
-                for (int y = 0; y < img.height(); y++)
+                for (int x = 0; x < img.width(); x++)
                 {
-                    for (int x = 0; x < img.width(); x++)
+                    if (qAlpha(img.pixel(x, y)) < 128)
                     {
-                        if (qAlpha(img.pixel(x, y)) < 128)
-                        {
-                            img.setPixel(x, y, alpha_pixel);
-                        }
+                        img.setPixel(x, y, alpha_pixel);
                     }
                 }
             }
         }
 
-        img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+        color_table << alpha_pixel;
+    }
 
+    img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+
+    if (alpha_q == 0)
+    {
         if (!src_alpha_channel)
         {
             alpha_pixel = img.pixel(0, 0);
@@ -726,10 +794,6 @@ void MainWindow::on_actionImport_triggered()
         }
         color_table.last() = qRgba(0, 0, 0, 0);
         img.setColorTable(color_table);
-    }
-    else
-    {
-        img = img.convertToFormat(QImage::Format_Indexed8, color_table);
     }
 
     grid_x = qMax(img.width(), grid_x);

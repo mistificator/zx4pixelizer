@@ -45,6 +45,7 @@ private:
     int grid_x = 64, grid_y = 64;
     int current_color = 0;
     QList<QColor> colors() const;
+    QList<QList<QColor>> palettes;
 
     struct Zx4Image
     {
