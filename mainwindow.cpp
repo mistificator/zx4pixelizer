@@ -5,6 +5,7 @@
 #include <QResizeEvent>
 #include <QInputDialog>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QDebug>
 #include <QMessageBox>
 
@@ -146,6 +147,30 @@ void MainWindow::on_actionQuit_triggered()
     close();
 }
 
+int MainWindow::colorIndex(int x, int y) const
+{
+    int i;
+    if (!image.color_layer0[y][x] && !image.color_layer1[y][x])
+    {
+        i = 0;
+    }
+    else
+    if (!image.color_layer0[y][x] && image.color_layer1[y][x])
+    {
+        i = 1;
+    }
+    else
+    if (image.color_layer0[y][x] && !image.color_layer1[y][x])
+    {
+        i = 2;
+    }
+    else
+    {
+        i = 3;
+    }
+    return i;
+}
+
 void MainWindow::drawPixels(QPainter * p, int step)
 {
     QList<QColor> list = colors();
@@ -155,26 +180,7 @@ void MainWindow::drawPixels(QPainter * p, int step)
         {
             if (image.alpha_layer[y][x])
             {
-                QColor c;
-                if (!image.color_layer0[y][x] && !image.color_layer1[y][x])
-                {
-                    c = list[0];
-                }
-                else
-                if (!image.color_layer0[y][x] && image.color_layer1[y][x])
-                {
-                    c = list[1];
-                }
-                else
-                if (image.color_layer0[y][x] && !image.color_layer1[y][x])
-                {
-                    c = list[2];
-                }
-                else
-                {
-                    c = list[3];
-                }
-                p->fillRect(x * step, y * step, step, step, c);
+                p->fillRect(x * step, y * step, step, step, list[colorIndex(x, y)]);
             }
         }
     }
@@ -515,7 +521,7 @@ void MainWindow::on_actionResize_canvas_triggered()
     {
         return;
     }
-    int new_grid_y = QInputDialog::getInt(this, "Height", "New canvas height", grid_y, 1, 255, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    int new_grid_y = QInputDialog::getInt(this, "Height", "New canvas height", grid_y, 1, 192, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     if (!ok)
     {
         return;
@@ -534,7 +540,7 @@ void MainWindow::on_actionResize_image_triggered()
     {
         return;
     }
-    int new_image_y = QInputDialog::getInt(this, "Height", "New image height", grid_y, 1, 255, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    int new_image_y = QInputDialog::getInt(this, "Height", "New image height", grid_y, 1, 192, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     if (!ok)
     {
         return;
@@ -825,6 +831,43 @@ void MainWindow::drawImage(QImage img)
 #endif
 }
 
+void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
+{
+    on_palettes_itemSelectionChanged();
+}
+
+void MainWindow::on_actionNew_triggered()
+{
+    image = Zx4Image();
+    resizeGrid();
+    update();
+}
+
+void MainWindow::on_actionImportWizardApply_triggered()
+{
+    drawImage(importImage(src_imp_image, ui->wizardPaletteBox->currentIndex() == 0 ? selectPalette(src_imp_image).first() : ui->palettes->currentRow(), ui->alphaBox->isChecked()));
+}
+
+
+void MainWindow::on_actionInvert_colors_triggered()
+{
+    if (image.isNull())
+    {
+        return;
+    }
+    for (int y = 0; y < grid_y; y++)
+    {
+        QVector<char> & line0 = image.color_layer0[y];
+        QVector<char> & line1 = image.color_layer1[y];
+        for (int x = 0; x < grid_x; x++)
+        {
+            line0[x] = line0[x] ? 0 : 1;
+            line1[x] = line1[x] ? 0 : 1;
+        }
+    }
+    update();
+}
+
 void MainWindow::on_actionImport_triggered()
 {
     QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
@@ -842,21 +885,81 @@ void MainWindow::on_actionImport_triggered()
     ui->actionImportWizardApply->trigger();
 }
 
-
-void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
+void MainWindow::on_actionOpen_triggered()
 {
-    on_palettes_itemSelectionChanged();
-}
+    QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "Images (*.zx4.png)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
 
-void MainWindow::on_actionNew_triggered()
-{
-    image = Zx4Image();
-    resizeGrid();
+    src_imp_image = QImage(filename);
+    if (src_imp_image.isNull())
+    {
+        QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
+        return;
+    }
+
+    if (src_imp_image.width() > 255 || src_imp_image.height() > 192)
+    {
+        src_imp_image = QImage();
+        QMessageBox::critical(this, "Error", "Wrong image size");
+        return;
+    }
+
+    if (src_imp_image.colorTable().count() != 5)
+    {
+        src_imp_image = QImage();
+        QMessageBox::critical(this, "Error", "Wrong image color table");
+        return;
+    }
+
+    grid_x = qMin(src_imp_image.width(), 255);
+    grid_y = qMin(src_imp_image.height(), 192);
+    ui->actionNew->trigger();
+    drawImage(src_imp_image);
+
+    src_imp_image = src_imp_image.convertToFormat(QImage::Format_ARGB32);
     update();
 }
 
-void MainWindow::on_actionImportWizardApply_triggered()
+
+void MainWindow::on_actionSave_as_triggered()
 {
-    drawImage(importImage(src_imp_image, ui->wizardPaletteBox->currentIndex() == 0 ? selectPalette(src_imp_image).first() : ui->palettes->currentRow(), ui->alphaBox->isChecked()));
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "Images (*.zx4.png)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
+    if (QFileInfo(filename).suffix().isEmpty())
+    {
+        filename += ".zx4.png";
+    }
+    QImage img(grid_x, grid_y, QImage::Format_Indexed8);
+    QVector<QRgb> color_table;
+    foreach(QColor color, colors())
+    {
+        color_table << color.rgb();
+    }
+    color_table << 0; // alpha
+    img.setColorTable(color_table);
+    for (int y = 0; y < grid_y; y++)
+    {
+        for (int x = 0; x < grid_x; x++)
+        {
+            if (!image.alpha_layer[y][x])
+            {
+                img.setPixel(x, y, 4);
+            }
+            else
+            {
+                img.setPixel(x, y, colorIndex(x, y));
+            }
+        }
+    }
+    if (!img.save(filename, "png"))
+    {
+        QMessageBox::critical(this, "Error", "Error occured while file saving");
+    }
 }
 

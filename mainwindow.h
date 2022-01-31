@@ -35,6 +35,12 @@ private slots:
 
     void on_actionImportWizardApply_triggered();
 
+    void on_actionInvert_colors_triggered();
+
+    void on_actionOpen_triggered();
+
+    void on_actionSave_as_triggered();
+
 private:
     Ui::MainWindow *ui;
 
@@ -58,6 +64,7 @@ private:
     QPoint old_grid_pos;
     QImage src_imp_image;
 
+    int colorIndex(int x, int y) const;
     void drawPixels(QPainter * p, int step);
     void drawDot(int x, int y);
     void drawBrush(int x, int y);

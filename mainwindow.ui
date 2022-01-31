@@ -84,13 +84,25 @@
     <property name="title">
      <string>Tools</string>
     </property>
-    <addaction name="actionResize_image"/>
-    <addaction name="actionResize_canvas"/>
-    <addaction name="separator"/>
-    <addaction name="actionPencil"/>
-    <addaction name="actionBrush"/>
-    <addaction name="actionMove"/>
-    <addaction name="actionEraser"/>
+    <widget class="QMenu" name="menuDraw_tools">
+     <property name="title">
+      <string>Draw tools</string>
+     </property>
+     <addaction name="actionPencil"/>
+     <addaction name="actionBrush"/>
+     <addaction name="actionMove"/>
+     <addaction name="actionEraser"/>
+    </widget>
+    <widget class="QMenu" name="menuTransform_tools">
+     <property name="title">
+      <string>Transform tools</string>
+     </property>
+     <addaction name="actionResize_image"/>
+     <addaction name="actionResize_canvas"/>
+     <addaction name="actionInvert_colors"/>
+    </widget>
+    <addaction name="menuDraw_tools"/>
+    <addaction name="menuTransform_tools"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
@@ -440,7 +452,7 @@
         <enum>Qt::LeftToRight</enum>
        </property>
        <property name="text">
-        <string>Apply</string>
+        <string>Reimport</string>
        </property>
       </widget>
      </item>
@@ -499,6 +511,15 @@
      </item>
     </layout>
    </widget>
+  </widget>
+  <widget class="QDockWidget" name="dockTransformTools">
+   <property name="windowTitle">
+    <string>Transform tools</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>1</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_6"/>
   </widget>
   <action name="actionQuit">
    <property name="text">
@@ -602,7 +623,12 @@
   </action>
   <action name="actionImportWizardApply">
    <property name="text">
-    <string>Apply</string>
+    <string>Reimport</string>
+   </property>
+  </action>
+  <action name="actionInvert_colors">
+   <property name="text">
+    <string>Invert colors</string>
    </property>
   </action>
  </widget>
