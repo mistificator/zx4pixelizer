@@ -789,31 +789,8 @@ QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
     return img;
 }
 
-void MainWindow::on_actionImport_triggered()
+void MainWindow::drawImage(QImage img)
 {
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
-    if (filename.isEmpty())
-    {
-        return;
-    }
-    src_imp_image = QImage(filename).convertToFormat(QImage::Format_ARGB32);
-    if (src_imp_image.isNull())
-    {
-        QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
-        return;
-    }
-
-    int alpha_q = QMessageBox::question(this,
-                                        "Alpha channel",
-                                        "Import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey",
-                                        "Use alpha channel", "Don't use alpha channel", "Cancel import");
-    if (alpha_q == 2)
-    {
-        src_imp_image = QImage();
-        return;
-    }
-
-    QImage img = importImage(src_imp_image, selectPalette(src_imp_image).first(), alpha_q == 0);
     QVector<QRgb> color_table = img.colorTable();
 
     grid_x = qMax(img.width(), grid_x);
@@ -843,6 +820,33 @@ void MainWindow::on_actionImport_triggered()
     w->resize(4 * img.width(), 4 * img.height());
     w->show();
 #endif
+}
+
+void MainWindow::on_actionImport_triggered()
+{
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
+    src_imp_image = QImage(filename).convertToFormat(QImage::Format_ARGB32);
+    if (src_imp_image.isNull())
+    {
+        QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
+        return;
+    }
+
+    int alpha_q = QMessageBox::question(this,
+                                        "Alpha channel",
+                                        "Import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey",
+                                        "Use alpha channel", "Don't use alpha channel", "Cancel import");
+    if (alpha_q == 2)
+    {
+        src_imp_image = QImage();
+        return;
+    }
+
+    drawImage(importImage(src_imp_image, selectPalette(src_imp_image).first(), alpha_q == 0));
 }
 
 

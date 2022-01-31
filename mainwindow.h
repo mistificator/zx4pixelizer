@@ -66,6 +66,7 @@ private:
     QImage scaleImage(QImage img, int w, int h) const;
     QMultiMap<int, int> selectPalette(QImage img) const;
     QImage importImage(QImage img, int palette_number, bool use_alpha);
+    void drawImage(QImage img);
 
     void showEvent(QShowEvent *);
     void resizeEvent(QResizeEvent *);
