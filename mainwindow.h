@@ -64,6 +64,8 @@ private:
     void resizeGrid();
     void createPalettes();
     QImage scaleImage(QImage img, int w, int h) const;
+    QMultiMap<int, int> selectPalette(QImage img) const;
+    QImage importImage(QImage img, int palette_number, bool use_alpha);
 
     void showEvent(QShowEvent *);
     void resizeEvent(QResizeEvent *);
