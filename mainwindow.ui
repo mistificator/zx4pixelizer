@@ -425,6 +425,81 @@
     </layout>
    </widget>
   </widget>
+  <widget class="QDockWidget" name="dockWizard">
+   <property name="windowTitle">
+    <string>Import wizard</string>
+   </property>
+   <attribute name="dockWidgetArea">
+    <number>2</number>
+   </attribute>
+   <widget class="QWidget" name="dockWidgetContents_5">
+    <layout class="QGridLayout" name="gridLayout_6">
+     <item row="2" column="2">
+      <widget class="QToolButton" name="importWizardApply">
+       <property name="layoutDirection">
+        <enum>Qt::LeftToRight</enum>
+       </property>
+       <property name="text">
+        <string>Apply</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1" colspan="2">
+      <widget class="QComboBox" name="wizardPaletteBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <item>
+        <property name="text">
+         <string>auto selection (any colors)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>current selection</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="0" column="0" colspan="3">
+      <widget class="QCheckBox" name="alphaBox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked ithen import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Alpha channel</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Palette</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2">
+      <spacer name="verticalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </widget>
+  </widget>
   <action name="actionQuit">
    <property name="text">
     <string>Quit</string>
@@ -523,6 +598,11 @@
    </property>
    <property name="text">
     <string>Move</string>
+   </property>
+  </action>
+  <action name="actionImportWizardApply">
+   <property name="text">
+    <string>Apply</string>
    </property>
   </action>
  </widget>

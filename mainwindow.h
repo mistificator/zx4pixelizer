@@ -33,6 +33,8 @@ private slots:
     void on_palettes_itemClicked(QListWidgetItem *item);
     void on_actionNew_triggered();
 
+    void on_actionImportWizardApply_triggered();
+
 private:
     Ui::MainWindow *ui;
 

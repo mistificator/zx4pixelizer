@@ -62,11 +62,14 @@ MainWindow::MainWindow(QWidget *parent)
     ui->moveButton->setDefaultAction(ui->actionMove);
     ui->eraserButton->setDefaultAction(ui->actionEraser);
 
+    ui->importWizardApply->setDefaultAction(ui->actionImportWizardApply);
+
     ui->menuWindow->addAction(ui->dockPalette->toggleViewAction());
     ui->menuWindow->addAction(ui->dockDrawTools->toggleViewAction());
     ui->menuWindow->addAction(ui->dockPreview->toggleViewAction());
     ui->menuWindow->addAction(ui->dockSource->toggleViewAction());
     tabifyDockWidget(ui->dockPreview, ui->dockSource);
+    tabifyDockWidget(ui->dockSource, ui->dockWizard);
     ui->dockPreview->raise();
 
     createPalettes();
@@ -836,17 +839,7 @@ void MainWindow::on_actionImport_triggered()
         return;
     }
 
-    int alpha_q = QMessageBox::question(this,
-                                        "Alpha channel",
-                                        "Import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey",
-                                        "Use alpha channel", "Don't use alpha channel", "Cancel import");
-    if (alpha_q == 2)
-    {
-        src_imp_image = QImage();
-        return;
-    }
-
-    drawImage(importImage(src_imp_image, selectPalette(src_imp_image).first(), alpha_q == 0));
+    ui->actionImportWizardApply->trigger();
 }
 
 
@@ -861,3 +854,9 @@ void MainWindow::on_actionNew_triggered()
     resizeGrid();
     update();
 }
+
+void MainWindow::on_actionImportWizardApply_triggered()
+{
+    drawImage(importImage(src_imp_image, ui->wizardPaletteBox->currentIndex() == 0 ? selectPalette(src_imp_image).first() : ui->palettes->currentRow(), ui->alphaBox->isChecked()));
+}
+
