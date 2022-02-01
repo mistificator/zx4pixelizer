@@ -32,16 +32,15 @@ private slots:
     void on_actionImport_triggered();
     void on_palettes_itemClicked(QListWidgetItem *item);
     void on_actionNew_triggered();
-
     void on_actionImportWizardApply_triggered();
-
     void on_actionInvert_colors_triggered();
-
     void on_actionOpen_triggered();
-
     void on_actionSave_as_triggered();
-
     void on_wizardPaletteBox_currentIndexChanged(int index);
+
+    void on_actionSave_triggered();
+
+    void on_actionImport_scene_triggered();
 
 private:
     Ui::MainWindow *ui;
@@ -64,6 +63,7 @@ private:
     };
     Zx4Image image, stored_image;
     QPoint old_grid_pos;
+    QString current_file_name;
     QImage src_imp_image;
 
     int colorIndex(int x, int y) const;
