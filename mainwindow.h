@@ -41,6 +41,8 @@ private slots:
 
     void on_actionSave_as_triggered();
 
+    void on_wizardPaletteBox_currentIndexChanged(int index);
+
 private:
     Ui::MainWindow *ui;
 

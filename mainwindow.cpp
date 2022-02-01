@@ -74,7 +74,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->dockPreview->raise();
 
     createPalettes();
-    ui->palettes->setCurrentItem(ui->palettes->item(1006 - 1));
+    ui->palettes->setCurrentItem(ui->palettes->item(615 - 1));
     ui->palettes->setStyleSheet("QListWidget::item:selected { background: rgb(100, 255, 100); }");
 }
 
@@ -88,13 +88,13 @@ void MainWindow::createPalettes()
     int color_num = 0;
     for (int c0i = 0; c0i < 8; c0i++)
     {
-        for (int c1i = c0i; c1i < 8; c1i++)
+        for (int c1i = c0i + 1; c1i < 8; c1i++)
         {
             for (int c2i = 0; c2i < 8; c2i++)
             {
-                for (int c3i = c2i; c3i < 8; c3i++)
+                for (int c3i = c2i + 1; c3i < 8; c3i++)
                 {
-                    if (c0i == c1i && c2i == c3i)
+                    if ((c0i == c1i && c2i == c3i) || (c1i == c2i))
                     {
                         continue;
                     }
@@ -730,6 +730,7 @@ QMultiMap<int, int> MainWindow::selectPalette(QImage img) const
         dist.insert(d, i);
     }
 
+    ui->paletteNumberBox->setRange(1, dist.count() + 1);
     qDebug() << "selectPalette" << dist;
 
     return dist;
@@ -845,7 +846,7 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionImportWizardApply_triggered()
 {
-    drawImage(importImage(src_imp_image, ui->wizardPaletteBox->currentIndex() == 0 ? selectPalette(src_imp_image).first() : ui->palettes->currentRow(), ui->alphaBox->isChecked()));
+    drawImage(importImage(src_imp_image, ui->wizardPaletteBox->currentIndex() == 0 ? * (selectPalette(src_imp_image).begin() + (ui->paletteNumberBox->value() - 1)) : ui->palettes->currentRow(), ui->alphaBox->isChecked()));
 }
 
 
@@ -961,5 +962,11 @@ void MainWindow::on_actionSave_as_triggered()
     {
         QMessageBox::critical(this, "Error", "Error occured while file saving");
     }
+}
+
+
+void MainWindow::on_wizardPaletteBox_currentIndexChanged(int index)
+{
+    ui->paletteNumberBox->setEnabled(ui->wizardPaletteBox->currentIndex() == 0);
 }
 

@@ -446,15 +446,25 @@
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_5">
     <layout class="QGridLayout" name="gridLayout_6">
-     <item row="2" column="2">
-      <widget class="QToolButton" name="importWizardApply">
-       <property name="layoutDirection">
-        <enum>Qt::LeftToRight</enum>
-       </property>
+     <item row="1" column="0">
+      <widget class="QLabel" name="label">
        <property name="text">
-        <string>Reimport</string>
+        <string>Palette</string>
        </property>
       </widget>
+     </item>
+     <item row="4" column="2">
+      <spacer name="verticalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>40</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item row="1" column="1" colspan="2">
       <widget class="QComboBox" name="wizardPaletteBox">
@@ -476,6 +486,16 @@
        </item>
       </widget>
      </item>
+     <item row="3" column="2">
+      <widget class="QToolButton" name="importWizardApply">
+       <property name="layoutDirection">
+        <enum>Qt::LeftToRight</enum>
+       </property>
+       <property name="text">
+        <string>Reimport</string>
+       </property>
+      </widget>
+     </item>
      <item row="0" column="0" colspan="3">
       <widget class="QCheckBox" name="alphaBox">
        <property name="toolTip">
@@ -489,25 +509,15 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Palette</string>
+     <item row="2" column="2">
+      <widget class="QSpinBox" name="paletteNumberBox">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>1</number>
        </property>
       </widget>
-     </item>
-     <item row="3" column="2">
-      <spacer name="verticalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>40</height>
-        </size>
-       </property>
-      </spacer>
      </item>
     </layout>
    </widget>
