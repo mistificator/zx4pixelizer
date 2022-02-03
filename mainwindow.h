@@ -75,7 +75,10 @@ private:
     void resizeGrid();
     void createPalettes();
     QImage scaleImage(QImage img, int w, int h) const;
-    QMultiMap<double, int> selectPalette(QImage img, int scale_x = 192, int scale_y = 192) const;
+    QMultiMap<int, QColor> colorDistribution(QImage img) const;
+    bool alikeColors(QColor c1, QColor c2, int hue_precision = 20) const;
+    QMap<QColor, int> colorDistribution4(QImage img, int scale_x = 256, int scale_y = 256) const;
+    QMultiMap<double, int> selectPalette(QImage img, int scale_x = 256, int scale_y = 256) const;
     QImage importImage(QImage img, int palette_number, bool use_alpha);
     void drawImage(QImage img);
 

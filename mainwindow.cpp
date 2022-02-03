@@ -677,14 +677,13 @@ template <> inline bool qMapLessThanKey<QColor>(const QColor &key1, const QColor
     return key1.rgb() < key2.rgb();
 }
 
-QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int scale_y) const
+QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img) const
 {
     bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
 
     QMap<QColor, int> color_distrib;
     QMultiMap<int, QColor> color_distrib2;
-    QImage img_scaled = scaleImage(img, qMin(img.width(), scale_x), qMin(img.height(), scale_y));
-    QImage detect_colors_img = img_scaled.convertToFormat(QImage::Format_Indexed8); // kind of hack
+    QImage detect_colors_img = img.convertToFormat(QImage::Format_Indexed8);
     QByteArray ba = QByteArray::fromRawData(reinterpret_cast<const char *>(detect_colors_img.constBits()), detect_colors_img.width() * detect_colors_img.height());
     QVector<QRgb> color_table = detect_colors_img.colorTable();
     for (int i = 0; i < color_table.count(); i++)
@@ -696,11 +695,11 @@ QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int sc
         }
     }
 
-    for (int y = 0; y < img_scaled.height(); y++)
+    for (int y = 0; y < img.height(); y++)
     {
-        for (int x = 0; x < img_scaled.width(); x++)
+        for (int x = 0; x < img.width(); x++)
         {
-            if ((src_alpha_channel && qAlpha(img_scaled.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
+            if ((src_alpha_channel && qAlpha(img.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
             {
                 color_distrib.remove(detect_colors_img.pixel(x, y));
             }
@@ -715,15 +714,53 @@ QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int sc
         }
     }
 
+    return color_distrib2;
+}
+
+bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision) const
+{
+    c1 = c1.toHsl();
+    c2 = c2.toHsl();
+    int c1_h = c1.hslHue();
+    int c2_h = c2.hslHue();
+    if (c1_h != -1 && c2_h != -1)
+    {
+        if (c1_h < c2_h)
+        {
+            c1_h += 360;
+        }
+        int _d = c1_h - c2_h;
+        if (_d > 180)
+        {
+            _d = 360 - _d;
+        }
+        if (_d > hue_precision)
+        {
+            return false;
+        }
+    }
+    if (qAbs(c1.lightness() - c2.lightness()) > 50)
+    {
+        return false;
+    }
+    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > 100)
+    {
+        return false;
+    }
+    return true;
+}
+
+QMap<QColor, int> MainWindow::colorDistribution4(QImage img, int scale_x, int scale_y) const
+{
+    QMultiMap<int, QColor> color_distrib2 = colorDistribution(scaleImage(img, qMin(img.width(), scale_x), qMin(img.height(), scale_y)));
+
     QMap<QColor, int> color_distrib4;
-    //    for (auto i = color_distrib2.begin(); i != color_distrib2.end() && color_distrib4.count() < 4; ++i)
-    //    {
     QColor prev_c, val_c;
     for (auto i = color_distrib2.end(); i != color_distrib2.begin() && color_distrib4.count() < 4;)
     {
         --i;
         QColor c = i.value().toHsl();
-        if (!prev_c.isValid() || !(qAbs(c.hslHue() - prev_c.hslHue()) < 20 && qAbs(c.lightness() - prev_c.lightness()) < 50))
+        if (!prev_c.isValid() || !alikeColors(c, prev_c))
         {
             color_distrib4[val_c = c] = i.key();
         }
@@ -735,6 +772,12 @@ QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int sc
         prev_c = c;
     }
 
+    return color_distrib4;
+}
+
+QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int scale_y) const
+{
+    QMap<QColor, int> color_distrib4 = colorDistribution4(img, scale_x, scale_y);
 //    qDebug() << color_distrib4;
 
     QMultiMap<double, int> dist;
@@ -1061,42 +1104,102 @@ void MainWindow::on_actionImport_scene_triggered()
     {
         return;
     }
-    QImage img = QImage(filename).convertToFormat(QImage::Format_ARGB32);
+    QImage img = QImage(filename).convertToFormat(QImage::Format_RGB32);
     if (img.isNull())
     {
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
         return;
     }
 
-    img = scaleImage(img, qMin(img.width(), 256), qMin(img.height(), 192));
+    img = scaleImage(img, qMin(img.width(), 256), qMin(img.height(), 192)).convertToFormat(QImage::Format_Indexed8);
 
-    QImage out(img.width(), img.height(), QImage::Format_ARGB32);
+    QImage out(img.width(), img.height(), QImage::Format_RGB32);
     QPainter p(& out);
     for (int y = 0; y < img.height(); y += 8)
     {
         for (int x = 0; x < img.width(); x += 8)
         {
-            const int quad_sz = 80;
-            QImage quad = img.copy(QRect(x - (quad_sz / 2 - 4), y - (quad_sz / 2 - 4), quad_sz, quad_sz));
-            QMultiMap<double, int> dist = selectPalette(quad, quad_sz, quad_sz);
+            const int quad_sz = 40;
+            const int offs = ((quad_sz - 8) / 2);
+            QRect r1(qMin(qMax(x - offs, 0), img.width() - quad_sz), qMin(qMax(y - offs, 0), img.height() - quad_sz), quad_sz, quad_sz);
+            QRect r2(x - r1.x(), y - r1.y(), 8, 8);
+            QImage large_quad = img.copy(r1);
+            QImage small_quad = large_quad.copy(r2);
+
+            auto large_dist4 = colorDistribution4(large_quad, large_quad.width(), large_quad.height());
+            if (large_dist4.isEmpty())
+            {
+                continue;
+            }
+            while (large_dist4.count() > 2)
+            {
+                QList<int> vals = large_dist4.values();
+                qSort(vals);
+                large_dist4.remove(large_dist4.keys(vals.first()).first());
+            }
+
+            auto small_dist4 = colorDistribution4(small_quad, small_quad.width(), small_quad.height());
+            if (small_dist4.isEmpty())
+            {
+                continue;
+            }
+            while (small_dist4.count() > 1)
+            {
+                QList<int> vals = small_dist4.values();
+                qSort(vals);
+                small_dist4.remove(small_dist4.keys(vals.first()).first());
+            }
+
+
+            QList<QColor> dist4 = QMap<QColor, int>(large_dist4).unite(small_dist4).uniqueKeys();
+
+            QMultiMap<double, int> dist = selectPalette(large_quad, large_quad.width(), large_quad.height());
             if (dist.isEmpty())
             {
                 continue;
             }
-            int p_idx = dist.first();
-            if (p_idx >= palettes.count())
+
+            int alike_counter_thr = dist4.count();
+            int p_idx = -1;
+            do
             {
-                continue;
+                foreach(int _p_idx, dist)
+                {
+                    int alike_counter = 0;
+                    QList<QColor> dist4_copy = dist4;
+                    foreach (QColor c2, palettes[_p_idx])
+                    {
+                        for (auto i1 = dist4_copy.begin(); i1 != dist4_copy.end(); ++i1)
+                        {
+                            QColor c1 = * i1;
+                            if (alikeColors(c1, c2, 5))
+                            {
+    //                            qDebug() << alike_counter << c1.toHsl() << c2.toHsl();
+                                alike_counter++;
+                                dist4_copy.erase(i1);
+                                break;
+                            }
+                        }
+                    }
+                    if (alike_counter >= alike_counter_thr)
+                    {
+                        p_idx = _p_idx;
+                        break;
+                    }
+                }
+            }
+            while (--alike_counter_thr > 0 && p_idx == -1);
+            if (p_idx == -1)
+            {
+                p_idx = dist.first();
             }
             QVector<QRgb> color_table;
             foreach(QColor c, palettes[p_idx])
             {
                 color_table << c.rgb();
             }
-            qDebug() << p_idx << dist.firstKey() << hex << color_table;
-            color_table << 0;
-            p.drawImage(QRect(x, y, 8, 8), quad.copy(QRect((quad_sz / 2 - 4), (quad_sz / 2 - 4), 8, 8)).convertToFormat(QImage::Format_Indexed8, color_table));
-//            p.drawImage(QRect(x, y, 8, 8), quad.copy(QRect(16, 16, 8, 8)));
+//            p.drawImage(QRect(x, y, 8, 8), large_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table).copy(r2));
+            p.drawImage(QRect(x, y, 8, 8), small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table));
         }
     }
 
