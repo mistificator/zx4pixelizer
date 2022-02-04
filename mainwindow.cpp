@@ -700,22 +700,29 @@ QImage MainWindow::scaleImage(QImage img, int w, int h) const
         {
             int ix = x * out.width() / img.width();
             int iy = y * out.height() / img.height();
-            QColor old_px = out.pixelColor(ix, iy).toHsl();
-            QColor new_px = img.pixelColor(x, y).toHsl();
-            QColor px = new_px.hslSaturation() > old_px.hslSaturation() ? new_px : old_px;
-#if 0
-            px.setHsl(
-                        qMax<int>(qMin<int>(((px.hslHue() + 4) / 8) * 8, 255), 0),
-                        qMax<int>(qMin<int>(((px.hslSaturation() + 4) / 8) * 8, 255), 0),
-                        qMax<int>(qMin<int>(((px.lightness() + 4) / 8) * 8, 255), 0),
-                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
-#else
-            px.setHsl(
-                        px.hslHue(),
-                        px.hslSaturation(),
-                        px.lightness(),
-                        new_px.alpha() > old_px.alpha() ? new_px.alpha() : old_px.alpha());
-#endif
+            QColor px;
+
+            QColor old_px_rgb = out.pixelColor(ix, iy);
+            QColor new_px_rgb = img.pixelColor(x, y);
+
+            QColor old_px_hsl = old_px_rgb.toHsl();
+            QColor new_px_hsl = new_px_rgb.toHsl();
+
+            if (new_px_hsl.hslHue() == -1 || old_px_hsl.hslHue() == -1)
+            {
+                px = new_px_rgb;
+            }
+            else
+            {
+                px = new_px_hsl.hslSaturation() > old_px_hsl.hslSaturation() ? new_px_hsl : old_px_hsl;
+
+                px.setHsl(
+                            px.hslHue(),
+                            px.hslSaturation(),
+                            px.lightness(),
+                            qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
+            }
+
             out.setPixelColor(ix, iy, px.toRgb());
         }
     }
