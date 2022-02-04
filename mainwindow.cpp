@@ -215,20 +215,20 @@ void MainWindow::on_actionQuit_triggered()
     close();
 }
 
-int MainWindow::colorIndex(int x, int y) const
+int MainWindow::colorIndex(const Zx4Image & img, int x, int y) const
 {
     int i;
-    if (!image.color_layer0[y][x] && !image.color_layer1[y][x])
+    if (!img.color_layer0[y][x] && !img.color_layer1[y][x])
     {
         i = 0;
     }
     else
-    if (!image.color_layer0[y][x] && image.color_layer1[y][x])
+    if (!img.color_layer0[y][x] && img.color_layer1[y][x])
     {
         i = 1;
     }
     else
-    if (image.color_layer0[y][x] && !image.color_layer1[y][x])
+    if (img.color_layer0[y][x] && !img.color_layer1[y][x])
     {
         i = 2;
     }
@@ -248,7 +248,7 @@ void MainWindow::drawPixels(QPainter * p, int step)
         {
             if (image.alpha_layer[y][x])
             {
-                p->fillRect(x * step, y * step, step, step, list[colorIndex(x, y)]);
+                p->fillRect(x * step, y * step, step, step, list[colorIndex(image, x, y)]);
             }
         }
     }
@@ -256,15 +256,7 @@ void MainWindow::drawPixels(QPainter * p, int step)
 
 void MainWindow::resizeGrid()
 {
-    image.color_layer0.resize(grid_y);
-    image.color_layer1.resize(grid_y);
-    image.alpha_layer.resize(grid_y);
-    for (int i = 0; i < grid_y; i++)
-    {
-        image.color_layer0[i].resize(grid_x);
-        image.color_layer1[i].resize(grid_x);
-        image.alpha_layer[i].resize(grid_x);
-    }
+    image.resize(grid_x, grid_y);
 }
 
 void MainWindow::drawGrid()
@@ -1071,7 +1063,7 @@ void MainWindow::on_actionInvert_colors_triggered()
 
 void MainWindow::on_actionImport_triggered()
 {
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
     if (filename.isEmpty())
     {
         return;
@@ -1088,7 +1080,7 @@ void MainWindow::on_actionImport_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-    QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "Images (*.zx4.png)");
+    QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "ZX4Sprite images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
@@ -1129,7 +1121,7 @@ void MainWindow::on_actionOpen_triggered()
 
 void MainWindow::on_actionSave_as_triggered()
 {
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "Images (*.zx4.png)");
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4Sprite images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
@@ -1170,7 +1162,7 @@ void MainWindow::on_actionSave_triggered()
             }
             else
             {
-                img.setPixel(x, y, colorIndex(x, y));
+                img.setPixel(x, y, colorIndex(image, x, y));
             }
         }
     }
@@ -1187,7 +1179,7 @@ void MainWindow::on_wizardPaletteBox_currentIndexChanged(int)
 
 void MainWindow::on_actionImport_scene_triggered()
 {
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.bmp)");
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
     if (filename.isEmpty())
     {
         return;
@@ -1201,6 +1193,9 @@ void MainWindow::on_actionImport_scene_triggered()
 
     img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192)).convertToFormat(QImage::Format_Indexed8);
 //    img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio, Qt::FastTransformation).convertToFormat(QImage::Format_Indexed8);
+
+    scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
+    scene_attr.clear();
 
     QImage out(img.width(), img.height(), QImage::Format_RGB32);
     QPainter p(& out);
@@ -1314,15 +1309,90 @@ void MainWindow::on_actionImport_scene_triggered()
                 {
                     color_table << c.rgb();
                 }
-                p.drawImage(QRect(x, y, 8, 8), small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table));
+                small_quad = small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
+                p.drawImage(QRect(x, y, 8, 8), small_quad);
+
+                scene_attr[x / 8][y / 8] = p_idx;
+                for (int iy = 0; iy < 8; iy++)
+                {
+                    for (int ix = 0; ix < 8; ix++)
+                    {
+                        int idx = color_table.indexOf(small_quad.pixel(ix, iy));
+                        if (idx >= 0 && idx < 4)
+                        {
+                            scene.color_layer0[iy + y][ix + x] = (idx & 0x1);
+                            scene.color_layer1[iy + y][ix + x] = (idx & 0x2);
+                            scene.alpha_layer[iy + y][ix + x] = 1;
+                        }
+                    }
+                }
             }
         }
     }
 
     QLabel * w = new QLabel();
+    w->addAction(ui->actionExport_scene);
+    w->setContextMenuPolicy(Qt::ActionsContextMenu);
     w->setScaledContents(true);
     w->setPixmap(QPixmap::fromImage(out));
     w->resize(4 * out.width(), 4 * out.height());
     w->show();
 }
 
+#define GetY(y)         (((y & 0xc0) << 5) | ((y & 0x07) << 8) | ((y & 0x38) << 2))
+#define GetXY(x, y)     (GetY(y) | (x & 0x1F))
+
+void MainWindow::on_actionExport_scene_triggered()
+{
+    if (scene.isNull() || scene_attr.isEmpty())
+    {
+        return;
+    }
+
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX Spectrum screen (*.scr0)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
+    if (QFileInfo(filename).suffix().isEmpty())
+    {
+        filename += ".scr0";
+    }
+
+    QByteArray scr0(32 * 192 + 32 * 24, 0);
+    QByteArray scr1 = scr0;
+    for (int y = 0; y < scene.color_layer0.count(); y++)
+    {
+        const QVector<char> & line0 = scene.color_layer0[y];
+        const QVector<char> & line1 = scene.color_layer1[y];
+        for (int x = 0; x < line0.count() / 8; x++)
+        {
+            int xy = GetXY(x, y);
+            for (int bit = 0; bit < 8; bit++)
+            {
+                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(line0[8 * x + bit]) << bit));
+                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(line1[8 * x + bit]) << bit));
+            }
+        }
+    }
+    int attr_offs = 192 * 32;
+    for (int y = 0; y < scene.color_layer0.count() / 8; y++)
+    {
+        for (int x = 0; x < scene.color_layer0[y].count() / 8; x++)
+        {
+            int p_idx = scene_attr[x][y];
+            scr0[attr_offs + y * 32 + x] = (color_table.key(palettes[p_idx][0]) & 0x07) | ((color_table.key(palettes[p_idx][1]) & 0x0F) << 3);
+            scr1[attr_offs + y * 32 + x] = (color_table.key(palettes[p_idx][2]) & 0x07) | ((color_table.key(palettes[p_idx][3]) & 0x0F) << 3);
+        }
+    }
+    QFile f0(filename), f1(filename.replace(".scr0", ".scr1", Qt::CaseInsensitive));
+    f0.open(QFile::WriteOnly);
+    f1.open(QFile::WriteOnly);
+    if (f0.isOpen() && f1.isOpen())
+    {
+        f0.write(scr0);
+        f1.write(scr1);
+    }
+    f0.close();
+    f1.close();
+}

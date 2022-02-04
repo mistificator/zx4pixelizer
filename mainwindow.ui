@@ -672,6 +672,11 @@
     <string>Import scene</string>
    </property>
   </action>
+  <action name="actionExport_scene">
+   <property name="text">
+    <string>Export scene</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="resource.qrc"/>

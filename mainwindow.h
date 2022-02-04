@@ -42,6 +42,8 @@ private slots:
 
     void on_actionImport_scene_triggered();
 
+    void on_actionExport_scene_triggered();
+
 private:
     Ui::MainWindow *ui;
 
@@ -64,13 +66,28 @@ private:
     {
         QVector<QVector<char>> color_layer0, color_layer1, alpha_layer;
         bool isNull() const { return color_layer0.isEmpty() || color_layer1.isEmpty() || alpha_layer.isEmpty(); }
+        void resize(int w, int h)
+        {
+            color_layer0.resize(h);
+            color_layer1.resize(h);
+            alpha_layer.resize(h);
+            for (int y = 0; y < h; ++y)
+            {
+                color_layer0[y].resize(w);
+                color_layer1[y].resize(w);
+                alpha_layer[y].resize(w);
+            }
+        }
     };
     Zx4Image image, stored_image;
     QPoint old_grid_pos;
     QString current_file_name;
     QImage src_imp_image;
 
-    int colorIndex(int x, int y) const;
+    Zx4Image scene;
+    QMap<int, QMap<int, int>> scene_attr; // 32x24
+
+    int colorIndex(const Zx4Image & img, int x, int y) const;
     void drawPixels(QPainter * p, int step);
     void drawDot(int x, int y);
     void drawBrush(int x, int y);
