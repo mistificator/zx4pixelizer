@@ -162,10 +162,40 @@ void MainWindow::createPalettes()
     {
         for (auto k = i + 1; k != palettes_by_color.end(); ++k)
         {
-            qSort(palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = i.value().toSet().intersect(k.value().toSet()).toList());
-            if (palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())].isEmpty())
+            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
+            if (!list.isEmpty())
             {
-                palettes_by_2colors.remove(QPair<QColor, QColor>(i.key(), k.key()));
+                qSort(palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = list);
+            }
+        }
+    }
+    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+    {
+        for (auto k = palettes_by_color.begin(); k != palettes_by_color.end(); ++k)
+        {
+            if (k.key().rgba() <= i.key().second.rgba())
+            {
+                continue;
+            }
+            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
+            if (!list.isEmpty())
+            {
+                qSort(palettes_by_3colors[i.key()][k.key()] = list);
+            }
+        }
+    }
+    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+    {
+        for (auto k = i + 1; k != palettes_by_2colors.end(); ++k)
+        {
+            if (k.key().first.rgba() <= i.key().second.rgba())
+            {
+                continue;
+            }
+            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
+            if (!list.isEmpty())
+            {
+                qSort(palettes_by_4colors[i.key()][k.key()] = list);
             }
         }
     }
@@ -718,7 +748,7 @@ public:
     }
 };
 
-QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img) const
+QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img, bool use_alpha) const
 {
     bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
 
@@ -736,13 +766,16 @@ QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img) const
         }
     }
 
-    for (int y = 0; y < img.height(); y++)
+    if (use_alpha)
     {
-        for (int x = 0; x < img.width(); x++)
+        for (int y = 0; y < img.height(); y++)
         {
-            if ((src_alpha_channel && qAlpha(img.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
+            for (int x = 0; x < img.width(); x++)
             {
-                color_distrib.remove(detect_colors_img.pixel(x, y));
+                if ((src_alpha_channel && qAlpha(img.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
+                {
+                    color_distrib.remove(detect_colors_img.pixel(x, y));
+                }
             }
         }
     }
@@ -780,11 +813,11 @@ bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision) const
             return false;
         }
     }
-    if (qAbs(c1.lightness() - c2.lightness()) > 50)
+    if (qAbs(c1.lightness() - c2.lightness()) > 48)
     {
         return false;
     }
-    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > 100)
+    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > 32)
     {
         return false;
     }
@@ -1159,7 +1192,8 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
 
-    img = scaleImage(img, qMin(img.width(), 256), qMin(img.height(), 192)).convertToFormat(QImage::Format_Indexed8);
+    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192)).convertToFormat(QImage::Format_Indexed8);
+//    img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio, Qt::FastTransformation).convertToFormat(QImage::Format_Indexed8);
 
     QImage out(img.width(), img.height(), QImage::Format_RGB32);
     QPainter p(& out);
@@ -1168,69 +1202,104 @@ void MainWindow::on_actionImport_scene_triggered()
     {
         for (int x = 0; x < img.width(); x += 8)
         {
-            const int quad_sz = 16;
-            const int offs = ((quad_sz - 8) / 2);
-            QRect r1(qMin(qMax(x - offs, 0), img.width() - quad_sz), qMin(qMax(y - offs, 0), img.height() - quad_sz), quad_sz, quad_sz);
-            QRect r2(x - r1.x(), y - r1.y(), 8, 8);
-            QImage large_quad = img.copy(r1);
-            QImage small_quad = large_quad.copy(r2);
-
-            QList<QColor> colors;
-            auto large_dist = colorDistribution(large_quad);
-            if (!large_dist.isEmpty())
-            {
-                colors << large_dist.last();
-            }
-            auto small_dist = colorDistribution(small_quad);
-            if (!small_dist.isEmpty())
-            {
-                colors << small_dist.last();
-                colors = colors.toSet().toList();
-                if (colors.count() == 1 && small_dist.count() > 1)
-                {
-                    colors << * (small_dist.end() - 2);
-                }
-            }
-            if (colors.count() == 1 && large_dist.count() > 1)
-            {
-                colors << * (large_dist.end() - 2);
-            }
-            if (colors.isEmpty())
-            {
-                continue;
-            }
-
-            qSort(colors);
+            QImage small_quad = img.copy(QRect(x, y, 8, 8));
+            auto small_dist = colorDistribution(small_quad, false);
 
             int p_idx = -1;
-            int hue_precision = 5;
-            do
+            if (!small_dist.isEmpty())
             {
-                if (colors.count() == 1)
+                int k = 0;
+                QMap<int, QColor> dist4;
+                for (auto i = --small_dist.end(); k < 4; --i, ++k)
                 {
-                    for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
+                    int key = i.key();
+                    while (dist4.contains(key))
                     {
-                        if (alikeColors(i.key(), colors.first(), hue_precision))
-                        {
-                            p_idx = i.value().first();
-                            break;
-                        }
+                        key++;
+                    }
+                    dist4[key] = i.value();
+                    if (i == small_dist.begin())
+                    {
+                        break;
                     }
                 }
-                if (colors.count() == 2)
+
+                do
                 {
-                    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+                    QList<QColor> colors = dist4.values();
+                    qSort(colors); // indexes "palettes_by_color" sorted by color
+
+                    int hue_precision = 5;
+                    do
                     {
-                        if (alikeColors(i.key().first, colors.first(), hue_precision) && alikeColors(i.key().second, colors.last(), hue_precision))
+                        if (colors.count() == 1)
                         {
-                            p_idx = i.value().first();
-                            break;
+                            for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
+                            {
+                                if (alikeColors(i.key(), colors.first(), hue_precision))
+                                {
+                                    p_idx = i.value().at(i.value().count() * 0.1);
+                                    break;
+                                }
+                            }
                         }
+                        else
+                        if (colors.count() == 2)
+                        {
+                            for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+                            {
+                                if (alikeColors(i.key().first, colors.first(), hue_precision) && alikeColors(i.key().second, colors.last(), hue_precision))
+                                {
+                                    p_idx = i.value().at(i.value().count() * 0.1);
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        if (colors.count() == 3)
+                        {
+                            for (auto i = palettes_by_3colors.begin(); i != palettes_by_3colors.end() && p_idx == -1; ++i)
+                            {
+                                if (alikeColors(i.key().first, colors.at(0), hue_precision) && alikeColors(i.key().second, colors.at(1), hue_precision))
+                                {
+                                    for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                                    {
+                                        if (alikeColors(k.key(), colors.at(2)))
+                                        {
+                                            p_idx = k.value().at(k.value().count() * 0.1);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        if (colors.count() == 4)
+                        {
+                            for (auto i = palettes_by_4colors.begin(); i != palettes_by_4colors.end() && p_idx == -1; ++i)
+                            {
+                                if (alikeColors(i.key().first, colors.at(0), hue_precision) && alikeColors(i.key().second, colors.at(1), hue_precision))
+                                {
+                                    for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                                    {
+                                        if (alikeColors(k.key().first, colors.at(2), hue_precision) && alikeColors(k.key().second, colors.at(3), hue_precision))
+                                        {
+                                            p_idx = k.value().at(k.value().count() * 0.1);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        hue_precision += 5;
                     }
+                    while (p_idx == -1 && hue_precision < 100 / (colors.count()));
+
+                    dist4.erase(dist4.begin());
                 }
-                hue_precision += 5;
+                while (p_idx == -1 && !dist4.isEmpty());
             }
-            while (p_idx == -1 && hue_precision < 90);
+
             if (p_idx != -1)
             {
                 QVector<QRgb> color_table;
@@ -1238,35 +1307,8 @@ void MainWindow::on_actionImport_scene_triggered()
                 {
                     color_table << c.rgb();
                 }
-//                p.drawImage(QRect(x, y, 8, 8), large_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table).copy(r2));
                 p.drawImage(QRect(x, y, 8, 8), small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table));
             }
-
-#if 0
-            QMap<QColor, int> map_color;
-            auto large_dist = colorDistribution(large_quad);
-            if (!large_dist.isEmpty())
-            {
-                map_color[large_dist.last()] = 5;
-            }
-            auto small_dist = colorDistribution(small_quad);
-            if (!small_dist.isEmpty())
-            {
-                map_color[small_dist.last()] = 25;
-            }         
-
-            QMultiMap<double, int> dist = selectPalette(map_color);
-            if (!dist.isEmpty())
-            {
-                QVector<QRgb> color_table;
-                foreach(QColor c, palettes[dist.first()])
-                {
-                    color_table << c.rgb();
-                }
-//                p.drawImage(QRect(x, y, 8, 8), large_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table).copy(r2));
-                p.drawImage(QRect(x, y, 8, 8), small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table));
-            }
-#endif
         }
     }
 

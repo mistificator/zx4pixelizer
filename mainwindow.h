@@ -57,6 +57,8 @@ private:
     QList<QList<QColor>> palettes;
     QMap<QColor, QList<int>> palettes_by_color;
     QMap<QPair<QColor, QColor>, QList<int>> palettes_by_2colors;
+    QMap<QPair<QColor, QColor>, QMap<QColor, QList<int>>> palettes_by_3colors;
+    QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
 
     struct Zx4Image
     {
@@ -77,7 +79,7 @@ private:
     void resizeGrid();
     void createPalettes();
     QImage scaleImage(QImage img, int w, int h) const;
-    QMultiMap<int, QColor> colorDistribution(QImage img) const;
+    QMultiMap<int, QColor> colorDistribution(QImage img, bool use_alpha = true) const;
     bool alikeColors(QColor c1, QColor c2, int hue_precision = 20) const;
     QMap<QColor, int> colorDistribution4(QImage img, int scale_x = 256, int scale_y = 256) const;
     QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4) const;
