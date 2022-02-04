@@ -78,6 +78,7 @@ private:
     QMultiMap<int, QColor> colorDistribution(QImage img) const;
     bool alikeColors(QColor c1, QColor c2, int hue_precision = 20) const;
     QMap<QColor, int> colorDistribution4(QImage img, int scale_x = 256, int scale_y = 256) const;
+    QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4) const;
     QMultiMap<double, int> selectPalette(QImage img, int scale_x = 256, int scale_y = 256) const;
     QImage importImage(QImage img, int palette_number, bool use_alpha);
     void drawImage(QImage img);
