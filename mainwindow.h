@@ -55,6 +55,8 @@ private:
     int current_color = 0;
     QList<QColor> colors() const;
     QList<QList<QColor>> palettes;
+    QMap<QColor, QList<int>> palettes_by_color;
+    QMap<QPair<QColor, QColor>, QList<int>> palettes_by_2colors;
 
     struct Zx4Image
     {
