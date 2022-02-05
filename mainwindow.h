@@ -50,6 +50,7 @@ private:
     enum ZxColorEnum {ZxBlack = 0, ZxBlue, ZxRed, ZxMagenta, ZxGreen, ZxCyan, ZxYellow, ZxWhite, ZxBrightBlack, ZxBrightBlue, ZxBrightRed, ZxBrightMagenta, ZxBrightGreen, ZxBrightCyan, ZxBrightYellow, ZxBrightWhite};
     QMap<ZxColorEnum, QColor> color_table;
     QMap<ZxColorEnum, QString> color_name;
+    QMap<QColor, QPair<ZxColorEnum, ZxColorEnum>> color_palette_table;
 
     bool eventFilter(QObject *, QEvent *);
 

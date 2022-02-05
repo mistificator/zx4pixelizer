@@ -115,6 +115,11 @@ void MainWindow::createPalettes()
                             m[2] = QColor::fromRgb((c[1].red() + c[2].red()) / 2, (c[1].green() + c[2].green()) / 2, (c[1].blue() + c[2].blue()) / 2);
                             m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2);
 
+                            color_palette_table[m[0]] = QPair<ZxColorEnum, ZxColorEnum>(z[0], z[2]);
+                            color_palette_table[m[1]] = QPair<ZxColorEnum, ZxColorEnum>(z[0], z[3]);
+                            color_palette_table[m[2]] = QPair<ZxColorEnum, ZxColorEnum>(z[1], z[2]);
+                            color_palette_table[m[3]] = QPair<ZxColorEnum, ZxColorEnum>(z[1], z[3]);
+
                             QList<QRgb> ml1;
                             ml1 << m[0].rgb() << m[1].rgb() << m[2].rgb() << m[3].rgb();
                             if (ml1.toSet().count() != 4)
@@ -1381,8 +1386,14 @@ void MainWindow::on_actionExport_scene_triggered()
         for (int x = 0; x < scene.color_layer0[y].count() / 8; x++)
         {
             int p_idx = scene_attr[x][y];
-            scr0[attr_offs + y * 32 + x] = (color_table.key(palettes[p_idx][0]) & 0x07) | ((color_table.key(palettes[p_idx][1]) & 0x0F) << 3);
-            scr1[attr_offs + y * 32 + x] = (color_table.key(palettes[p_idx][2]) & 0x07) | ((color_table.key(palettes[p_idx][3]) & 0x0F) << 3);
+            QList<QColor> pal = palettes[p_idx];
+            QVector<ZxColorEnum> z;
+            z << color_palette_table[pal[0]].first << color_palette_table[pal[2]].first << color_palette_table[pal[0]].second << color_palette_table[pal[1]].second;
+            qDebug() << color_palette_table;
+            qDebug() << pal;
+            qDebug() << z;
+            scr0[attr_offs + y * 32 + x] = (z[0] & 0x07) | ((z[1] & 0x0F) << 3);
+            scr1[attr_offs + y * 32 + x] = (z[2] & 0x07) | ((z[3] & 0x0F) << 3);
         }
     }
     QFile f0(filename), f1(filename.replace(".scr0", ".scr1", Qt::CaseInsensitive));
