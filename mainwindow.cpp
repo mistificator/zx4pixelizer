@@ -115,11 +115,6 @@ void MainWindow::createPalettes()
                             m[2] = QColor::fromRgb((c[1].red() + c[2].red()) / 2, (c[1].green() + c[2].green()) / 2, (c[1].blue() + c[2].blue()) / 2);
                             m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2);
 
-                            color_palette_table[m[0]] = QPair<ZxColorEnum, ZxColorEnum>(z[0], z[2]);
-                            color_palette_table[m[1]] = QPair<ZxColorEnum, ZxColorEnum>(z[0], z[3]);
-                            color_palette_table[m[2]] = QPair<ZxColorEnum, ZxColorEnum>(z[1], z[2]);
-                            color_palette_table[m[3]] = QPair<ZxColorEnum, ZxColorEnum>(z[1], z[3]);
-
                             QList<QRgb> ml1;
                             ml1 << m[0].rgb() << m[1].rgb() << m[2].rgb() << m[3].rgb();
                             if (ml1.toSet().count() != 4)
@@ -151,6 +146,8 @@ void MainWindow::createPalettes()
                             palettes_by_color[m[1]] << color_num;
                             palettes_by_color[m[2]] << color_num;
                             palettes_by_color[m[3]] << color_num;
+
+                            color_palette_table[color_num] << z[0] << z[1] << z[2] << z[3];
 
                             color_num++;
                         }
@@ -1002,7 +999,7 @@ void MainWindow::drawImage(QImage img)
     {
         for (int x = 0; x < img.width(); x++)
         {
-            int idx = color_table.indexOf(img.pixel(x, y));
+            int idx = img.pixelIndex(x, y);
             if (idx >= 0 && idx < 4)
             {
                 current_color = idx;
@@ -1322,12 +1319,16 @@ void MainWindow::on_actionImport_scene_triggered()
                 {
                     for (int ix = 0; ix < 8; ix++)
                     {
-                        int idx = color_table.indexOf(small_quad.pixel(ix, iy));
+                        int idx = small_quad.pixelIndex(ix, iy);
                         if (idx >= 0 && idx < 4)
                         {
-                            scene.color_layer0[iy + y][ix + x] = (idx & 0x1);
-                            scene.color_layer1[iy + y][ix + x] = (idx & 0x2);
+                            scene.color_layer0[iy + y][ix + x] = idx == 0 || idx == 1 ? 0 : 1;
+                            scene.color_layer1[iy + y][ix + x] = idx == 0 || idx == 2 ? 0 : 1;
                             scene.alpha_layer[iy + y][ix + x] = 1;
+                        }
+                        else
+                        {
+                            qDebug() << "wrong color index" << idx;
                         }
                     }
                 }
@@ -1375,8 +1376,8 @@ void MainWindow::on_actionExport_scene_triggered()
             int xy = GetXY(x, y);
             for (int bit = 0; bit < 8; bit++)
             {
-                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(line0[8 * x + bit]) << bit));
-                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(line1[8 * x + bit]) << bit));
+                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
+                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
             }
         }
     }
@@ -1386,14 +1387,9 @@ void MainWindow::on_actionExport_scene_triggered()
         for (int x = 0; x < scene.color_layer0[y].count() / 8; x++)
         {
             int p_idx = scene_attr[x][y];
-            QList<QColor> pal = palettes[p_idx];
-            QVector<ZxColorEnum> z;
-            z << color_palette_table[pal[0]].first << color_palette_table[pal[2]].first << color_palette_table[pal[0]].second << color_palette_table[pal[1]].second;
-            qDebug() << color_palette_table;
-            qDebug() << pal;
-            qDebug() << z;
-            scr0[attr_offs + y * 32 + x] = (z[0] & 0x07) | ((z[1] & 0x0F) << 3);
-            scr1[attr_offs + y * 32 + x] = (z[2] & 0x07) | ((z[3] & 0x0F) << 3);
+            QList<ZxColorEnum> z = color_palette_table[p_idx];
+            scr0[attr_offs + y * 32 + x] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
+            scr1[attr_offs + y * 32 + x] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
         }
     }
     QFile f0(filename), f1(filename.replace(".scr0", ".scr1", Qt::CaseInsensitive));
