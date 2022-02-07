@@ -6,5 +6,6 @@
         <file>color_placeholder.png</file>
         <file>resize_canvas.png</file>
         <file>move.png</file>
+        <file>sonic.zx4.png</file>
     </qresource>
 </RCC>

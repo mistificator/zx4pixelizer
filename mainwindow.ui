@@ -13,6 +13,16 @@
   <property name="windowTitle">
    <string>ZX4 Pixelizer</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="resource.qrc">
+    <normaloff>:/sonic.zx4.png</normaloff>:/sonic.zx4.png</iconset>
+  </property>
+  <property name="iconSize">
+   <size>
+    <width>32</width>
+    <height>32</height>
+   </size>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_2">
     <property name="leftMargin">
@@ -121,9 +131,16 @@
      <string>Window</string>
     </property>
    </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout_ZX4_Pixelizer"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
    <addaction name="menuWindow"/>
+   <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="dockPalette">
@@ -561,6 +578,11 @@
    </property>
    <property name="toolTip">
     <string>Color 11</string>
+   </property>
+  </action>
+  <action name="actionAbout_ZX4_Pixelizer">
+   <property name="text">
+    <string>About ZX4 Pixelizer</string>
    </property>
   </action>
  </widget>

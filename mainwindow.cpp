@@ -1066,9 +1066,57 @@ void MainWindow::on_actionImport_triggered()
     ui->actionImportWizardApply->trigger();
 }
 
+void MainWindow::on_actionExport_triggered()
+{
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4 Sprite images (*.zx4)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
+    if (QFileInfo(filename).suffix().isEmpty())
+    {
+        filename += ".zx4";
+    }
+
+    int p_idx = ui->palettes->currentRow();
+    QList<ZxColorEnum> z = color_palette_table[p_idx];
+
+    const int layer_sz = ((grid_x * grid_y + 7) / 8);
+    QByteArray zx4(4 + 3 * layer_sz, 0);
+    int offs = 0;
+    zx4[offs++] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
+    zx4[offs++] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
+    zx4[offs++] = grid_x;
+    zx4[offs++] = grid_y;
+
+    for (int y = 0; y < grid_y; y++)
+    {
+        const QVector<char> & line0 = image.color_layer0[y];
+        const QVector<char> & line1 = image.color_layer1[y];
+        const QVector<char> & alpha = image.alpha_layer[y];
+        for (int x = 0; x < (grid_x + 7) / 8; x++, offs++)
+        {
+            for (int bit = 0; bit < 8 && (8 * x) + bit < grid_x; bit++)
+            {
+                zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
+                zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
+                zx4[offs + 2 * layer_sz] =  static_cast<char>(zx4[offs + 2 * layer_sz] | (static_cast<int>(alpha[(8 * x) + (7 - bit)]) << bit));
+            }
+        }
+    }
+    QFile f(filename);
+    f.open(QFile::WriteOnly);
+    if (f.isOpen())
+    {
+        f.write(zx4);
+    }
+    f.close();
+
+}
+
 void MainWindow::on_actionOpen_triggered()
 {
-    QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "ZX4Sprite images (*.zx4.png)");
+    QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "ZX4 Pixelizer images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
@@ -1109,7 +1157,7 @@ void MainWindow::on_actionOpen_triggered()
 
 void MainWindow::on_actionSave_as_triggered()
 {
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4Sprite images (*.zx4.png)");
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4 Pixelizer images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
@@ -1390,4 +1438,9 @@ void MainWindow::on_actionExport_scene_triggered()
     f1.close();
 }
 
+
+void MainWindow::on_actionAbout_ZX4_Pixelizer_triggered()
+{
+    QMessageBox::about(this, "ZX4 Pixelizer", "ZX4 Pixelizer\nImages & sprites manipulation tool\nfor ZX Spectrum 128K\n\n© 2022 ZXLDR Custom");
+}
 

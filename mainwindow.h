@@ -40,6 +40,10 @@ private slots:
     void on_actionColor_10_toggled(bool);
     void on_actionColor_11_toggled(bool);
 
+    void on_actionExport_triggered();
+
+    void on_actionAbout_ZX4_Pixelizer_triggered();
+
 private:
     Ui::MainWindow *ui;
 
