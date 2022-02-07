@@ -58,19 +58,17 @@ MainWindow::MainWindow(QWidget *parent)
     ag->addAction(ui->actionBrush);
     ag->addAction(ui->actionMove);
     ag->addAction(ui->actionEraser);
-    ui->pencilButton->setDefaultAction(ui->actionPencil);
-    ui->brushButton->setDefaultAction(ui->actionBrush);
-    ui->moveButton->setDefaultAction(ui->actionMove);
-    ui->eraserButton->setDefaultAction(ui->actionEraser);
 
-    ui->resizeImageButton->setDefaultAction(ui->actionResize_image);
-    ui->resizeCanvasButton->setDefaultAction(ui->actionResize_canvas);
-    ui->invertColorsButton->setDefaultAction(ui->actionInvert_colors);
+    ag = new QActionGroup(this);
+    ag->setExclusive(true);
+    ag->addAction(ui->actionColor_00);
+    ag->addAction(ui->actionColor_01);
+    ag->addAction(ui->actionColor_10);
+    ag->addAction(ui->actionColor_11);
 
     ui->importWizardApply->setDefaultAction(ui->actionImportWizardApply);
 
     ui->menuWindow->addAction(ui->dockPalette->toggleViewAction());
-    ui->menuWindow->addAction(ui->dockDrawTools->toggleViewAction());
     ui->menuWindow->addAction(ui->dockPreview->toggleViewAction());
     ui->menuWindow->addAction(ui->dockSource->toggleViewAction());
     tabifyDockWidget(ui->dockPreview, ui->dockSource);
@@ -92,6 +90,7 @@ void MainWindow::createPalettes()
     int color_num = 0;
     for (int c0i = 0; c0i < 8; c0i++)
     {
+        qApp->processEvents();
         for (int c1i = 0; c1i < 8; c1i++)
         {
             for (int c2i = 0; c2i < 8; c2i++)
@@ -162,6 +161,7 @@ void MainWindow::createPalettes()
     }
     for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
     {
+        qApp->processEvents();
         for (auto k = i + 1; k != palettes_by_color.end(); ++k)
         {
             auto list = i.value().toSet().intersect(k.value().toSet()).toList();
@@ -173,6 +173,7 @@ void MainWindow::createPalettes()
     }
     for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
     {
+        qApp->processEvents();
         for (auto k = palettes_by_color.begin(); k != palettes_by_color.end(); ++k)
         {
             if (k.key().rgba() <= i.key().second.rgba())
@@ -188,6 +189,7 @@ void MainWindow::createPalettes()
     }
     for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
     {
+        qApp->processEvents();
         for (auto k = i + 1; k != palettes_by_2colors.end(); ++k)
         {
             if (k.key().first.rgba() <= i.key().second.rgba())
@@ -526,53 +528,37 @@ QList<QColor> MainWindow::colors() const
 void MainWindow::on_palettes_itemSelectionChanged()
 {
     QList<QColor> list = colors();
-    QPixmap px(ui->color00->iconSize());
+    QPixmap px(QSize(32, 32));
     px.fill(list[0]);
-    ui->color00->setIcon(px);
+    ui->actionColor_00->setIcon(px);
     px.fill(list[1]);
-    ui->color01->setIcon(px);
+    ui->actionColor_01->setIcon(px);
     px.fill(list[2]);
-    ui->color10->setIcon(px);
+    ui->actionColor_10->setIcon(px);
     px.fill(list[3]);
-    ui->color11->setIcon(px);
+    ui->actionColor_11->setIcon(px);
 
-    updateColorArea();
     ui->canvas->update();
 }
 
-
-void MainWindow::on_color00_clicked()
+void MainWindow::on_actionColor_00_toggled(bool)
 {
     current_color = 0;
-    updateColorArea();
 }
 
-
-void MainWindow::on_color01_clicked()
+void MainWindow::on_actionColor_01_toggled(bool)
 {
     current_color = 1;
-    updateColorArea();
 }
 
-
-void MainWindow::on_color10_clicked()
+void MainWindow::on_actionColor_10_toggled(bool)
 {
     current_color = 2;
-    updateColorArea();
 }
 
-
-void MainWindow::on_color11_clicked()
+void MainWindow::on_actionColor_11_toggled(bool)
 {
     current_color = 3;
-    updateColorArea();
-}
-
-void MainWindow::updateColorArea()
-{
-    QPixmap px(64, 64);
-    px.fill(colors()[current_color]);
-    ui->currenColorArea->setPixmap(px);
 }
 
 void MainWindow::on_actionResize_canvas_triggered()
@@ -1403,3 +1389,5 @@ void MainWindow::on_actionExport_scene_triggered()
     f0.close();
     f1.close();
 }
+
+
