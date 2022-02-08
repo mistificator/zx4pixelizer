@@ -7,5 +7,8 @@
         <file>resize_canvas.png</file>
         <file>move.png</file>
         <file>sonic.zx4.png</file>
+        <file>invert.png</file>
+        <file>resize_image.png</file>
+        <file>about.png</file>
     </qresource>
 </RCC>

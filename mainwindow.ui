@@ -439,6 +439,10 @@
    </property>
   </action>
   <action name="actionResize_image">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/resize_image.png</normaloff>:/resize_image.png</iconset>
+   </property>
    <property name="text">
     <string>Resize image</string>
    </property>
@@ -509,6 +513,10 @@
    </property>
   </action>
   <action name="actionInvert_colors">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/invert.png</normaloff>:/invert.png</iconset>
+   </property>
    <property name="text">
     <string>Invert colors</string>
    </property>
@@ -581,6 +589,10 @@
    </property>
   </action>
   <action name="actionAbout_ZX4_Pixelizer">
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/about.png</normaloff>:/about.png</iconset>
+   </property>
    <property name="text">
     <string>About ZX4 Pixelizer</string>
    </property>

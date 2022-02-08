@@ -1091,16 +1091,16 @@ void MainWindow::on_actionExport_triggered()
 
     for (int y = 0; y < grid_y; y++)
     {
+        const QVector<char> & alpha = image.alpha_layer[y];
         const QVector<char> & line0 = image.color_layer0[y];
         const QVector<char> & line1 = image.color_layer1[y];
-        const QVector<char> & alpha = image.alpha_layer[y];
         for (int x = 0; x < (grid_x + 7) / 8; x++, offs++)
         {
             for (int bit = 0; bit < 8 && (8 * x) + bit < grid_x; bit++)
             {
-                zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
-                zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
-                zx4[offs + 2 * layer_sz] =  static_cast<char>(zx4[offs + 2 * layer_sz] | (static_cast<int>(alpha[(8 * x) + (7 - bit)]) << bit));
+                zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(alpha[(8 * x) + (7 - bit)]) << bit));
+                zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
+                zx4[offs + 2 * layer_sz] =  static_cast<char>(zx4[offs + 2 * layer_sz] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
             }
         }
     }
