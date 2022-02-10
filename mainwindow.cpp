@@ -853,6 +853,19 @@ void MainWindow::on_actionOpen_triggered()
         QMessageBox::critical(this, "Error", "Wrong image color table");
         return;
     }
+    QVector<QRgb> colors = src_imp_image.colorTable().mid(0, 4);
+    qSort(colors);
+    int p_idx = ui->palettes->currentRow();
+    if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+    {
+        QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+        if (!list.isEmpty())
+        {
+            p_idx = list.first();
+        }
+    }
+    current_sprite->setPaletteIndex(p_idx);
+    ui->palettes->setCurrentRow(p_idx);
 
     current_sprite->setFileName(filename);
     current_sprite->clearCanvas(QSize(qMin(src_imp_image.width(), 255), qMin(src_imp_image.height(), 192)));
