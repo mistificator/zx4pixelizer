@@ -536,7 +536,7 @@ bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision) const
 
 QMap<QColor, int> MainWindow::colorDistribution4(QImage img, int scale_x, int scale_y) const
 {
-    QMultiMap<int, QColor> color_distrib2 = colorDistribution(scaleImage(img, qMin(img.width(), scale_x), qMin(img.height(), scale_y)));
+    QMultiMap<int, QColor> color_distrib2 = colorDistribution(img.colorCount() == 0 ? scaleImage(img, qMin(img.width(), scale_x), qMin(img.height(), scale_y)) : img.scaled(qMin(img.width(), scale_x), qMin(img.height(), scale_y)));
 
     QMap<QColor, int> color_distrib4;
     QColor prev_c, val_c;
@@ -628,6 +628,21 @@ QMultiMap<double, int> MainWindow::selectPalette(QMap<QColor, int> color_distrib
 
 QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int scale_y) const
 {
+    if (img.colorCount() >= 4)
+    {
+        QVector<QRgb> colors = img.colorTable();
+        if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+        {
+            QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+            if (!list.isEmpty())
+            {
+                int p_idx = list.first();
+                QMultiMap<double, int> map;
+                map.insert(0, p_idx);
+                return map;
+            }
+        }
+    }
     return selectPalette(colorDistribution4(img, scale_x, scale_y));
 }
 
@@ -729,11 +744,11 @@ void MainWindow::on_actionImportWizardApply_triggered()
     if (ui->wizardPaletteBox->currentIndex() == 0)
     {
         QMultiMap<double, int> dist = selectPalette(current_sprite->sourceImage());
-        ui->paletteNumberBox->setRange(1, dist.count() + 1);
+        ui->paletteNumberBox->setRange(1, dist.count());
         p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
     }
     current_sprite->setPaletteIndex(p_idx);
-    current_sprite->drawImage(importImage(current_sprite->sourceImage(),  p_idx, ui->alphaBox->isChecked()));
+    current_sprite->drawImage(importImage(current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32),  p_idx, ui->alphaBox->isChecked()));
 }
 
 
@@ -749,7 +764,8 @@ void MainWindow::on_actionImport_triggered()
 {
     if (!current_sprite)
     {
-        return;
+        ui->actionNew->trigger();
+        ui->actionResize_canvas->trigger();
     }
 
     QString path = QFileInfo(current_sprite->fileName()).absolutePath();
@@ -763,7 +779,7 @@ void MainWindow::on_actionImport_triggered()
     {
         return;
     }
-    QImage src_imp_image = QImage(filename).convertToFormat(QImage::Format_ARGB32);
+    QImage src_imp_image = QImage(filename);
     if (src_imp_image.isNull())
     {
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
@@ -840,7 +856,8 @@ void MainWindow::on_actionOpen_triggered()
 {
     if (!current_sprite)
     {
-        return;
+        ui->actionNew->trigger();
+        ui->actionResize_canvas->trigger();
     }
 
     QString path = QFileInfo(current_sprite->fileName()).absolutePath();
@@ -891,7 +908,7 @@ void MainWindow::on_actionOpen_triggered()
 
     current_sprite->setFileName(filename);
     current_sprite->clearCanvas(QSize(qMin(src_imp_image.width(), 255), qMin(src_imp_image.height(), 192)));
-    current_sprite->setSourceImage(src_imp_image.convertToFormat(QImage::Format_ARGB32));
+    current_sprite->setSourceImage(src_imp_image);
     current_sprite->drawImage(src_imp_image);
 }
 
@@ -1157,6 +1174,15 @@ void MainWindow::on_actionImport_scene_triggered()
     current_scene->setAttr(scene_attr);
     current_scene->setSourceImage(img);
     current_scene->canvas()->setPixmap(QPixmap::fromImage(out));
+
+    foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
+    {
+        if (msw->widget() == current_scene)
+        {
+            msw->resize(out.width() * 4, out.height() * 4);
+            break;
+        }
+    }
 
     pd.hide();
 
