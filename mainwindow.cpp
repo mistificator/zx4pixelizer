@@ -14,7 +14,6 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    ui->canvas->installEventFilter(this);
     ui->preview->installEventFilter(this);
     ui->sourceImage->installEventFilter(this);
 
@@ -76,8 +75,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->dockPreview->raise();
 
     createPalettes();
-    ui->palettes->setCurrentItem(ui->palettes->item(327 - 1));
     ui->palettes->setStyleSheet("QListWidget::item:selected { background: rgb(100, 255, 100); }");
+
+    ui->actionNew->trigger();
+    ui->palettes->setCurrentRow(327 - 1);
 }
 
 MainWindow::~MainWindow()
@@ -219,251 +220,20 @@ void MainWindow::on_actionQuit_triggered()
     close();
 }
 
-int MainWindow::colorIndex(const Zx4Image & img, int x, int y) const
-{
-    int i;
-    if (!img.color_layer0[y][x] && !img.color_layer1[y][x])
-    {
-        i = 0;
-    }
-    else
-    if (!img.color_layer0[y][x] && img.color_layer1[y][x])
-    {
-        i = 1;
-    }
-    else
-    if (img.color_layer0[y][x] && !img.color_layer1[y][x])
-    {
-        i = 2;
-    }
-    else
-    {
-        i = 3;
-    }
-    return i;
-}
-
-void MainWindow::drawPixels(QPainter * p, int step)
-{
-    QList<QColor> list = colors();
-    for (int y = 0; y < grid_y; y++)
-    {
-        for (int x = 0; x < grid_x; x++)
-        {
-            if (image.alpha_layer[y][x])
-            {
-                p->fillRect(x * step, y * step, step, step, list[colorIndex(image, x, y)]);
-            }
-        }
-    }
-}
-
-void MainWindow::resizeGrid()
-{
-    image.resize(grid_x, grid_y);
-}
-
-void MainWindow::drawGrid()
-{    
-    resizeGrid();
-
-    int step = qMin((ui->canvas->width() - 1) / grid_x, (ui->canvas->height() - 1) / grid_y);
-    int side_x = step * grid_x;
-    int side_y = step * grid_y;
-    QColor grid_color(55, 55, 55);
-    QPainter p(ui->canvas);
-    p.fillRect(ui->canvas->rect(), Qt::black);
-    p.fillRect(ui->canvas->rect(), QBrush(grid_color, Qt::Dense6Pattern));
-
-    drawPixels(& p, step);
-
-    p.setPen(grid_color);
-    for (int y = 0; y <= grid_y; y++)
-    {
-        p.drawLine(0, y * step, side_x, y * step);
-    }
-    for (int x = 0; x <= grid_x; x++)
-    {
-        p.drawLine(x * step, 0, x * step, side_y);
-    }
-    QMetaObject::invokeMethod(ui->preview, "update", Qt::QueuedConnection);
-    QMetaObject::invokeMethod(ui->sourceImage, "update", Qt::QueuedConnection);
-}
-
-void MainWindow::drawDot(int x, int y)
-{
-    if (x < 0 || y < 0 || x >= grid_x || y >= grid_y)
-    {
-        return;
-    }
-
-    if (current_color == 0)
-    {
-        image.color_layer0[y][x] = 0;
-        image.color_layer1[y][x] = 0;
-    }
-    else
-    if (current_color == 1)
-    {
-        image.color_layer0[y][x] = 0;
-        image.color_layer1[y][x] = 1;
-    }
-    else
-    if (current_color == 2)
-    {
-        image.color_layer0[y][x] = 1;
-        image.color_layer1[y][x] = 0;
-    }
-    else
-    {
-        image.color_layer0[y][x] = 1;
-        image.color_layer1[y][x] = 1;
-    }
-    image.alpha_layer[y][x] = 1;
-}
-
-void MainWindow::eraseDot(int x, int y)
-{
-    if (x < 0 || y < 0 || x >= grid_x || y >= grid_y)
-    {
-        return;
-    }
-    image.alpha_layer[y][x] = 0;
-}
-
-void MainWindow::drawBrush(int x, int y)
-{
-    drawDot(x - 1, y - 2);
-    drawDot(x, y - 2);
-    drawDot(x + 1, y - 2);
-
-    drawDot(x - 2, y - 1);
-    drawDot(x - 1, y - 1);
-    drawDot(x, y - 1);
-    drawDot(x + 1, y - 1);
-    drawDot(x + 2, y - 1);
-
-    drawDot(x - 2, y);
-    drawDot(x - 1, y);
-    drawDot(x, y);
-    drawDot(x + 1, y);
-    drawDot(x + 2, y);
-
-    drawDot(x - 2, y + 1);
-    drawDot(x - 1, y + 1);
-    drawDot(x, y + 1);
-    drawDot(x + 1, y + 1);
-    drawDot(x + 2, y + 1);
-
-    drawDot(x - 1, y + 2);
-    drawDot(x, y + 2);
-    drawDot(x + 1, y + 2);
-}
-
-void MainWindow::moveImage(int dx, int dy)
-{
-    for (int my = 0; my < grid_y; my++)
-    {
-        if (my + dy >= 0 && my + dy < grid_y)
-        {
-            image.color_layer0[my] = stored_image.color_layer0[my + dy];
-            image.color_layer1[my] = stored_image.color_layer1[my + dy];
-            image.alpha_layer[my] = stored_image.alpha_layer[my + dy];
-        }
-        else
-        {
-            image.alpha_layer[my] = QVector<char>(grid_x);
-        }
-        if (dx > 0)
-        {
-            image.color_layer0[my] = image.color_layer0[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-            image.color_layer1[my] = image.color_layer1[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-            image.alpha_layer[my] = image.alpha_layer[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-        }
-        else
-        if (dx < 0)
-        {
-            image.color_layer0[my] = QVector<char>(-dx) + image.color_layer0[my].mid(0, grid_x + dx);
-            image.color_layer1[my] = QVector<char>(-dx) + image.color_layer1[my].mid(0, grid_x + dx);
-            image.alpha_layer[my] = QVector<char>(-dx) + image.alpha_layer[my].mid(0, grid_x + dx);
-        }
-    }
-}
-
 bool MainWindow::eventFilter(QObject * o, QEvent * ev)
 {
-    if (o == ui->canvas)
-    {
-        switch (ev->type())
-        {
-            case QEvent::Paint:
-                drawGrid();
-            break;
-            case QEvent::MouseButtonPress:
-            case QEvent::MouseMove:
-            {
-                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
-                int step = qMin(ui->canvas->width() / grid_x, ui->canvas->height() / grid_y);
-
-                QPoint pt = me->pos();
-                int x = (pt.x() - 1) / step;
-                int y = (pt.y() - 1) / step;
-
-                if (me->buttons().testFlag(Qt::LeftButton))
-                {
-                    if (ui->actionPencil->isChecked())
-                    {
-                        drawDot(x, y);
-                    }
-                    else
-                    if (ui->actionBrush->isChecked())
-                    {
-                        drawBrush(x, y);
-                    }
-                    else
-                    if (ui->actionMove->isChecked())
-                    {
-                        if (ev->type() == QEvent::MouseButtonPress)
-                        {
-                            stored_image = image;
-                            old_grid_pos = QPoint(x, y);
-                        }
-                        else
-                        {
-                            if (old_grid_pos != QPoint(x, y))
-                            {
-                                int dx = old_grid_pos.x() - x;
-                                int dy = old_grid_pos.y() - y;
-                                moveImage(dx, dy);
-                            }
-                        }
-                    }
-                }
-                if (me->buttons().testFlag(Qt::RightButton) || (me->buttons().testFlag(Qt::LeftButton) && ui->actionEraser->isChecked()))
-                {
-                    eraseDot(x, y);
-                }
-                QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
-
-            }
-            break;
-            default:
-            break;
-        }
-    }
-    else
     if (o == ui->preview)
     {
         switch (ev->type())
         {
             case QEvent::Paint:
-            if (!image.isNull() && image.alpha_layer.count() == grid_y)
+            if (current_sprite && !current_sprite->image().isNull() && current_sprite->image().alpha_layer.count() == current_sprite->canvasSize().height())
             {               
-                int step = qMin(ui->preview->width() / grid_x, ui->preview->height() / grid_y);
-                int side_x = step * grid_x;
-                int side_y = step * grid_y;
+                int step = qMin(ui->preview->width() / current_sprite->canvasSize().width(), ui->preview->height() / current_sprite->canvasSize().height());
+                int side_x = step * current_sprite->canvasSize().width();
+                int side_y = step * current_sprite->canvasSize().height();
 
-                QList<QColor> c = colors();
+                QList<QColor> c = current_sprite->colors();
                 QImage pattern(4 * step, 4 * step, QImage::Format_RGB32);
                 QPainter pp(& pattern);
                 QList<int> idx = QList<int>() << 0 << 3 << 2 << 1 <<
@@ -476,7 +246,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                 }
                 QPainter p(ui->preview);
                 p.fillRect(0, 0, side_x, side_y, pattern);
-                drawPixels(& p, step);
+                current_sprite->drawPixels(& p, step);
             }
             break;
             default:
@@ -489,22 +259,22 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
         switch (ev->type())
         {
             case QEvent::Paint:
-            if (!src_imp_image.isNull())
+            if (current_sprite && !current_sprite->sourceImage().isNull())
             {
-                int step = qMin(ui->sourceImage->width() / grid_x, ui->sourceImage->height() / grid_y);
+                int step = qMin(ui->sourceImage->width() / current_sprite->canvasSize().width(), ui->sourceImage->height() / current_sprite->canvasSize().height());
 
-                int side_x = step * grid_x;
-                int side_y = step * grid_y;
-                if (src_imp_image.width() < src_imp_image.height())
+                int side_x = step * current_sprite->canvasSize().width();
+                int side_y = step * current_sprite->canvasSize().height();
+                if (current_sprite->sourceImage().width() < current_sprite->sourceImage().height())
                 {
-                    side_x = src_imp_image.width() * side_x / src_imp_image.height();
+                    side_x = current_sprite->sourceImage().width() * side_x / current_sprite->sourceImage().height();
                 }
                 else
                 {
-                    side_y = src_imp_image.height() * side_y / src_imp_image.width();
+                    side_y = current_sprite->sourceImage().height() * side_y / current_sprite->sourceImage().width();
                 }
                 QPainter p(ui->sourceImage);
-                p.drawImage((step * grid_x - side_x) / 2, (step * grid_y - side_y) / 2, src_imp_image.scaled(side_x, side_y));
+                p.drawImage((step * current_sprite->canvasSize().width() - side_x) / 2, (step * current_sprite->canvasSize().height() - side_y) / 2, current_sprite->sourceImage().scaled(side_x, side_y));
             }
             break;
             default:
@@ -538,135 +308,87 @@ void MainWindow::on_palettes_itemSelectionChanged()
     px.fill(list[3]);
     ui->actionColor_11->setIcon(px);
 
-    ui->canvas->update();
+    if (current_sprite)
+    {
+        current_sprite->setPaletteIndex(ui->palettes->currentRow());
+        current_sprite->setColors(list);
+    }
 }
 
 void MainWindow::on_actionColor_00_toggled(bool)
 {
-    current_color = 0;
+    if (current_sprite)
+    {
+        current_sprite->setCurrentColorIndex(0);
+    }
 }
 
 void MainWindow::on_actionColor_01_toggled(bool)
 {
-    current_color = 1;
+    if (current_sprite)
+    {
+        current_sprite->setCurrentColorIndex(1);
+    }
 }
 
 void MainWindow::on_actionColor_10_toggled(bool)
 {
-    current_color = 2;
+    if (current_sprite)
+    {
+        current_sprite->setCurrentColorIndex(2);
+    }
 }
 
 void MainWindow::on_actionColor_11_toggled(bool)
 {
-    current_color = 3;
+    if (current_sprite)
+    {
+        current_sprite->setCurrentColorIndex(3);
+    }
 }
 
 void MainWindow::on_actionResize_canvas_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
+
     bool ok = false;
-    int new_grid_x = QInputDialog::getInt(this, "Width", "New canvas width", grid_x, 1, 255, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    int new_grid_x = QInputDialog::getInt(this, "Width", "New canvas width", current_sprite->canvasSize().width(), 1, 255, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     if (!ok)
     {
         return;
     }
-    int new_grid_y = QInputDialog::getInt(this, "Height", "New canvas height", grid_y, 1, 192, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    int new_grid_y = QInputDialog::getInt(this, "Height", "New canvas height", current_sprite->canvasSize().height(), 1, 192, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     if (!ok)
     {
         return;
     }
-    grid_x = new_grid_x;
-    grid_y = new_grid_y;
-    update();
+    current_sprite->setCanvasSize(QSize(new_grid_x, new_grid_y));
 }
 
 
 void MainWindow::on_actionResize_image_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
+
     bool ok = false;
-    int new_image_x = QInputDialog::getInt(this, "Width", "New image width", grid_x, 1, 255, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    int new_image_x = QInputDialog::getInt(this, "Width", "New image width", current_sprite->canvasSize().width(), 1, 255, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     if (!ok)
     {
         return;
     }
-    int new_image_y = QInputDialog::getInt(this, "Height", "New image height", grid_y, 1, 192, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    int new_image_y = QInputDialog::getInt(this, "Height", "New image height", current_sprite->canvasSize().height(), 1, 192, 1, & ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
     if (!ok)
     {
         return;
     }
 
-    stored_image = image;
-    int old_grid_x = grid_x;
-    if (new_image_x > old_grid_x)
-    {
-        grid_x = new_image_x;
-    }
-    resizeGrid();
-
-    if (new_image_x > old_grid_x)
-    {
-        for (int y = 0; y < grid_y; y++)
-        {
-            for (int x = 0; x < grid_x; x++)
-            {
-                image.color_layer0[y][x] = stored_image.color_layer0[y][x * old_grid_x / grid_x];
-                image.color_layer1[y][x] = stored_image.color_layer1[y][x * old_grid_x / grid_x];
-                image.alpha_layer[y][x] = stored_image.alpha_layer[y][x * old_grid_x / grid_x];
-            }
-        }
-    }
-    else
-    if (new_image_x < old_grid_x)
-    {
-        for (int y = 0; y < grid_y; y++)
-        {
-            int x = 0;
-            for (; x < new_image_x; x++)
-            {
-                image.color_layer0[y][x] = stored_image.color_layer0[y][x * old_grid_x / new_image_x];
-                image.color_layer1[y][x] = stored_image.color_layer1[y][x * old_grid_x / new_image_x];
-                image.alpha_layer[y][x] = stored_image.alpha_layer[y][x * old_grid_x / new_image_x];
-            }
-            for (; x < grid_x; x++)
-            {
-                image.alpha_layer[y][x] = 0;
-            }
-        }
-    }
-
-    stored_image = image;
-    int old_grid_y = grid_y;
-    if (new_image_y > old_grid_y)
-    {
-        grid_y = new_image_y;
-    }
-    resizeGrid();
-
-    if (new_image_y > old_grid_y)
-    {
-        for (int y = 0; y < grid_y; y++)
-        {
-            image.color_layer0[y] = stored_image.color_layer0[y * old_grid_y / grid_y];
-            image.color_layer1[y] = stored_image.color_layer1[y * old_grid_y / grid_y];
-            image.alpha_layer[y] = stored_image.alpha_layer[y * old_grid_y / grid_y];
-        }
-    }
-    else
-    if (new_image_y < old_grid_y)
-    {
-        int y = 0;
-        for (; y < new_image_y; y++)
-        {
-            image.color_layer0[y] = stored_image.color_layer0[y * old_grid_y / new_image_y];
-            image.color_layer1[y] = stored_image.color_layer1[y * old_grid_y / new_image_y];
-            image.alpha_layer[y] = stored_image.alpha_layer[y * old_grid_y / new_image_y];
-        }
-        for (; y < grid_y; y++)
-        {
-            image.alpha_layer[y] = QVector<char>(grid_x);
-        }
-    }
-
-    update();
+    current_sprite->resizeImage(QSize(new_image_x, new_image_y));
 }
 
 QImage MainWindow::scaleImage(QImage img, int w, int h) const
@@ -910,9 +632,14 @@ QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int sc
 
 QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
 {
+    if (!current_sprite)
+    {
+        return QImage();
+    }
+
     ui->palettes->setCurrentItem(ui->palettes->item(palette_number));
 
-    img = scaleImage(img, grid_x, grid_y);
+    img = scaleImage(img, current_sprite->canvasSize().width(), current_sprite->canvasSize().height());
 
     QVector<QRgb> color_table;
     foreach (QColor color, colors())
@@ -971,39 +698,6 @@ QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
     return img;
 }
 
-void MainWindow::drawImage(QImage img)
-{
-    QVector<QRgb> color_table = img.colorTable();
-
-    grid_x = qMax(img.width(), grid_x);
-    grid_y = qMax(img.height(), grid_y);
-    ui->actionNew->trigger();
-
-    int x_offs = (grid_x - img.width()) / 2;
-    int y_offs = (grid_y - img.height()) / 2;
-    for (int y = 0; y < img.height(); y++)
-    {
-        for (int x = 0; x < img.width(); x++)
-        {
-            int idx = img.pixelIndex(x, y);
-            if (idx >= 0 && idx < 4)
-            {
-                current_color = idx;
-                drawDot(x_offs + x, y_offs + y);
-            }
-        }
-    }
-    ui->canvas->update();
-
-#if 0
-    QLabel * w = new QLabel();
-    w->setScaledContents(true);
-    w->setPixmap(QPixmap::fromImage(img));
-    w->resize(4 * img.width(), 4 * img.height());
-    w->show();
-#endif
-}
-
 void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
 {
     on_palettes_itemSelectionChanged();
@@ -1011,63 +705,75 @@ void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
 
 void MainWindow::on_actionNew_triggered()
 {
-    current_file_name.clear();
-    image = Zx4Image();
-    resizeGrid();
-    update();
+    current_sprite = new SpriteWindow();
+    current_sprite->setAction(SpriteWindow::ActionPencil, ui->actionPencil);
+    current_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
+    current_sprite->setAction(SpriteWindow::ActionMove, ui->actionMove);
+    current_sprite->setAction(SpriteWindow::ActionEraser, ui->actionEraser);
+    current_sprite->setWindowTitle("untitled");
+    QMdiSubWindow * msw = ui->mdiArea->addSubWindow(current_sprite);
+    msw->show();
+
+    current_sprite->clearCanvas(QSize(64, 64));
+    connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->preview, SLOT(update()));
+    connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->sourceImage, SLOT(update()));
 }
 
 void MainWindow::on_actionImportWizardApply_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
     int p_idx = ui->palettes->currentRow();
     if (ui->wizardPaletteBox->currentIndex() == 0)
     {
-        QMultiMap<double, int> dist = selectPalette(src_imp_image);
+        QMultiMap<double, int> dist = selectPalette(current_sprite->sourceImage());
         ui->paletteNumberBox->setRange(1, dist.count() + 1);
         p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
     }
-    drawImage(importImage(src_imp_image,  p_idx, ui->alphaBox->isChecked()));
+    current_sprite->setPaletteIndex(p_idx);
+    current_sprite->drawImage(importImage(current_sprite->sourceImage(),  p_idx, ui->alphaBox->isChecked()));
 }
 
 
 void MainWindow::on_actionInvert_colors_triggered()
 {
-    if (image.isNull())
+    if (current_sprite)
     {
-        return;
+        current_sprite->invertColors();
     }
-    for (int y = 0; y < grid_y; y++)
-    {
-        QVector<char> & line0 = image.color_layer0[y];
-        QVector<char> & line1 = image.color_layer1[y];
-        for (int x = 0; x < grid_x; x++)
-        {
-            line0[x] = line0[x] ? 0 : 1;
-            line1[x] = line1[x] ? 0 : 1;
-        }
-    }
-    update();
 }
 
 void MainWindow::on_actionImport_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
+
     QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
     if (filename.isEmpty())
     {
         return;
     }
-    src_imp_image = QImage(filename).convertToFormat(QImage::Format_ARGB32);
+    QImage src_imp_image = QImage(filename).convertToFormat(QImage::Format_ARGB32);
     if (src_imp_image.isNull())
     {
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
         return;
     }
-
+    current_sprite->setSourceImage(src_imp_image);
     ui->actionImportWizardApply->trigger();
 }
 
 void MainWindow::on_actionExport_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
+
     QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4 Sprite images (*.zx4)");
     if (filename.isEmpty())
     {
@@ -1081,22 +787,22 @@ void MainWindow::on_actionExport_triggered()
     int p_idx = ui->palettes->currentRow();
     QList<ZxColorEnum> z = color_palette_table[p_idx];
 
-    const int layer_sz = ((grid_x * grid_y + 7) / 8);
+    const int layer_sz = ((current_sprite->canvasSize().width() * current_sprite->canvasSize().height() + 7) / 8);
     QByteArray zx4(4 + 3 * layer_sz, 0);
     int offs = 0;
     zx4[offs++] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
     zx4[offs++] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
-    zx4[offs++] = grid_x;
-    zx4[offs++] = grid_y;
+    zx4[offs++] = current_sprite->canvasSize().width();
+    zx4[offs++] = current_sprite->canvasSize().height();
 
-    for (int y = 0; y < grid_y; y++)
+    for (int y = 0; y < current_sprite->canvasSize().height(); y++)
     {
-        const QVector<char> & alpha = image.alpha_layer[y];
-        const QVector<char> & line0 = image.color_layer0[y];
-        const QVector<char> & line1 = image.color_layer1[y];
-        for (int x = 0; x < (grid_x + 7) / 8; x++, offs++)
+        const QVector<char> & alpha = current_sprite->image().alpha_layer[y];
+        const QVector<char> & line0 = current_sprite->image().color_layer0[y];
+        const QVector<char> & line1 = current_sprite->image().color_layer1[y];
+        for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++, offs++)
         {
-            for (int bit = 0; bit < 8 && (8 * x) + bit < grid_x; bit++)
+            for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
             {
                 zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(alpha[(8 * x) + (7 - bit)]) << bit));
                 zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
@@ -1116,13 +822,18 @@ void MainWindow::on_actionExport_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
+
     QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "ZX4 Pixelizer images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
     }
 
-    src_imp_image = QImage(filename);
+    QImage src_imp_image = QImage(filename);
     if (src_imp_image.isNull())
     {
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
@@ -1143,20 +854,20 @@ void MainWindow::on_actionOpen_triggered()
         return;
     }
 
-    current_file_name = filename;
-
-    grid_x = qMin(src_imp_image.width(), 255);
-    grid_y = qMin(src_imp_image.height(), 192);
-    ui->actionNew->trigger();
-    drawImage(src_imp_image);
-
-    src_imp_image = src_imp_image.convertToFormat(QImage::Format_ARGB32);
-    update();
+    current_sprite->setFileName(filename);
+    current_sprite->clearCanvas(QSize(qMin(src_imp_image.width(), 255), qMin(src_imp_image.height(), 192)));
+    current_sprite->setSourceImage(src_imp_image.convertToFormat(QImage::Format_ARGB32));
+    current_sprite->drawImage(src_imp_image);
 }
 
 
 void MainWindow::on_actionSave_as_triggered()
 {
+    if (!current_sprite)
+    {
+        return;
+    }
+
     QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4 Pixelizer images (*.zx4.png)");
     if (filename.isEmpty())
     {
@@ -1167,20 +878,24 @@ void MainWindow::on_actionSave_as_triggered()
         filename += ".zx4.png";
     }
 
-    current_file_name = filename;
-
+    current_sprite->setFileName(filename);
     ui->actionSave->trigger();
 }
 
 void MainWindow::on_actionSave_triggered()
 {
-    if (current_file_name.isEmpty())
+    if (!current_sprite)
+    {
+        return;
+    }
+
+    if (current_sprite->fileName().isEmpty())
     {
         ui->actionSave_as->trigger();
         return;
     }
 
-    QImage img(grid_x, grid_y, QImage::Format_Indexed8);
+    QImage img(current_sprite->canvasSize().width(), current_sprite->canvasSize().height(), QImage::Format_Indexed8);
     QVector<QRgb> color_table;
     foreach(QColor color, colors())
     {
@@ -1188,21 +903,21 @@ void MainWindow::on_actionSave_triggered()
     }
     color_table << 0; // alpha
     img.setColorTable(color_table);
-    for (int y = 0; y < grid_y; y++)
+    for (int y = 0; y < current_sprite->canvasSize().height(); y++)
     {
-        for (int x = 0; x < grid_x; x++)
+        for (int x = 0; x < current_sprite->canvasSize().width(); x++)
         {
-            if (!image.alpha_layer[y][x])
+            if (!current_sprite->image().alpha_layer[y][x])
             {
                 img.setPixel(x, y, 4);
             }
             else
             {
-                img.setPixel(x, y, colorIndex(image, x, y));
+                img.setPixel(x, y, current_sprite->colorIndex(current_sprite->image(), x, y));
             }
         }
     }
-    if (!img.save(current_file_name, "png"))
+    if (!img.save(current_sprite->fileName(), "png"))
     {
         QMessageBox::critical(this, "Error", "Error occured while file saving");
     }
@@ -1443,4 +1158,35 @@ void MainWindow::on_actionAbout_ZX4_Pixelizer_triggered()
 {
     QMessageBox::about(this, "ZX4 Pixelizer", "ZX4 Pixelizer\nImages & sprites manipulation tool\nfor ZX Spectrum 128K\n\n© 2022 ZXLDR Custom");
 }
+
+
+void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
+{
+    if (msw == 0)
+    {
+        current_sprite = 0;
+        return;
+    }
+    if (SpriteWindow * sw = dynamic_cast<SpriteWindow *>(msw->widget()))
+    {
+        current_sprite = sw;
+        ui->palettes->setCurrentRow(current_sprite->paletteIndex());
+        switch (current_sprite->currentColorIndex())
+        {
+        case 0:
+            ui->actionColor_00->setChecked(true);
+            break;
+        case 1:
+            ui->actionColor_01->setChecked(true);
+            break;
+        case 2:
+            ui->actionColor_10->setChecked(true);
+            break;
+        default:
+            ui->actionColor_11->setChecked(true);
+            break;
+        }
+    }
+}
+
 

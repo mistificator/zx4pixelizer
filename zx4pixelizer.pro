@@ -10,13 +10,17 @@ CONFIG += c++11
 
 SOURCES += \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    spritewindow.cpp
 
 HEADERS += \
-    mainwindow.h
+    mainwindow.h \
+    spritewindow.h \
+    zx4pixelizer.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    spritewindow.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
