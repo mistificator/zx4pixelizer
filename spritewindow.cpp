@@ -14,6 +14,7 @@ SpriteWindow::SpriteWindow(QWidget *parent) :
     ui->canvas->installEventFilter(this);
 
     clrs << Qt::black << Qt::black << Qt::black << Qt::black;
+    setFileName(QString());
 }
 
 SpriteWindow::~SpriteWindow()
@@ -23,13 +24,13 @@ SpriteWindow::~SpriteWindow()
 
 void SpriteWindow::setFileName(QString s)
 {
-    current_file_name = s;
-    setWindowTitle(QFileInfo(current_file_name).fileName());
+    file_name = s;
+    setWindowTitle((!file_name.isEmpty() ? QFileInfo(file_name).fileName() : "untitled") + " - Sprite");
 }
 
 QString SpriteWindow::fileName() const
 {
-    return current_file_name;
+    return file_name;
 }
 
 QSize SpriteWindow::sizeHint() const

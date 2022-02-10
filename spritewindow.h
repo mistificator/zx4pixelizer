@@ -68,7 +68,7 @@ private:
     int grid_x = 64, grid_y = 64;
     Zx4Image img, stored_img;
     QPoint old_grid_pos;
-    QString current_file_name;
+    QString file_name;
     QImage src_imp_img;
 
     QMap<ActionEnum, QAction *> acts;

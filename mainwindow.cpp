@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <QMessageBox>
+#include <QProgressDialog>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -710,7 +711,6 @@ void MainWindow::on_actionNew_triggered()
     current_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
     current_sprite->setAction(SpriteWindow::ActionMove, ui->actionMove);
     current_sprite->setAction(SpriteWindow::ActionEraser, ui->actionEraser);
-    current_sprite->setWindowTitle("untitled");
     QMdiSubWindow * msw = ui->mdiArea->addSubWindow(current_sprite);
     msw->show();
 
@@ -752,7 +752,13 @@ void MainWindow::on_actionImport_triggered()
         return;
     }
 
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
+    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    if (path.isEmpty())
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
     if (filename.isEmpty())
     {
         return;
@@ -774,7 +780,17 @@ void MainWindow::on_actionExport_triggered()
         return;
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4 Sprite images (*.zx4)");
+    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    if (!path.isEmpty())
+    {
+        path += "/" + QFileInfo(current_sprite->fileName()).fileName() + ".zx4";
+    }
+    else
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX4 Pixelizer images (*.zx4)");
     if (filename.isEmpty())
     {
         return;
@@ -827,7 +843,13 @@ void MainWindow::on_actionOpen_triggered()
         return;
     }
 
-    QString filename = QFileDialog::getOpenFileName(this, "Open file", QDir::homePath() + "/Pictures/", "ZX4 Pixelizer images (*.zx4.png)");
+    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    if (path.isEmpty())
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getOpenFileName(this, "Open file", path, "ZX4 Pixelizer images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
@@ -881,7 +903,17 @@ void MainWindow::on_actionSave_as_triggered()
         return;
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX4 Pixelizer images (*.zx4.png)");
+    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    if (!path.isEmpty())
+    {
+        path += "/" + QFileInfo(current_sprite->fileName()).fileName() + ".zx4.png";
+    }
+    else
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX4 Pixelizer images (*.zx4.png)");
     if (filename.isEmpty())
     {
         return;
@@ -942,8 +974,14 @@ void MainWindow::on_wizardPaletteBox_currentIndexChanged(int)
 }
 
 void MainWindow::on_actionImport_scene_triggered()
-{
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", QDir::homePath() + "/Pictures/", "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
+{       
+    QString path = current_scene ? QFileInfo(current_scene->fileName()).absolutePath() : QString();
+    if (path.isEmpty())
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
     if (filename.isEmpty())
     {
         return;
@@ -955,11 +993,28 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
 
-    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192)).convertToFormat(QImage::Format_Indexed8);
-//    img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio, Qt::FastTransformation).convertToFormat(QImage::Format_Indexed8);
+    QProgressDialog pd(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+    pd.setWindowIcon(QPixmap(":/sonic.zx4.png"));
+    pd.setWindowTitle("ZX4 Pixelizer");
+    pd.setLabelText("Importing scene");
+    pd.setRange(0, 0);
+    pd.setCancelButton(0);
+    pd.show();
+    qApp->processEvents();
 
+    if (current_scene == 0)
+    {
+        current_scene = new SceneWindow();
+        ui->mdiArea->addSubWindow(current_scene);
+        current_scene->show();
+    }
+    current_scene->setFileName(filename);
+
+    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192)).convertToFormat(QImage::Format_Indexed8);
+
+    Zx4Image scene;
     scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
-    scene_attr.clear();
+    QMap<int, QMap<int, int>> scene_attr;
 
     QImage out(img.width(), img.height(), QImage::Format_RGB32);
     QPainter p(& out);
@@ -1098,6 +1153,14 @@ void MainWindow::on_actionImport_scene_triggered()
         }
     }
 
+    current_scene->setImage(scene);
+    current_scene->setAttr(scene_attr);
+    current_scene->setSourceImage(img);
+    current_scene->canvas()->setPixmap(QPixmap::fromImage(out));
+
+    pd.hide();
+
+#if 0
     QLabel * w = new QLabel();
     w->addAction(ui->actionExport_scene);
     w->setContextMenuPolicy(Qt::ActionsContextMenu);
@@ -1105,6 +1168,7 @@ void MainWindow::on_actionImport_scene_triggered()
     w->setPixmap(QPixmap::fromImage(out));
     w->resize(4 * out.width(), 4 * out.height());
     w->show();
+#endif
 }
 
 #define GetY(y)         (((y & 0xc0) << 5) | ((y & 0x07) << 8) | ((y & 0x38) << 2))
@@ -1112,12 +1176,30 @@ void MainWindow::on_actionImport_scene_triggered()
 
 void MainWindow::on_actionExport_scene_triggered()
 {
+    if (!current_scene)
+    {
+        return;
+    }
+
+    Zx4Image scene = current_scene->image();
+    QMap<int, QMap<int, int>> scene_attr = current_scene->attr();
+
     if (scene.isNull() || scene_attr.isEmpty())
     {
         return;
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", QDir::homePath() + "/Pictures/", "ZX Spectrum screen (*.scr0)");
+    QString path = QFileInfo(current_scene->fileName()).absolutePath();
+    if (!path.isEmpty())
+    {
+        path += "/" + QFileInfo(current_scene->fileName()).fileName() + ".scr0";
+    }
+    else
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX Spectrum screen (*.scr0)");
     if (filename.isEmpty())
     {
         return;
@@ -1175,9 +1257,10 @@ void MainWindow::on_actionAbout_ZX4_Pixelizer_triggered()
 
 void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
 {
+    current_sprite = 0;
+    current_scene = 0;
     if (msw == 0)
     {
-        current_sprite = 0;
         return;
     }
     if (SpriteWindow * sw = dynamic_cast<SpriteWindow *>(msw->widget()))
@@ -1199,6 +1282,11 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
             ui->actionColor_11->setChecked(true);
             break;
         }
+    }
+    else
+    if (SceneWindow * sw = dynamic_cast<SceneWindow *>(msw->widget()))
+    {
+        current_scene = sw;
     }
 }
 

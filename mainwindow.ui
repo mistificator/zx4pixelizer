@@ -86,6 +86,7 @@
     <addaction name="actionExport"/>
     <addaction name="separator"/>
     <addaction name="actionImport_scene"/>
+    <addaction name="actionExport_scene"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>

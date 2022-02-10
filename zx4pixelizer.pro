@@ -11,15 +11,18 @@ CONFIG += c++11
 SOURCES += \
     main.cpp \
     mainwindow.cpp \
+    scenewindow.cpp \
     spritewindow.cpp
 
 HEADERS += \
     mainwindow.h \
+    scenewindow.h \
     spritewindow.h \
     zx4pixelizer.h
 
 FORMS += \
     mainwindow.ui \
+    scenewindow.ui \
     spritewindow.ui
 
 # Default rules for deployment.

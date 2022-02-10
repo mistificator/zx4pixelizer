@@ -7,6 +7,7 @@
 #include <QMdiSubWindow>
 #include "zx4pixelizer.h"
 #include "spritewindow.h"
+#include "scenewindow.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -47,6 +48,7 @@ private slots:
 private:
     Ui::MainWindow *ui;
     SpriteWindow * current_sprite = 0;
+    SceneWindow * current_scene = 0;
 
     QMap<ZxColorEnum, QColor> color_table;
     QMap<ZxColorEnum, QString> color_name;
@@ -59,9 +61,6 @@ private:
     QMap<QPair<QColor, QColor>, QList<int>> palettes_by_2colors;
     QMap<QPair<QColor, QColor>, QMap<QColor, QList<int>>> palettes_by_3colors;
     QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
-
-    Zx4Image scene;
-    QMap<int, QMap<int, int>> scene_attr; // 32x24
 
     QList<QColor> colors() const;
     void createPalettes();
