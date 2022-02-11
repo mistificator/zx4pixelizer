@@ -66,7 +66,7 @@ private:
     void createPalettes();
     QImage scaleImage(QImage img, int w, int h) const;
     QMultiMap<int, QColor> colorDistribution(QImage img, bool use_alpha = true) const;
-    bool alikeColors(QColor c1, QColor c2, int hue_precision = 20, int light_precision = 48, int satur_precision = 48) const;
+    bool alikeColors(QColor c1, QColor c2, int hue_precision = 20, int light_precision = 48, int satur_precision = 32) const;
     QMap<QColor, int> colorDistribution4(QImage img) const;
     QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4) const;
     QMultiMap<double, int> selectPalette(QImage img) const;

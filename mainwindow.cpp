@@ -1027,29 +1027,8 @@ void MainWindow::on_actionImport_scene_triggered()
     }
     current_scene->setFileName(filename);
 
-#if 1
     img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
     QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
-#else
-    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
-    for (int y = 0; y < img.height(); y++)
-    {
-        for (int x = 0; x < img.width(); x++)
-        {
-            QColor c = img.pixelColor(x, y);
-            const int k = 4;
-            img.setPixelColor(x, y, QColor(qMin(255, ((c.red() + k / 2) / k) * k), qMin(255, ((c.green() + k / 2) / k) * k), qMin(255, ((c.blue() + k / 2) / k) * k), c.alpha()));
-        }
-    }
-    auto img_dist = colorDistribution(img, false);
-    qDebug() << img_dist.count() << img_dist;
-    QVector<QRgb> img_color_table;
-    foreach (QColor c, img_dist.values().mid(0, 256))
-    {
-        img_color_table << c.rgba();
-    }
-    img = img.convertToFormat(QImage::Format_Indexed8, img_color_table);
-#endif
 
     Zx4Image scene;
     scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
@@ -1062,7 +1041,11 @@ void MainWindow::on_actionImport_scene_triggered()
     {
         for (int x = 0; x < img.width(); x += 8)
         {
+#if 1
             QImage small_quad = img.copy(QRect(x, y, 8, 8));
+#else
+            QImage small_quad = img8.copy(QRect(x, y, 8, 8));
+#endif
             auto small_dist = colorDistribution(small_quad, false);
 
             int p_idx = -1;
