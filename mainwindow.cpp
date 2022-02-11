@@ -18,40 +18,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->preview->installEventFilter(this);
     ui->sourceImage->installEventFilter(this);
 
-    color_table[ZxBlack] =          Qt::black;
-    color_table[ZxBlue] =           Qt::darkBlue;
-    color_table[ZxRed] =            Qt::darkRed;
-    color_table[ZxMagenta] =        Qt::darkMagenta;
-    color_table[ZxGreen] =          Qt::darkGreen;
-    color_table[ZxCyan] =           Qt::darkCyan;
-    color_table[ZxYellow] =         Qt::darkYellow;
-    color_table[ZxWhite] =          Qt::lightGray;
-    color_table[ZxBrightBlack] =    Qt::black;
-    color_table[ZxBrightBlue] =     Qt::blue;
-    color_table[ZxBrightRed] =      Qt::red;
-    color_table[ZxBrightMagenta] =  Qt::magenta;
-    color_table[ZxBrightGreen] =    Qt::green;
-    color_table[ZxBrightCyan] =     Qt::cyan;
-    color_table[ZxBrightYellow] =   Qt::yellow;
-    color_table[ZxBrightWhite] =    Qt::white;
-
-    color_name[ZxBlack] =          "Black";
-    color_name[ZxBlue] =           "Blue";
-    color_name[ZxRed] =            "Red";
-    color_name[ZxMagenta] =        "Magenta";
-    color_name[ZxGreen] =          "Green";
-    color_name[ZxCyan] =           "Cyan";
-    color_name[ZxYellow] =         "Yellow";
-    color_name[ZxWhite] =          "White";
-    color_name[ZxBrightBlack] =    "Bright black";
-    color_name[ZxBrightBlue] =     "Bright blue";
-    color_name[ZxBrightRed] =      "Bright red";
-    color_name[ZxBrightMagenta] =  "Bright magenta";
-    color_name[ZxBrightGreen] =    "Bright green";
-    color_name[ZxBrightCyan] =     "Bright cyan";
-    color_name[ZxBrightYellow] =   "Bright yellow";
-    color_name[ZxBrightWhite] =    "Bright white";
-
     QActionGroup * ag = new QActionGroup(this);
     ag->setExclusive(true);
     ag->addAction(ui->actionPencil);
@@ -89,121 +55,26 @@ MainWindow::~MainWindow()
 
 void MainWindow::createPalettes()
 {
-    int color_num = 0;
-    for (int c0i = 0; c0i < 8; c0i++)
+    palettes.init();
+
+    for (int p_idx = 0; p_idx < palettes.palettes.count(); p_idx++)
     {
         qApp->processEvents();
-        for (int c1i = 0; c1i < 8; c1i++)
-        {
-            for (int c2i = 0; c2i < 8; c2i++)
-            {
-                for (int c3i = 0; c3i < 8; c3i++)
-                {
-                    for (int b0 = 0; b0 < 2; b0++)
-                    {
-                        for (int b1 = 0; b1 < 2; b1++)
-                        {
-                            QColor c[4];
-                            ZxColorEnum z[4];
-                            c[0] = color_table[z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0)];
-                            c[1] = color_table[z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0)];
-                            c[2] = color_table[z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1)];
-                            c[3] = color_table[z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1)];
 
-                            QColor m[4];
-                            m[0] = QColor::fromRgb((c[0].red() + c[2].red()) / 2, (c[0].green() + c[2].green()) / 2, (c[0].blue() + c[2].blue()) / 2);
-                            m[1] = QColor::fromRgb((c[0].red() + c[3].red()) / 2, (c[0].green() + c[3].green()) / 2, (c[0].blue() + c[3].blue()) / 2);
-                            m[2] = QColor::fromRgb((c[1].red() + c[2].red()) / 2, (c[1].green() + c[2].green()) / 2, (c[1].blue() + c[2].blue()) / 2);
-                            m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2);
+        QList<QColor> m = palettes.palettes[p_idx];
+        QPixmap px(64, 64);
+        QPainter p(& px);
+        p.fillRect(0, 0, px.width() / 2, px.height() / 2,                               m[0]);
+        p.fillRect(px.width() / 2, 0, px.width() / 2, px.height() / 2,                  m[1]);
+        p.fillRect(0, px.height() / 2, px.width() / 2, px.height() / 2,                 m[2]);
+        p.fillRect(px.width() / 2, px.height() / 2, px.width() / 2, px.height() / 2,    m[3]);
 
-                            QList<QRgb> ml1;
-                            ml1 << m[0].rgb() << m[1].rgb() << m[2].rgb() << m[3].rgb();
-                            if (ml1.toSet().count() != 4)
-                            {
-                                continue;
-                            }
-                            QList<QRgb> ml2 = ml1;
-                            qSort(ml1);
-                            if (ml1 != ml2)
-                            {
-                                continue;
-                            }
-
-                            QPixmap px(64, 64);
-                            QPainter p(& px);
-                            p.fillRect(0, 0, px.width() / 2, px.height() / 2,                               m[0]);
-                            p.fillRect(px.width() / 2, 0, px.width() / 2, px.height() / 2,                  m[1]);
-                            p.fillRect(0, px.height() / 2, px.width() / 2, px.height() / 2,                 m[2]);
-                            p.fillRect(px.width() / 2, px.height() / 2, px.width() / 2, px.height() / 2,    m[3]);
-
-                            QListWidgetItem * item = new QListWidgetItem();
-                            palettes << (QList<QColor>() << m[0] << m[1] << m[2] << m[3]);
-                            item->setData(Qt::UserRole, color_num);
-                            item->setToolTip((QStringList() << QString("#%1").arg(color_num + 1) << color_name[z[0]] << color_name[z[1]] << color_name[z[2]] << color_name[z[3]]).join("\n"));
-                            item->setIcon(px);
-                            ui->palettes->addItem(item);
-
-                            palettes_by_color[m[0]] << color_num;
-                            palettes_by_color[m[1]] << color_num;
-                            palettes_by_color[m[2]] << color_num;
-                            palettes_by_color[m[3]] << color_num;
-
-                            color_palette_table[color_num] << z[0] << z[1] << z[2] << z[3];
-
-                            color_num++;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
-    {
-        qSort(i.value() = i.value().toSet().toList());
-    }
-    for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
-    {
-        qApp->processEvents();
-        for (auto k = i + 1; k != palettes_by_color.end(); ++k)
-        {
-            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
-            if (!list.isEmpty())
-            {
-                qSort(palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = list);
-            }
-        }
-    }
-    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
-    {
-        qApp->processEvents();
-        for (auto k = palettes_by_color.begin(); k != palettes_by_color.end(); ++k)
-        {
-            if (k.key().rgba() <= i.key().second.rgba())
-            {
-                continue;
-            }
-            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
-            if (!list.isEmpty())
-            {
-                qSort(palettes_by_3colors[i.key()][k.key()] = list);
-            }
-        }
-    }
-    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
-    {
-        qApp->processEvents();
-        for (auto k = i + 1; k != palettes_by_2colors.end(); ++k)
-        {
-            if (k.key().first.rgba() <= i.key().second.rgba())
-            {
-                continue;
-            }
-            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
-            if (!list.isEmpty())
-            {
-                qSort(palettes_by_4colors[i.key()][k.key()] = list);
-            }
-        }
+        QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
+        QListWidgetItem * item = new QListWidgetItem();
+        item->setData(Qt::UserRole, p_idx);
+        item->setToolTip((QStringList() << QString("#%1").arg(p_idx + 1) << palettes.color_name[z[0]] << palettes.color_name[z[1]] << palettes.color_name[z[2]] << palettes.color_name[z[3]]).join("\n"));
+        item->setIcon(px);
+        ui->palettes->addItem(item);
     }
 }
 
@@ -293,7 +164,7 @@ QList<QColor> MainWindow::colors() const
     {
         return list;
     }
-    return palettes.at(item->data(Qt::UserRole).toInt());
+    return palettes.palettes.at(item->data(Qt::UserRole).toInt());
 }
 
 void MainWindow::on_palettes_itemSelectionChanged()
@@ -432,32 +303,6 @@ QImage MainWindow::scaleImage(QImage img, int w, int h) const
     return out;
 }
 
-template <> inline bool qMapLessThanKey<QColor>(const QColor &key1, const QColor &key2)
-{
-    return key1.rgb() < key2.rgb();
-}
-
-template <> inline uint qHash<QColor>(const QColor &t, uint seed)
-    noexcept(noexcept(qHash(t.rgba())))
-{
-    return qHash(t.rgba()) ^ seed;
-}
-
-template <> inline bool operator< <QColor, QColor>(const QPair<QColor, QColor> &p1, const QPair<QColor, QColor> &p2)
-{
-    return p1.first.rgba() < p2.first.rgba() || (!(p2.first.rgba() < p1.first.rgba()) && p1.second.rgba() < p2.second.rgba());
-}
-
-template <>
-class qLess<QColor>
-{
-public:
-    inline bool operator()(const QColor &t1, const QColor &t2) const
-    {
-        return (t1.rgba() < t2.rgba());
-    }
-};
-
 QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img, bool use_alpha) const
 {
     bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
@@ -562,9 +407,9 @@ QMap<QColor, int> MainWindow::colorDistribution4(QImage img) const
 QMultiMap<double, int> MainWindow::selectPalette(QMap<QColor, int> color_distrib4) const
 {
     QMultiMap<double, int> dist;
-    for (int i = 0; i < palettes.count(); i++)
+    for (int i = 0; i < palettes.palettes.count(); i++)
     {
-        QList<QColor> pal = palettes[i];
+        QList<QColor> pal = palettes.palettes[i];
         if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3] || pal[1] == pal[2])
         {
             continue;
@@ -631,9 +476,9 @@ QMultiMap<double, int> MainWindow::selectPalette(QImage img) const
     if (img.colorCount() >= 4)
     {
         QVector<QRgb> colors = img.colorTable();
-        if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+        if (palettes.palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
         {
-            QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+            QList<int> list = palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
             if (!list.isEmpty())
             {
                 int p_idx = list.first();
@@ -817,7 +662,7 @@ void MainWindow::on_actionExport_triggered()
     }
 
     int p_idx = ui->palettes->currentRow();
-    QList<ZxColorEnum> z = color_palette_table[p_idx];
+    QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
 
     const int layer_sz = ((current_sprite->canvasSize().width() * current_sprite->canvasSize().height() + 7) / 8);
     QByteArray zx4(4 + 3 * layer_sz, 0);
@@ -895,9 +740,9 @@ void MainWindow::on_actionOpen_triggered()
     QVector<QRgb> colors = src_imp_image.colorTable().mid(0, 4);
     qSort(colors);
     int p_idx = ui->palettes->currentRow();
-    if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+    if (palettes.palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
     {
-        QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+        QList<int> list = palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
         if (!list.isEmpty())
         {
             p_idx = list.first();
@@ -1088,7 +933,7 @@ void MainWindow::on_actionImport_scene_triggered()
                         {
                             if (colors.count() == 1)
                             {
-                                for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
+                                for (auto i = palettes.palettes_by_color.begin(); i != palettes.palettes_by_color.end(); ++i)
                                 {
                                     if (alikeColors(i.key(), colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision))
                                     {
@@ -1100,7 +945,7 @@ void MainWindow::on_actionImport_scene_triggered()
                             else
                             if (colors.count() == 2)
                             {
-                                for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+                                for (auto i = palettes.palettes_by_2colors.begin(); i != palettes.palettes_by_2colors.end(); ++i)
                                 {
                                     if (alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
                                     {
@@ -1112,7 +957,7 @@ void MainWindow::on_actionImport_scene_triggered()
                             else
                             if (colors.count() == 3)
                             {
-                                for (auto i = palettes_by_3colors.begin(); i != palettes_by_3colors.end() && p_idx == -1; ++i)
+                                for (auto i = palettes.palettes_by_3colors.begin(); i != palettes.palettes_by_3colors.end() && p_idx == -1; ++i)
                                 {
                                     if (alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
                                     {
@@ -1130,7 +975,7 @@ void MainWindow::on_actionImport_scene_triggered()
                             else
                             if (colors.count() == 4)
                             {
-                                for (auto i = palettes_by_4colors.begin(); i != palettes_by_4colors.end() && p_idx == -1; ++i)
+                                for (auto i = palettes.palettes_by_4colors.begin(); i != palettes.palettes_by_4colors.end() && p_idx == -1; ++i)
                                 {
                                     if (alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
                                     {
@@ -1160,7 +1005,7 @@ void MainWindow::on_actionImport_scene_triggered()
             if (p_idx != -1)
             {
                 QVector<QRgb> color_table;
-                foreach(QColor c, palettes[p_idx])
+                foreach(QColor c, palettes.palettes[p_idx])
                 {
                     color_table << c.rgb();
                 }
@@ -1193,7 +1038,7 @@ void MainWindow::on_actionImport_scene_triggered()
         for (int x = 0; x < out.width(); x++)
         {
             int p_idx = scene_attr[x / 8][y / 8];
-            auto c = palettes[p_idx];
+            auto c = palettes.palettes[p_idx];
 
             char l0 = scene.color_layer0[y][x];
             char l1 = scene.color_layer1[y][x];
@@ -1288,7 +1133,7 @@ void MainWindow::on_actionExport_scene_triggered()
         for (int x = 0; x < scene.color_layer0[y].count() / 8; x++)
         {
             int p_idx = scene_attr[x][y];
-            QList<ZxColorEnum> z = color_palette_table[p_idx];
+            QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
             scr0[attr_offs + y * 32 + x] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
             scr1[attr_offs + y * 32 + x] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
         }

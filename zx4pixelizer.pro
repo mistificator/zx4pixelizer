@@ -10,15 +10,16 @@ CONFIG += c++11
 
 SOURCES += \
     main.cpp \
+    zx4pixelizer.cpp \
     mainwindow.cpp \
     scenewindow.cpp \
     spritewindow.cpp
 
 HEADERS += \
+    zx4pixelizer.h \
     mainwindow.h \
     scenewindow.h \
-    spritewindow.h \
-    zx4pixelizer.h
+    spritewindow.h
 
 FORMS += \
     mainwindow.ui \

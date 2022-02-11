@@ -49,18 +49,9 @@ private:
     Ui::MainWindow *ui;
     SpriteWindow * current_sprite = 0;
     SceneWindow * current_scene = 0;
-
-    QMap<ZxColorEnum, QColor> color_table;
-    QMap<ZxColorEnum, QString> color_name;
-    QMap<int, QList<ZxColorEnum>> color_palette_table;
+    Zx4Palette palettes;
 
     bool eventFilter(QObject *, QEvent *);
-
-    QList<QList<QColor>> palettes;
-    QMap<QColor, QList<int>> palettes_by_color;
-    QMap<QPair<QColor, QColor>, QList<int>> palettes_by_2colors;
-    QMap<QPair<QColor, QColor>, QMap<QColor, QList<int>>> palettes_by_3colors;
-    QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
 
     QList<QColor> colors() const;
     void createPalettes();
