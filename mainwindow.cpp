@@ -501,7 +501,7 @@ QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img, bool use_alpha)
     return color_distrib2;
 }
 
-bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision) const
+bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision, int light_precision, int satur_precision) const
 {
     c1 = c1.toHsl();
     c2 = c2.toHsl();
@@ -523,20 +523,20 @@ bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision) const
             return false;
         }
     }
-    if (qAbs(c1.lightness() - c2.lightness()) > 48)
+    if (qAbs(c1.lightness() - c2.lightness()) > light_precision)
     {
         return false;
     }
-    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > 32)
+    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > satur_precision)
     {
         return false;
     }
     return true;
 }
 
-QMap<QColor, int> MainWindow::colorDistribution4(QImage img, int scale_x, int scale_y) const
+QMap<QColor, int> MainWindow::colorDistribution4(QImage img) const
 {
-    QMultiMap<int, QColor> color_distrib2 = colorDistribution(img.colorCount() == 0 ? scaleImage(img, qMin(img.width(), scale_x), qMin(img.height(), scale_y)) : img.scaled(qMin(img.width(), scale_x), qMin(img.height(), scale_y)));
+    QMultiMap<int, QColor> color_distrib2 = colorDistribution(img);
 
     QMap<QColor, int> color_distrib4;
     QColor prev_c, val_c;
@@ -626,7 +626,7 @@ QMultiMap<double, int> MainWindow::selectPalette(QMap<QColor, int> color_distrib
     return dist;
 }
 
-QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int scale_y) const
+QMultiMap<double, int> MainWindow::selectPalette(QImage img) const
 {
     if (img.colorCount() >= 4)
     {
@@ -643,7 +643,7 @@ QMultiMap<double, int> MainWindow::selectPalette(QImage img, int scale_x, int sc
             }
         }
     }
-    return selectPalette(colorDistribution4(img, scale_x, scale_y));
+    return selectPalette(colorDistribution4(img));
 }
 
 QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
@@ -1027,7 +1027,29 @@ void MainWindow::on_actionImport_scene_triggered()
     }
     current_scene->setFileName(filename);
 
-    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192)).convertToFormat(QImage::Format_Indexed8);
+#if 1
+    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
+    QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
+#else
+    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
+    for (int y = 0; y < img.height(); y++)
+    {
+        for (int x = 0; x < img.width(); x++)
+        {
+            QColor c = img.pixelColor(x, y);
+            const int k = 4;
+            img.setPixelColor(x, y, QColor(qMin(255, ((c.red() + k / 2) / k) * k), qMin(255, ((c.green() + k / 2) / k) * k), qMin(255, ((c.blue() + k / 2) / k) * k), c.alpha()));
+        }
+    }
+    auto img_dist = colorDistribution(img, false);
+    qDebug() << img_dist.count() << img_dist;
+    QVector<QRgb> img_color_table;
+    foreach (QColor c, img_dist.values().mid(0, 256))
+    {
+        img_color_table << c.rgba();
+    }
+    img = img.convertToFormat(QImage::Format_Indexed8, img_color_table);
+#endif
 
     Zx4Image scene;
     scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
@@ -1068,6 +1090,7 @@ void MainWindow::on_actionImport_scene_triggered()
                     qSort(colors); // indexes "palettes_by_color" sorted by color
 
                     int hue_precision = 5;
+                    const double t = 0.1;
                     do
                     {
                         if (colors.count() == 1)
@@ -1076,7 +1099,7 @@ void MainWindow::on_actionImport_scene_triggered()
                             {
                                 if (alikeColors(i.key(), colors.first(), hue_precision))
                                 {
-                                    p_idx = i.value().at(i.value().count() * 0.1);
+                                    p_idx = i.value().at(i.value().count() * t);
                                     break;
                                 }
                             }
@@ -1088,7 +1111,7 @@ void MainWindow::on_actionImport_scene_triggered()
                             {
                                 if (alikeColors(i.key().first, colors.first(), hue_precision) && alikeColors(i.key().second, colors.last(), hue_precision))
                                 {
-                                    p_idx = i.value().at(i.value().count() * 0.1);
+                                    p_idx = i.value().at(i.value().count() * t);
                                     break;
                                 }
                             }
@@ -1104,7 +1127,7 @@ void MainWindow::on_actionImport_scene_triggered()
                                     {
                                         if (alikeColors(k.key(), colors.at(2)))
                                         {
-                                            p_idx = k.value().at(k.value().count() * 0.1);
+                                            p_idx = k.value().at(k.value().count() * t);
                                             break;
                                         }
                                     }
@@ -1122,7 +1145,7 @@ void MainWindow::on_actionImport_scene_triggered()
                                     {
                                         if (alikeColors(k.key().first, colors.at(2), hue_precision) && alikeColors(k.key().second, colors.at(3), hue_precision))
                                         {
-                                            p_idx = k.value().at(k.value().count() * 0.1);
+                                            p_idx = k.value().at(k.value().count() * t);
                                             break;
                                         }
                                     }
@@ -1145,7 +1168,7 @@ void MainWindow::on_actionImport_scene_triggered()
                 {
                     color_table << c.rgb();
                 }
-                small_quad = small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
+                small_quad = img8.copy(QRect(x, y, 8, 8)).convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
                 p.drawImage(QRect(x, y, 8, 8), small_quad);
 
                 scene_attr[x / 8][y / 8] = p_idx;
