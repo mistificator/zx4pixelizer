@@ -1277,7 +1277,7 @@ void MainWindow::on_actionExport_scene_triggered()
 
 void MainWindow::on_actionAbout_ZX4_Pixelizer_triggered()
 {
-    QMessageBox::about(this, "ZX4 Pixelizer", "ZX4 Pixelizer\nImages & sprites manipulation tool\nfor ZX Spectrum 128K\n\n© 2022 ZXLDR Custom");
+    QMessageBox::about(this, "ZX4 Pixelizer", QString("ZX4 Pixelizer\nImages & sprites manipulation tool\nfor ZX Spectrum 128K\n\nVersion %1\n© 2022 ZXLDR Custom").arg(APP_VERSION));
 }
 
 
