@@ -1027,8 +1027,17 @@ void MainWindow::on_actionImport_scene_triggered()
     }
     current_scene->setFileName(filename);
 
-    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
+//    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
+    img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio);
     QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
+
+#if 0
+    auto img8_dist = colorDistribution(img8, false);
+    qDebug() << img8_dist.count() << img8_dist;
+
+    auto img_dist = colorDistribution(img, false);
+    qDebug() << img_dist.count() << img_dist;
+#endif
 
     Zx4Image scene;
     scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
@@ -1041,11 +1050,7 @@ void MainWindow::on_actionImport_scene_triggered()
     {
         for (int x = 0; x < img.width(); x += 8)
         {
-#if 1
-            QImage small_quad = img.copy(QRect(x, y, 8, 8));
-#else
             QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-#endif
             auto small_dist = colorDistribution(small_quad, false);
 
             int p_idx = -1;
@@ -1072,69 +1077,77 @@ void MainWindow::on_actionImport_scene_triggered()
                     QList<QColor> colors = dist4.values();
                     qSort(colors); // indexes "palettes_by_color" sorted by color
 
-                    int hue_precision = 5;
+                    const double ls = 1.0;
                     const double t = 0.1;
+
+                    int hue_precision = 10;
                     do
                     {
-                        if (colors.count() == 1)
+                        int light_satur_precision = 16;
+                        do
                         {
-                            for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
+                            if (colors.count() == 1)
                             {
-                                if (alikeColors(i.key(), colors.first(), hue_precision))
+                                for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
                                 {
-                                    p_idx = i.value().at(i.value().count() * t);
-                                    break;
-                                }
-                            }
-                        }
-                        else
-                        if (colors.count() == 2)
-                        {
-                            for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
-                            {
-                                if (alikeColors(i.key().first, colors.first(), hue_precision) && alikeColors(i.key().second, colors.last(), hue_precision))
-                                {
-                                    p_idx = i.value().at(i.value().count() * t);
-                                    break;
-                                }
-                            }
-                        }
-                        else
-                        if (colors.count() == 3)
-                        {
-                            for (auto i = palettes_by_3colors.begin(); i != palettes_by_3colors.end() && p_idx == -1; ++i)
-                            {
-                                if (alikeColors(i.key().first, colors.at(0), hue_precision) && alikeColors(i.key().second, colors.at(1), hue_precision))
-                                {
-                                    for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                                    if (alikeColors(i.key(), colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision))
                                     {
-                                        if (alikeColors(k.key(), colors.at(2)))
+                                        p_idx = i.value().at(i.value().count() * t);
+                                        break;
+                                    }
+                                }
+                            }
+                            else
+                            if (colors.count() == 2)
+                            {
+                                for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+                                {
+                                    if (alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
+                                    {
+                                        p_idx = i.value().at(i.value().count() * t);
+                                        break;
+                                    }
+                                }
+                            }
+                            else
+                            if (colors.count() == 3)
+                            {
+                                for (auto i = palettes_by_3colors.begin(); i != palettes_by_3colors.end() && p_idx == -1; ++i)
+                                {
+                                    if (alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
+                                    {
+                                        for (auto k = i.value().begin(); k != i.value().end(); ++k)
                                         {
-                                            p_idx = k.value().at(k.value().count() * t);
-                                            break;
+                                            if (alikeColors(k.key(), colors.at(2)))
+                                            {
+                                                p_idx = k.value().at(k.value().count() * t);
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                        else
-                        if (colors.count() == 4)
-                        {
-                            for (auto i = palettes_by_4colors.begin(); i != palettes_by_4colors.end() && p_idx == -1; ++i)
+                            else
+                            if (colors.count() == 4)
                             {
-                                if (alikeColors(i.key().first, colors.at(0), hue_precision) && alikeColors(i.key().second, colors.at(1), hue_precision))
+                                for (auto i = palettes_by_4colors.begin(); i != palettes_by_4colors.end() && p_idx == -1; ++i)
                                 {
-                                    for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                                    if (alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
                                     {
-                                        if (alikeColors(k.key().first, colors.at(2), hue_precision) && alikeColors(k.key().second, colors.at(3), hue_precision))
+                                        for (auto k = i.value().begin(); k != i.value().end(); ++k)
                                         {
-                                            p_idx = k.value().at(k.value().count() * t);
-                                            break;
+                                            if (alikeColors(k.key().first, colors.at(2), hue_precision) && alikeColors(k.key().second, colors.at(3), hue_precision))
+                                            {
+                                                p_idx = k.value().at(k.value().count() * t);
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
+                            light_satur_precision += 16;
                         }
+                        while (p_idx == -1 && light_satur_precision <= 64);
                         hue_precision += 5;
                     }
                     while (p_idx == -1 && hue_precision < 100 / (colors.count()));
@@ -1151,8 +1164,7 @@ void MainWindow::on_actionImport_scene_triggered()
                 {
                     color_table << c.rgb();
                 }
-                small_quad = img8.copy(QRect(x, y, 8, 8)).convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
-                p.drawImage(QRect(x, y, 8, 8), small_quad);
+                small_quad = small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
 
                 scene_attr[x / 8][y / 8] = p_idx;
                 for (int iy = 0; iy < 8; iy++)
@@ -1173,6 +1185,19 @@ void MainWindow::on_actionImport_scene_triggered()
                     }
                 }
             }
+        }
+    }
+
+    for (int y = 0; y < out.height(); y++)
+    {
+        for (int x = 0; x < out.width(); x++)
+        {
+            int p_idx = scene_attr[x / 8][y / 8];
+            auto c = palettes[p_idx];
+
+            char l0 = scene.color_layer0[y][x];
+            char l1 = scene.color_layer1[y][x];
+            out.setPixelColor(x, y, !l0 && !l1 ? c[0] : l0 && !l1 ? c[2] : !l0 && l1 ? c[1] : c[3]);
         }
     }
 

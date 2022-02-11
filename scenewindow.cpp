@@ -1,4 +1,5 @@
 #include <QFileInfo>
+#include <QPainter>
 #include "scenewindow.h"
 #include "ui_scenewindow.h"
 
@@ -7,6 +8,8 @@ SceneWindow::SceneWindow(QWidget *parent) :
     ui(new Ui::SceneWindow)
 {
     ui->setupUi(this);
+    ui->canvas->installEventFilter(this);
+
     setFileName(QString());
 }
 
@@ -64,4 +67,24 @@ void SceneWindow::setAttr(QMap<int, QMap<int, int>> a)
 QMap<int, QMap<int, int>> SceneWindow::attr() const
 {
     return scene_attr;
+}
+
+bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
+{
+    if (o == ui->canvas)
+    {
+        switch (ev->type())
+        {
+            case QEvent::Paint:
+                drawGrid();
+            break;
+            default:
+            break;
+        }
+    }
+    return QWidget::eventFilter(o, ev);
+}
+
+void SceneWindow::drawGrid()
+{
 }

@@ -32,6 +32,8 @@ public:
 
     void setAttr(QMap<int, QMap<int, int>>);
     QMap<int, QMap<int, int>> attr() const;
+private slots:
+    void drawGrid();
 private:
     Ui::SceneWindow *ui;
 
@@ -41,6 +43,8 @@ private:
     QMap<int, QMap<int, int>> scene_attr; // 32x24
 
     QImage src_imp_img;
+
+    bool eventFilter(QObject *, QEvent *);
 };
 
 #endif // SCENEWINDOW_H
