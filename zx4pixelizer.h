@@ -4,6 +4,7 @@
 #include <QVector>
 #include <QColor>
 #include <QMap>
+#include <QImage>
 
 enum ZxColorEnum {ZxBlack = 0, ZxBlue, ZxRed, ZxMagenta, ZxGreen, ZxCyan, ZxYellow, ZxWhite, ZxBrightBlack, ZxBrightBlue, ZxBrightRed, ZxBrightMagenta, ZxBrightGreen, ZxBrightCyan, ZxBrightYellow, ZxBrightWhite};
 
@@ -64,6 +65,11 @@ struct Zx4Palette
     QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
 
     void init();
+};
+
+struct Zx4Processing
+{
+    static QImage scaleImage(QImage img, int w, int h);
 };
 
 #endif // ZX4PIXELIZER_H

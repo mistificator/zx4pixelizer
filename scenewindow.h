@@ -15,7 +15,7 @@ class SceneWindow : public QWidget
     Q_OBJECT
 
 public:
-    explicit SceneWindow(QWidget *parent = nullptr);
+    explicit SceneWindow(const Zx4Palette & palettes, QWidget *parent = nullptr);
     ~SceneWindow();
 
     void setFileName(QString);
@@ -23,6 +23,7 @@ public:
 
     void setSourceImage(const QImage &);
     const QImage & sourceImage() const;
+    const QImage & renderedImage() const;
 
     virtual QSize sizeHint() const;
     QLabel * canvas() const;
@@ -32,19 +33,31 @@ public:
 
     void setAttr(QMap<int, QMap<int, int>>);
     QMap<int, QMap<int, int>> attr() const;
+
+    QPoint currentChar() const;
+    void setAttr(QPoint, int p_idx);
+    void setAttr(int p_idx);
+
+    void importChar(QPoint, int p_idx, QImage small_quad);
+signals:
+    void previewUpdateIsNeeded();
+    void charSelected(int p_idx);
 private slots:
     void drawGrid();
 private:
     Ui::SceneWindow *ui;
+    const Zx4Palette & palettes;
+
+    bool eventFilter(QObject *, QEvent *);
 
     QString file_name;
 
     Zx4Image scene;
     QMap<int, QMap<int, int>> scene_attr; // 32x24
 
-    QImage src_imp_img;
-
-    bool eventFilter(QObject *, QEvent *);
+    QImage src_imp_img, rdr_img;
+    int grid_x = 1, grid_y = 1;
+    QPoint current_char;
 };
 
 #endif // SCENEWINDOW_H

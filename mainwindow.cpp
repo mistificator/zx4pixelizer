@@ -156,20 +156,9 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
     return QMainWindow::eventFilter(o, ev);
 }
 
-QList<QColor> MainWindow::colors() const
-{
-    QList<QColor> list = QList<QColor>() << Qt::black << Qt::black << Qt::black << Qt::black;
-    QListWidgetItem * item = ui->palettes->currentItem();
-    if (!item)
-    {
-        return list;
-    }
-    return palettes.palettes.at(item->data(Qt::UserRole).toInt());
-}
-
 void MainWindow::on_palettes_itemSelectionChanged()
 {
-    QList<QColor> list = colors();
+    QList<QColor> list = palettes.palettes[ui->palettes->currentRow()];
     QPixmap px(QSize(32, 32));
     px.fill(list[0]);
     ui->actionColor_00->setIcon(px);
@@ -180,10 +169,18 @@ void MainWindow::on_palettes_itemSelectionChanged()
     px.fill(list[3]);
     ui->actionColor_11->setIcon(px);
 
-    if (current_sprite)
+    if (ui->mdiArea->activeSubWindow())
     {
-        current_sprite->setPaletteIndex(ui->palettes->currentRow());
-        current_sprite->setColors(list);
+        if (current_sprite && ui->mdiArea->activeSubWindow()->widget() == current_sprite)
+        {
+            current_sprite->setPaletteIndex(ui->palettes->currentRow());
+            current_sprite->setColors(list);
+        }
+        if (current_scene && ui->mdiArea->activeSubWindow()->widget() == current_scene)
+        {
+            current_scene->setAttr(ui->palettes->currentRow());
+            current_scene->canvas()->update();
+        }
     }
 }
 
@@ -261,46 +258,6 @@ void MainWindow::on_actionResize_image_triggered()
     }
 
     current_sprite->resizeImage(QSize(new_image_x, new_image_y));
-}
-
-QImage MainWindow::scaleImage(QImage img, int w, int h) const
-{
-    img = img.convertToFormat(QImage::Format_ARGB32);
-    QImage out(img.scaled(w, h, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
-    out.fill(QColor(0, 0, 0, 0));
-    for (int y = 0; y < img.height(); y++)
-    {
-        for (int x = 0; x < img.width(); x++)
-        {
-            int ix = x * out.width() / img.width();
-            int iy = y * out.height() / img.height();
-            QColor px;
-
-            QColor old_px_rgb = out.pixelColor(ix, iy);
-            QColor new_px_rgb = img.pixelColor(x, y);
-
-            QColor old_px_hsl = old_px_rgb.toHsl();
-            QColor new_px_hsl = new_px_rgb.toHsl();
-
-            if (new_px_hsl.hslHue() == -1 || old_px_hsl.hslHue() == -1)
-            {
-                px = new_px_rgb;
-            }
-            else
-            {
-                px = new_px_hsl.hslSaturation() > old_px_hsl.hslSaturation() ? new_px_hsl : old_px_hsl;
-
-                px.setHsl(
-                            px.hslHue(),
-                            px.hslSaturation(),
-                            px.lightness(),
-                            qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
-            }
-
-            out.setPixelColor(ix, iy, px.toRgb());
-        }
-    }
-    return out;
 }
 
 QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img, bool use_alpha) const
@@ -498,12 +455,12 @@ QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
         return QImage();
     }
 
-    ui->palettes->setCurrentItem(ui->palettes->item(palette_number));
+    ui->palettes->setCurrentRow(palette_number);
 
-    img = scaleImage(img, current_sprite->canvasSize().width(), current_sprite->canvasSize().height());
+    img = Zx4Processing::scaleImage(img, current_sprite->canvasSize().width(), current_sprite->canvasSize().height());
 
     QVector<QRgb> color_table;
-    foreach (QColor color, colors())
+    foreach (QColor color, palettes.palettes[palette_number])
     {
         color_table << color.rgb();
     }
@@ -566,7 +523,7 @@ void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
 
 void MainWindow::on_actionNew_triggered()
 {
-    current_sprite = new SpriteWindow();
+    current_sprite = new SpriteWindow(palettes);
     current_sprite->setAction(SpriteWindow::ActionPencil, ui->actionPencil);
     current_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
     current_sprite->setAction(SpriteWindow::ActionMove, ui->actionMove);
@@ -804,7 +761,7 @@ void MainWindow::on_actionSave_triggered()
 
     QImage img(current_sprite->canvasSize().width(), current_sprite->canvasSize().height(), QImage::Format_Indexed8);
     QVector<QRgb> color_table;
-    foreach(QColor color, colors())
+    foreach(QColor color, palettes.palettes[ui->palettes->currentRow()])
     {
         color_table << color.rgb();
     }
@@ -866,14 +823,17 @@ void MainWindow::on_actionImport_scene_triggered()
 
     if (current_scene == 0)
     {
-        current_scene = new SceneWindow();
+        current_scene = new SceneWindow(palettes);
         ui->mdiArea->addSubWindow(current_scene);
         current_scene->show();
+        connect(current_scene, SIGNAL(charSelected(int)), this, SLOT(selectPalette(int)), Qt::QueuedConnection);
     }
     current_scene->setFileName(filename);
 
 //    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
     img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio);
+    current_scene->setSourceImage(img);
+
     QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
 
 #if 0
@@ -922,7 +882,7 @@ void MainWindow::on_actionImport_scene_triggered()
                     QList<QColor> colors = dist4.values();
                     qSort(colors); // indexes "palettes_by_color" sorted by color
 
-                    const double ls = 1.0;
+                    const double ls = 0.85;
                     const double t = 0.1;
 
                     int hue_precision = 10;
@@ -1004,52 +964,11 @@ void MainWindow::on_actionImport_scene_triggered()
 
             if (p_idx != -1)
             {
-                QVector<QRgb> color_table;
-                foreach(QColor c, palettes.palettes[p_idx])
-                {
-                    color_table << c.rgb();
-                }
-                small_quad = small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
-
-                scene_attr[x / 8][y / 8] = p_idx;
-                for (int iy = 0; iy < 8; iy++)
-                {
-                    for (int ix = 0; ix < 8; ix++)
-                    {
-                        int idx = small_quad.pixelIndex(ix, iy);
-                        if (idx >= 0 && idx < 4)
-                        {
-                            scene.color_layer0[iy + y][ix + x] = idx == 0 || idx == 1 ? 0 : 1;
-                            scene.color_layer1[iy + y][ix + x] = idx == 0 || idx == 2 ? 0 : 1;
-                            scene.alpha_layer[iy + y][ix + x] = 1;
-                        }
-                        else
-                        {
-                            qDebug() << "wrong color index" << idx;
-                        }
-                    }
-                }
+                current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
             }
         }
     }
-
-    for (int y = 0; y < out.height(); y++)
-    {
-        for (int x = 0; x < out.width(); x++)
-        {
-            int p_idx = scene_attr[x / 8][y / 8];
-            auto c = palettes.palettes[p_idx];
-
-            char l0 = scene.color_layer0[y][x];
-            char l1 = scene.color_layer1[y][x];
-            out.setPixelColor(x, y, !l0 && !l1 ? c[0] : l0 && !l1 ? c[2] : !l0 && l1 ? c[1] : c[3]);
-        }
-    }
-
-    current_scene->setImage(scene);
-    current_scene->setAttr(scene_attr);
-    current_scene->setSourceImage(img);
-    current_scene->canvas()->setPixmap(QPixmap::fromImage(out));
+    current_scene->canvas()->update();
 
     foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
     {
@@ -1101,11 +1020,17 @@ void MainWindow::on_actionExport_scene_triggered()
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX Spectrum screen (*.scr0)");
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX Spectrum screen (*.scr0);;PNG image (*.png)");
     if (filename.isEmpty())
     {
         return;
     }
+    if (QFileInfo(filename).suffix().compare("png", Qt::CaseInsensitive) == 0)
+    {
+        current_scene->renderedImage().convertToFormat(QImage::Format_RGB32).save(filename, "PNG");
+        return;
+    }
+
     if (QFileInfo(filename).suffix().isEmpty())
     {
         filename += ".scr0";
@@ -1192,4 +1117,7 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
     }
 }
 
-
+void MainWindow::selectPalette(int p_idx)
+{
+    ui->palettes->setCurrentRow(p_idx);
+}

@@ -15,7 +15,7 @@ class SpriteWindow : public QWidget
     Q_OBJECT
 
 public:
-    explicit SpriteWindow(QWidget *parent = nullptr);
+    explicit SpriteWindow(const Zx4Palette & palettes, QWidget *parent = nullptr);
     ~SpriteWindow();
 
     void setFileName(QString);
@@ -62,6 +62,7 @@ private slots:
 
 private:
     Ui::SpriteWindow *ui;
+    const Zx4Palette & palettes;
 
     bool eventFilter(QObject *, QEvent *);
 

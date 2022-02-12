@@ -6,9 +6,10 @@
 #include "spritewindow.h"
 #include "ui_spritewindow.h"
 
-SpriteWindow::SpriteWindow(QWidget *parent) :
+SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::SpriteWindow)
+    ui(new Ui::SpriteWindow),
+    palettes(palettes)
 {
     ui->setupUi(this);
     ui->canvas->installEventFilter(this);
@@ -249,13 +250,13 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                             }
                         }
                     }
+                    QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
                 }
                 if (me->buttons().testFlag(Qt::RightButton) || (me->buttons().testFlag(Qt::LeftButton) && acts[ActionEraser] && acts[ActionEraser]->isChecked()))
                 {
                     eraseDot(x, y);
+                    QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
                 }
-                QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
-
             }
             break;
             default:

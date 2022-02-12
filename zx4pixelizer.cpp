@@ -143,3 +143,43 @@ void Zx4Palette::init()
         }
     }
 }
+
+QImage Zx4Processing::scaleImage(QImage img, int w, int h)
+{
+    img = img.convertToFormat(QImage::Format_ARGB32);
+    QImage out(img.scaled(w, h, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
+    out.fill(QColor(0, 0, 0, 0));
+    for (int y = 0; y < img.height(); y++)
+    {
+        for (int x = 0; x < img.width(); x++)
+        {
+            int ix = x * out.width() / img.width();
+            int iy = y * out.height() / img.height();
+            QColor px;
+
+            QColor old_px_rgb = out.pixelColor(ix, iy);
+            QColor new_px_rgb = img.pixelColor(x, y);
+
+            QColor old_px_hsl = old_px_rgb.toHsl();
+            QColor new_px_hsl = new_px_rgb.toHsl();
+
+            if (new_px_hsl.hslHue() == -1 || old_px_hsl.hslHue() == -1)
+            {
+                px = new_px_rgb;
+            }
+            else
+            {
+                px = new_px_hsl.hslSaturation() > old_px_hsl.hslSaturation() ? new_px_hsl : old_px_hsl;
+
+                px.setHsl(
+                            px.hslHue(),
+                            px.hslSaturation(),
+                            px.lightness(),
+                            qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
+            }
+
+            out.setPixelColor(ix, iy, px.toRgb());
+        }
+    }
+    return out;
+}

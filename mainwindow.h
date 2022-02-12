@@ -23,6 +23,8 @@ public:
     ~MainWindow();
 
 private slots:
+    void selectPalette(int p_idx);
+
     void on_actionQuit_triggered();
     void on_palettes_itemSelectionChanged();
     void on_actionResize_canvas_triggered();
@@ -53,7 +55,6 @@ private:
 
     bool eventFilter(QObject *, QEvent *);
 
-    QList<QColor> colors() const;
     void createPalettes();
     QImage scaleImage(QImage img, int w, int h) const;
     QMultiMap<int, QColor> colorDistribution(QImage img, bool use_alpha = true) const;
