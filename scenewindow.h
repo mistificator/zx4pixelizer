@@ -57,7 +57,7 @@ private:
 
     QImage src_imp_img, rdr_img;
     int grid_x = 1, grid_y = 1;
-    QPoint current_char;
+    QPoint selected_char, update_char;
 };
 
 #endif // SCENEWINDOW_H

@@ -84,7 +84,7 @@ QMap<int, QMap<int, int>> SceneWindow::attr() const
 
 QPoint SceneWindow::currentChar() const
 {
-    return current_char;
+    return selected_char;
 }
 
 void SceneWindow::setAttr(QPoint p, int p_idx)
@@ -94,7 +94,7 @@ void SceneWindow::setAttr(QPoint p, int p_idx)
 
 void SceneWindow::setAttr(int p_idx)
 {
-    setAttr(current_char, p_idx);
+    setAttr(selected_char, p_idx);
 }
 
 bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
@@ -108,6 +108,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             break;
             case QEvent::MouseButtonPress:
             case QEvent::MouseMove:
+            case QEvent::MouseButtonDblClick:
             {
                 QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
                 double step = qMin(1.0 * grid_x / src_imp_img.width(), 1.0 * grid_y / src_imp_img.height());
@@ -120,19 +121,38 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                 {
                     if (me->modifiers().testFlag(Qt::ShiftModifier))
                     {
-                        importChar(
-                            QPoint(x / 8, y / 8),
-                            scene_attr[x / 8][y / 8] = scene_attr[current_char.x()][current_char.y()],
-                            src_imp_img.convertToFormat(QImage::Format_Indexed8).copy((x / 8) * 8, (y / 8) * 8, 8, 8));
+                        if (!selected_char.isNull())
+                        {
+                            update_char = QPoint(x / 8, y / 8);
+                            importChar(
+                                update_char,
+                                scene_attr[update_char.x()][update_char.y()] = scene_attr[selected_char.x()][selected_char.y()],
+                                src_imp_img.convertToFormat(QImage::Format_Indexed8).copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
+                        }
                     }
-                    current_char = QPoint(x / 8, y / 8);
                     if (me->modifiers().testFlag(Qt::ControlModifier))
                     {
-                        emit charSelected(scene_attr[current_char.x()][current_char.y()]);
+                        if (me->type() == QMouseEvent::MouseButtonDblClick && selected_char == QPoint(x / 8, y / 8))
+                        {
+                            selected_char = QPoint();
+                        }
+                        else
+                        {
+                            selected_char = QPoint(x / 8, y / 8);
+                            emit charSelected(scene_attr[selected_char.x()][selected_char.y()]);
+                        }
                     }
                     QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
                 }
             }
+            break;
+            case QEvent::MouseButtonRelease:
+            {
+                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
+                update_char = QPoint();
+                QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
+            }
+            break;
             default:
             break;
         }
@@ -163,6 +183,18 @@ void SceneWindow::drawGrid()
     QPainter p(ui->canvas);
     p.fillRect(ui->canvas->rect(), Qt::black);
     p.drawImage(0, 0, out);
+
+    double kx = 8.0 * grid_x / src_imp_img.width();
+    double ky = 8.0 * grid_y / src_imp_img.height();
+    auto list = QList<QPair<QPoint, QColor> >() << QPair<QPoint, QColor>(selected_char, QColor(0, 255, 0, 128)) << QPair<QPoint, QColor>(update_char, QColor(255, 0, 0, 128));
+    for (auto i = list.begin(); i != list.end(); ++i)
+    {
+        if (!i->first.isNull())
+        {
+            p.setPen(QPen(i->second, 3, Qt::DotLine, Qt::RoundCap));
+            p.drawRect(i->first.x() * kx, i->first.y() * ky, kx, ky);
+        }
+    }
 
     QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
 }

@@ -1053,7 +1053,7 @@ void MainWindow::on_actionExport_scene_triggered()
         }
     }
     int attr_offs = 192 * 32;
-    for (int y = 0; y < scene.color_layer0.count() / 8; y++)
+    for (int y = 0; y < (scene.color_layer0.count() + 7) / 8; y++)
     {
         for (int x = 0; x < scene.color_layer0[y].count() / 8; x++)
         {
