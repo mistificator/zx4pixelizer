@@ -77,17 +77,30 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionNew"/>
-    <addaction name="actionOpen"/>
-    <addaction name="actionSave"/>
-    <addaction name="actionSave_as"/>
+    <widget class="QMenu" name="menuSprite">
+     <property name="title">
+      <string>Sprite</string>
+     </property>
+     <addaction name="actionNew"/>
+     <addaction name="actionOpen"/>
+     <addaction name="actionSave"/>
+     <addaction name="actionSave_as"/>
+     <addaction name="separator"/>
+     <addaction name="actionImport"/>
+     <addaction name="actionExport"/>
+    </widget>
+    <widget class="QMenu" name="menuScene">
+     <property name="title">
+      <string>Scene</string>
+     </property>
+     <addaction name="actionImport_scene"/>
+     <addaction name="actionExport_scene"/>
+    </widget>
     <addaction name="separator"/>
-    <addaction name="actionImport"/>
-    <addaction name="actionExport"/>
     <addaction name="separator"/>
-    <addaction name="actionImport_scene"/>
-    <addaction name="actionExport_scene"/>
     <addaction name="separator"/>
+    <addaction name="menuSprite"/>
+    <addaction name="menuScene"/>
     <addaction name="actionQuit"/>
    </widget>
    <widget class="QMenu" name="menuTools">
@@ -428,7 +441,7 @@
   </action>
   <action name="actionNew">
    <property name="text">
-    <string> New sprite</string>
+    <string>New sprite</string>
    </property>
   </action>
   <action name="actionOpen">
