@@ -47,6 +47,8 @@ private slots:
     void on_actionExport_triggered();
     void on_actionAbout_ZX4_Pixelizer_triggered();
     void on_mdiArea_subWindowActivated(QMdiSubWindow *msw);
+    void on_paletteIndex_currentIndexChanged(int index);
+
 private:
     Ui::MainWindow *ui;
     SpriteWindow * current_sprite = 0;
@@ -56,12 +58,6 @@ private:
     bool eventFilter(QObject *, QEvent *);
 
     void createPalettes();
-    QImage scaleImage(QImage img, int w, int h) const;
-    QMultiMap<int, QColor> colorDistribution(QImage img, bool use_alpha = true) const;
-    bool alikeColors(QColor c1, QColor c2, int hue_precision = 20, int light_precision = 32, int satur_precision = 32) const;
-    QMap<QColor, int> colorDistribution4(QImage img) const;
-    QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4) const;
-    QMultiMap<double, int> selectPalette(QImage img) const;
     QImage importImage(QImage img, int palette_number, bool use_alpha);
 
     void showEvent(QShowEvent *);

@@ -97,6 +97,30 @@ void SceneWindow::setAttr(int p_idx)
     setAttr(selected_char, p_idx);
 }
 
+void SceneWindow::setCurrentColorIndex(int i)
+{
+    current_color_index = i;
+}
+
+int SceneWindow::currentColorIndex() const
+{
+    return current_color_index;
+}
+
+void SceneWindow::setPixel(QPoint p, int color_index)
+{
+    if (p.y() < 0 || p.y() >= scene.color_layer0.count())
+    {
+        return;
+    }
+    if (p.x() < 0 || p.x() >= scene.color_layer0[p.y()].count())
+    {
+        return;
+    }
+    scene.color_layer0[p.y()][p.x()] = color_index == 0 || color_index == 1 ? 0 : 1;
+    scene.color_layer1[p.y()][p.x()] = color_index == 0 || color_index == 2 ? 0 : 1;
+}
+
 bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
 {
     if (o == ui->canvas)
@@ -130,6 +154,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                                 src_imp_img.convertToFormat(QImage::Format_Indexed8).copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
                         }
                     }
+                    else
                     if (me->modifiers().testFlag(Qt::ControlModifier))
                     {
                         if (me->type() == QMouseEvent::MouseButtonDblClick && selected_char == QPoint(x / 8, y / 8))
@@ -140,6 +165,14 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                         {
                             selected_char = QPoint(x / 8, y / 8);
                             emit charSelected(scene_attr[selected_char.x()][selected_char.y()]);
+                        }
+                    }
+                    else
+                    if (me->modifiers().testFlag(Qt::NoModifier))
+                    {
+                        if (selected_char == QPoint(x / 8, y / 8))
+                        {
+                            setPixel(QPoint(x, y), currentColorIndex());
                         }
                     }
                     QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
@@ -197,6 +230,119 @@ void SceneWindow::drawGrid()
     }
 
     QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
+}
+
+int SceneWindow::selectPalette(QImage small_quad) const
+{
+    auto small_dist = Zx4Processing::colorDistribution(small_quad, false);
+
+    int p_idx = -1;
+    if (small_dist.isEmpty())
+    {
+        return p_idx;
+    }
+
+    int k = 0;
+    QMap<int, QColor> dist4;
+    for (auto i = --small_dist.end(); k < 4; --i, ++k)
+    {
+        int key = i.key();
+        while (dist4.contains(key))
+        {
+            key++;
+        }
+        dist4[key] = i.value();
+        if (i == small_dist.begin())
+        {
+            break;
+        }
+    }
+
+    do
+    {
+        QList<QColor> colors = dist4.values();
+        qSort(colors); // indexes "palettes_by_color" sorted by color
+
+        const double ls = 0.85;
+        const double t = 0.1;
+
+        int hue_precision = 10;
+        do
+        {
+            int light_satur_precision = 16;
+            do
+            {
+                if (colors.count() == 1)
+                {
+                    for (auto i = palettes.palettes_by_color.begin(); i != palettes.palettes_by_color.end(); ++i)
+                    {
+                        if (Zx4Processing::alikeColors(i.key(), colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        {
+                            p_idx = i.value().at(i.value().count() * t);
+                            break;
+                        }
+                    }
+                }
+                else
+                if (colors.count() == 2)
+                {
+                    for (auto i = palettes.palettes_by_2colors.begin(); i != palettes.palettes_by_2colors.end(); ++i)
+                    {
+                        if (Zx4Processing::alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        {
+                            p_idx = i.value().at(i.value().count() * t);
+                            break;
+                        }
+                    }
+                }
+                else
+                if (colors.count() == 3)
+                {
+                    for (auto i = palettes.palettes_by_3colors.begin(); i != palettes.palettes_by_3colors.end() && p_idx == -1; ++i)
+                    {
+                        if (Zx4Processing::alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        {
+                            for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                            {
+                                if (Zx4Processing::alikeColors(k.key(), colors.at(2)))
+                                {
+                                    p_idx = k.value().at(k.value().count() * t);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                if (colors.count() == 4)
+                {
+                    for (auto i = palettes.palettes_by_4colors.begin(); i != palettes.palettes_by_4colors.end() && p_idx == -1; ++i)
+                    {
+                        if (Zx4Processing::alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        {
+                            for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                            {
+                                if (Zx4Processing::alikeColors(k.key().first, colors.at(2), hue_precision) && Zx4Processing::alikeColors(k.key().second, colors.at(3), hue_precision))
+                                {
+                                    p_idx = k.value().at(k.value().count() * t);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                light_satur_precision += 16;
+            }
+            while (p_idx == -1 && light_satur_precision <= 64);
+            hue_precision += 5;
+        }
+        while (p_idx == -1 && hue_precision < 100 / (colors.count()));
+
+        dist4.erase(dist4.begin());
+    }
+    while (p_idx == -1 && !dist4.isEmpty());
+
+    return p_idx;
 }
 
 void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)

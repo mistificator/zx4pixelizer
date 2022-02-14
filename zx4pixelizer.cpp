@@ -67,7 +67,7 @@ void Zx4Palette::init()
 
                             QList<QRgb> ml1;
                             ml1 << m[0].rgb() << m[1].rgb() << m[2].rgb() << m[3].rgb();
-                            if (ml1.toSet().count() != 4)
+                            if (ml1.toSet().count() < 2) // if (ml1.toSet().count() != 4)
                             {
                                 continue;
                             }
@@ -78,7 +78,13 @@ void Zx4Palette::init()
                                 continue;
                             }
 
-                            palettes << (QList<QColor>() << m[0] << m[1] << m[2] << m[3]);
+                            QList<QColor> list;
+                            list << m[0] << m[1] << m[2] << m[3];
+                            if (palettes.contains(list))
+                            {
+                                continue;
+                            }
+                            palettes << list;
 
                             palettes_by_color[m[0]] << color_num;
                             palettes_by_color[m[1]] << color_num;
@@ -144,6 +150,94 @@ void Zx4Palette::init()
     }
 }
 
+QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib4) const
+{
+    QMultiMap<double, int> dist;
+    for (int i = 0; i < palettes.count(); i++)
+    {
+        QList<QColor> pal = palettes[i];
+        if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3] || pal[1] == pal[2])
+        {
+            continue;
+        }
+        double d = 0;
+        foreach (QColor p, pal)
+        {
+            QColor p_hsl = p.toHsl();
+            int p_h = p_hsl.hslHue();
+            int p_s = p_hsl.hslSaturation();
+            int p_l = p_hsl.lightness();
+            for(QMap<QColor, int>::iterator c = color_distrib4.begin(); c != color_distrib4.end(); ++c)
+            {
+                QColor c_hsl = c.key().toHsl();
+                int c_h = c_hsl.hslHue();
+                int c_s = c_hsl.hslSaturation();
+                int c_l = c_hsl.lightness();
+
+                double _d = 0;
+                if (p_h != -1 && c_h != -1)
+                {
+                    if (p_h < c_h)
+                    {
+                        p_h += 360;
+                    }
+                    _d = p_h - c_h;
+                    if (_d > 180)
+                    {
+                        _d = 360 - _d;
+                    }
+                }
+                else
+                if (p_h != c_h)
+                {
+                    _d += 90;
+                }
+
+//                _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
+                _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
+//
+                /*
+                if (qAbs(p_s - c_s) + qAbs(p_l - c_l) > 96)
+                {
+                    _d += 90;
+                }
+                */
+
+                d += _d / c.value();
+            }
+        }
+        if (d > 0)
+        {
+            dist.insert(d, i);
+        }
+    }
+
+//    qDebug() << dist;
+
+    return dist;
+}
+
+QMultiMap<double, int> Zx4Palette::selectPalette(QImage img) const
+{
+    if (img.colorCount() >= 4)
+    {
+        QVector<QRgb> colors = img.colorTable();
+        if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+        {
+            QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+            if (!list.isEmpty())
+            {
+                int p_idx = list.first();
+                QMultiMap<double, int> map;
+                map.insert(0, p_idx);
+                return map;
+            }
+        }
+    }
+    return selectPalette(Zx4Processing::colorDistribution4(img));
+}
+
+
 QImage Zx4Processing::scaleImage(QImage img, int w, int h)
 {
     img = img.convertToFormat(QImage::Format_ARGB32);
@@ -182,4 +276,158 @@ QImage Zx4Processing::scaleImage(QImage img, int w, int h)
         }
     }
     return out;
+}
+
+QMultiMap<int, QColor> Zx4Processing::colorDistribution(QImage img, bool use_alpha)
+{
+    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+
+    QMap<QColor, int> color_distrib;
+    QMultiMap<int, QColor> color_distrib2;
+    QImage detect_colors_img = img.convertToFormat(QImage::Format_Indexed8);
+    QByteArray ba = QByteArray::fromRawData(reinterpret_cast<const char *>(detect_colors_img.constBits()), detect_colors_img.width() * detect_colors_img.height());
+    QVector<QRgb> color_table = detect_colors_img.colorTable();
+    for (int i = 0; i < color_table.count(); i++)
+    {
+        int n = ba.count(i);
+        if (n > 0)
+        {
+            color_distrib[color_table[i]] += n;
+        }
+    }
+
+    if (use_alpha)
+    {
+        for (int y = 0; y < img.height(); y++)
+        {
+            for (int x = 0; x < img.width(); x++)
+            {
+                if ((src_alpha_channel && qAlpha(img.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
+                {
+                    color_distrib.remove(detect_colors_img.pixel(x, y));
+                }
+            }
+        }
+    }
+
+    for (auto i = color_distrib.begin(); i != color_distrib.end(); ++i)
+    {
+        if (i.value() > 0)
+        {
+            color_distrib2.insert(i.value(), i.key());
+        }
+    }
+
+    return color_distrib2;
+}
+
+bool Zx4Processing::alikeColors(QColor c1, QColor c2, int hue_precision, int light_precision, int satur_precision)
+{
+    c1 = c1.toHsl();
+    c2 = c2.toHsl();
+    int c1_h = c1.hslHue();
+    int c2_h = c2.hslHue();
+    if (c1_h != -1 && c2_h != -1)
+    {
+        if (c1_h < c2_h)
+        {
+            c1_h += 360;
+        }
+        int _d = c1_h - c2_h;
+        if (_d > 180)
+        {
+            _d = 360 - _d;
+        }
+        if (_d > hue_precision)
+        {
+            return false;
+        }
+    }
+    if (qAbs(c1.lightness() - c2.lightness()) > light_precision)
+    {
+        return false;
+    }
+    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > satur_precision)
+    {
+        return false;
+    }
+    return true;
+}
+
+QMap<QColor, int> Zx4Processing::colorDistribution4(QImage img)
+{
+    QMultiMap<int, QColor> color_distrib2 = colorDistribution(img);
+
+    QMap<QColor, int> color_distrib4;
+    QColor prev_c, val_c;
+    for (auto i = color_distrib2.end(); i != color_distrib2.begin() && color_distrib4.count() < 4;)
+    {
+        --i;
+        QColor c = i.value().toHsl();
+        if (!prev_c.isValid() || !alikeColors(c, prev_c))
+        {
+            color_distrib4[val_c = c] = i.key();
+        }
+        else
+        if (val_c.isValid())
+        {
+            color_distrib4[val_c] += i.key();
+        }
+        prev_c = c;
+    }
+
+    return color_distrib4;
+}
+
+QImage Zx4Processing::importImage(QImage img, QVector<QRgb> color_table, bool use_alpha)
+{
+    QRgb alpha_pixel;
+    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+    if (use_alpha)
+    {
+        if (!src_alpha_channel)
+        {
+            alpha_pixel = img.pixel(0, 0);
+        }
+        else
+        {
+            alpha_pixel = color_table.first() & 0x00FFFFFF; // duplicate color with full opacity
+            for (int y = 0; y < img.height(); y++)
+            {
+                for (int x = 0; x < img.width(); x++)
+                {
+                    if (qAlpha(img.pixel(x, y)) < 128)
+                    {
+                        img.setPixel(x, y, alpha_pixel);
+                    }
+                }
+            }
+        }
+
+        color_table << alpha_pixel;
+    }
+
+    img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+
+    if (use_alpha)
+    {
+        if (!src_alpha_channel)
+        {
+            alpha_pixel = img.pixel(0, 0);
+            for (int y = 0; y < img.height(); y++)
+            {
+                for (int x = 0; x < img.width(); x++)
+                {
+                    if (img.pixel(x, y) == alpha_pixel)
+                    {
+                        img.setPixel(x, y, 4); // alpha_pixel index
+                    }
+                }
+            }
+        }
+        color_table.last() = qRgba(0, 0, 0, 0);
+        img.setColorTable(color_table);
+    }
+
+    return img;
 }

@@ -45,7 +45,10 @@ MainWindow::MainWindow(QWidget *parent)
     ui->palettes->setStyleSheet("QListWidget::item:selected { background: rgb(100, 255, 100); }");
 
     ui->actionNew->trigger();
-    ui->palettes->setCurrentRow(327 - 1);
+
+    //    ui->palettes->setCurrentRow(327 - 1);
+    ui->paletteIndex->setCurrentIndex(540 - 1);
+    QMetaObject::invokeMethod(this, "on_paletteIndex_currentIndexChanged", Qt::QueuedConnection, Q_ARG(int, ui->paletteIndex->currentIndex()));
 }
 
 MainWindow::~MainWindow()
@@ -75,7 +78,9 @@ void MainWindow::createPalettes()
         item->setToolTip((QStringList() << QString("#%1").arg(p_idx + 1) << palettes.color_name[z[0]] << palettes.color_name[z[1]] << palettes.color_name[z[2]] << palettes.color_name[z[3]]).join("\n"));
         item->setIcon(px);
         ui->palettes->addItem(item);
+        ui->paletteIndex->addItem(px, QString::number(p_idx + 1));
     }
+    ui->paletteIndex->lineEdit()->setValidator(new QIntValidator(1, palettes.palettes.count()));
 }
 
 void MainWindow::showEvent(QShowEvent *)
@@ -182,6 +187,8 @@ void MainWindow::on_palettes_itemSelectionChanged()
             current_scene->canvas()->update();
         }
     }
+
+    ui->paletteIndex->setCurrentIndex(ui->palettes->currentRow());
 }
 
 void MainWindow::on_actionColor_00_toggled(bool)
@@ -189,6 +196,10 @@ void MainWindow::on_actionColor_00_toggled(bool)
     if (current_sprite)
     {
         current_sprite->setCurrentColorIndex(0);
+    }
+    if (current_scene)
+    {
+        current_scene->setCurrentColorIndex(0);
     }
 }
 
@@ -198,6 +209,10 @@ void MainWindow::on_actionColor_01_toggled(bool)
     {
         current_sprite->setCurrentColorIndex(1);
     }
+    if (current_scene)
+    {
+        current_scene->setCurrentColorIndex(1);
+    }
 }
 
 void MainWindow::on_actionColor_10_toggled(bool)
@@ -206,6 +221,10 @@ void MainWindow::on_actionColor_10_toggled(bool)
     {
         current_sprite->setCurrentColorIndex(2);
     }
+    if (current_scene)
+    {
+        current_scene->setCurrentColorIndex(2);
+    }
 }
 
 void MainWindow::on_actionColor_11_toggled(bool)
@@ -213,6 +232,10 @@ void MainWindow::on_actionColor_11_toggled(bool)
     if (current_sprite)
     {
         current_sprite->setCurrentColorIndex(3);
+    }
+    if (current_scene)
+    {
+        current_scene->setCurrentColorIndex(3);
     }
 }
 
@@ -260,194 +283,6 @@ void MainWindow::on_actionResize_image_triggered()
     current_sprite->resizeImage(QSize(new_image_x, new_image_y));
 }
 
-QMultiMap<int, QColor> MainWindow::colorDistribution(QImage img, bool use_alpha) const
-{
-    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
-
-    QMap<QColor, int> color_distrib;
-    QMultiMap<int, QColor> color_distrib2;
-    QImage detect_colors_img = img.convertToFormat(QImage::Format_Indexed8);
-    QByteArray ba = QByteArray::fromRawData(reinterpret_cast<const char *>(detect_colors_img.constBits()), detect_colors_img.width() * detect_colors_img.height());
-    QVector<QRgb> color_table = detect_colors_img.colorTable();
-    for (int i = 0; i < color_table.count(); i++)
-    {
-        int n = ba.count(i);
-        if (n > 0)
-        {
-            color_distrib[color_table[i]] += n;
-        }
-    }
-
-    if (use_alpha)
-    {
-        for (int y = 0; y < img.height(); y++)
-        {
-            for (int x = 0; x < img.width(); x++)
-            {
-                if ((src_alpha_channel && qAlpha(img.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
-                {
-                    color_distrib.remove(detect_colors_img.pixel(x, y));
-                }
-            }
-        }
-    }
-
-    for (auto i = color_distrib.begin(); i != color_distrib.end(); ++i)
-    {
-        if (i.value() > 0)
-        {
-            color_distrib2.insert(i.value(), i.key());
-        }
-    }
-
-    return color_distrib2;
-}
-
-bool MainWindow::alikeColors(QColor c1, QColor c2, int hue_precision, int light_precision, int satur_precision) const
-{
-    c1 = c1.toHsl();
-    c2 = c2.toHsl();
-    int c1_h = c1.hslHue();
-    int c2_h = c2.hslHue();
-    if (c1_h != -1 && c2_h != -1)
-    {
-        if (c1_h < c2_h)
-        {
-            c1_h += 360;
-        }
-        int _d = c1_h - c2_h;
-        if (_d > 180)
-        {
-            _d = 360 - _d;
-        }
-        if (_d > hue_precision)
-        {
-            return false;
-        }
-    }
-    if (qAbs(c1.lightness() - c2.lightness()) > light_precision)
-    {
-        return false;
-    }
-    if (qAbs(c1.hslSaturation() - c2.hslSaturation()) > satur_precision)
-    {
-        return false;
-    }
-    return true;
-}
-
-QMap<QColor, int> MainWindow::colorDistribution4(QImage img) const
-{
-    QMultiMap<int, QColor> color_distrib2 = colorDistribution(img);
-
-    QMap<QColor, int> color_distrib4;
-    QColor prev_c, val_c;
-    for (auto i = color_distrib2.end(); i != color_distrib2.begin() && color_distrib4.count() < 4;)
-    {
-        --i;
-        QColor c = i.value().toHsl();
-        if (!prev_c.isValid() || !alikeColors(c, prev_c))
-        {
-            color_distrib4[val_c = c] = i.key();
-        }
-        else
-        if (val_c.isValid())
-        {
-            color_distrib4[val_c] += i.key();
-        }
-        prev_c = c;
-    }
-
-    return color_distrib4;
-}
-
-QMultiMap<double, int> MainWindow::selectPalette(QMap<QColor, int> color_distrib4) const
-{
-    QMultiMap<double, int> dist;
-    for (int i = 0; i < palettes.palettes.count(); i++)
-    {
-        QList<QColor> pal = palettes.palettes[i];
-        if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3] || pal[1] == pal[2])
-        {
-            continue;
-        }
-        double d = 0;
-        foreach (QColor p, pal)
-        {
-            QColor p_hsl = p.toHsl();
-            int p_h = p_hsl.hslHue();
-            int p_s = p_hsl.hslSaturation();
-            int p_l = p_hsl.lightness();
-            for(QMap<QColor, int>::iterator c = color_distrib4.begin(); c != color_distrib4.end(); ++c)
-            {
-                QColor c_hsl = c.key().toHsl();
-                int c_h = c_hsl.hslHue();
-                int c_s = c_hsl.hslSaturation();
-                int c_l = c_hsl.lightness();
-
-                double _d = 0;
-                if (p_h != -1 && c_h != -1)
-                {
-                    if (p_h < c_h)
-                    {
-                        p_h += 360;
-                    }
-                    _d = p_h - c_h;
-                    if (_d > 180)
-                    {
-                        _d = 360 - _d;
-                    }
-                }
-                else
-                if (p_h != c_h)
-                {
-                    _d += 90;
-                }
-
-//                _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
-                _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
-//
-                /*
-                if (qAbs(p_s - c_s) + qAbs(p_l - c_l) > 96)
-                {
-                    _d += 90;
-                }
-                */
-
-                d += _d / c.value();
-            }
-        }
-        if (d > 0)
-        {
-            dist.insert(d, i);
-        }
-    }
-
-//    qDebug() << dist;
-
-    return dist;
-}
-
-QMultiMap<double, int> MainWindow::selectPalette(QImage img) const
-{
-    if (img.colorCount() >= 4)
-    {
-        QVector<QRgb> colors = img.colorTable();
-        if (palettes.palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
-        {
-            QList<int> list = palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
-            if (!list.isEmpty())
-            {
-                int p_idx = list.first();
-                QMultiMap<double, int> map;
-                map.insert(0, p_idx);
-                return map;
-            }
-        }
-    }
-    return selectPalette(colorDistribution4(img));
-}
-
 QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
 {
     if (!current_sprite)
@@ -465,55 +300,7 @@ QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
         color_table << color.rgb();
     }
 
-    QRgb alpha_pixel;
-    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
-    if (use_alpha)
-    {
-        if (!src_alpha_channel)
-        {
-            alpha_pixel = img.pixel(0, 0);
-        }
-        else
-        {
-            alpha_pixel = color_table.first() & 0x00FFFFFF; // duplicate color with full opacity
-            for (int y = 0; y < img.height(); y++)
-            {
-                for (int x = 0; x < img.width(); x++)
-                {
-                    if (qAlpha(img.pixel(x, y)) < 128)
-                    {
-                        img.setPixel(x, y, alpha_pixel);
-                    }
-                }
-            }
-        }
-
-        color_table << alpha_pixel;
-    }
-
-    img = img.convertToFormat(QImage::Format_Indexed8, color_table);
-
-    if (use_alpha)
-    {
-        if (!src_alpha_channel)
-        {
-            alpha_pixel = img.pixel(0, 0);
-            for (int y = 0; y < img.height(); y++)
-            {
-                for (int x = 0; x < img.width(); x++)
-                {
-                    if (img.pixel(x, y) == alpha_pixel)
-                    {
-                        img.setPixel(x, y, 4); // alpha_pixel index
-                    }
-                }
-            }
-        }
-        color_table.last() = qRgba(0, 0, 0, 0);
-        img.setColorTable(color_table);
-    }
-
-    return img;
+    return Zx4Processing::importImage(img, color_table, use_alpha);
 }
 
 void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
@@ -538,6 +325,7 @@ void MainWindow::on_actionNew_triggered()
 
 void MainWindow::on_actionImportWizardApply_triggered()
 {
+    ui->paletteNumberBox->setToolTip(QString());
     if (!current_sprite)
     {
         return;
@@ -545,8 +333,9 @@ void MainWindow::on_actionImportWizardApply_triggered()
     int p_idx = ui->palettes->currentRow();
     if (ui->wizardPaletteBox->currentIndex() == 0)
     {
-        QMultiMap<double, int> dist = selectPalette(current_sprite->sourceImage());
+        QMultiMap<double, int> dist = palettes.selectPalette(current_sprite->sourceImage());
         ui->paletteNumberBox->setRange(1, dist.count());
+        ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
         p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
     }
     current_sprite->setPaletteIndex(p_idx);
@@ -856,112 +645,7 @@ void MainWindow::on_actionImport_scene_triggered()
         for (int x = 0; x < img.width(); x += 8)
         {
             QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-            auto small_dist = colorDistribution(small_quad, false);
-
-            int p_idx = -1;
-            if (!small_dist.isEmpty())
-            {
-                int k = 0;
-                QMap<int, QColor> dist4;
-                for (auto i = --small_dist.end(); k < 4; --i, ++k)
-                {
-                    int key = i.key();
-                    while (dist4.contains(key))
-                    {
-                        key++;
-                    }
-                    dist4[key] = i.value();
-                    if (i == small_dist.begin())
-                    {
-                        break;
-                    }
-                }
-
-                do
-                {
-                    QList<QColor> colors = dist4.values();
-                    qSort(colors); // indexes "palettes_by_color" sorted by color
-
-                    const double ls = 0.85;
-                    const double t = 0.1;
-
-                    int hue_precision = 10;
-                    do
-                    {
-                        int light_satur_precision = 16;
-                        do
-                        {
-                            if (colors.count() == 1)
-                            {
-                                for (auto i = palettes.palettes_by_color.begin(); i != palettes.palettes_by_color.end(); ++i)
-                                {
-                                    if (alikeColors(i.key(), colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision))
-                                    {
-                                        p_idx = i.value().at(i.value().count() * t);
-                                        break;
-                                    }
-                                }
-                            }
-                            else
-                            if (colors.count() == 2)
-                            {
-                                for (auto i = palettes.palettes_by_2colors.begin(); i != palettes.palettes_by_2colors.end(); ++i)
-                                {
-                                    if (alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
-                                    {
-                                        p_idx = i.value().at(i.value().count() * t);
-                                        break;
-                                    }
-                                }
-                            }
-                            else
-                            if (colors.count() == 3)
-                            {
-                                for (auto i = palettes.palettes_by_3colors.begin(); i != palettes.palettes_by_3colors.end() && p_idx == -1; ++i)
-                                {
-                                    if (alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
-                                    {
-                                        for (auto k = i.value().begin(); k != i.value().end(); ++k)
-                                        {
-                                            if (alikeColors(k.key(), colors.at(2)))
-                                            {
-                                                p_idx = k.value().at(k.value().count() * t);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            if (colors.count() == 4)
-                            {
-                                for (auto i = palettes.palettes_by_4colors.begin(); i != palettes.palettes_by_4colors.end() && p_idx == -1; ++i)
-                                {
-                                    if (alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
-                                    {
-                                        for (auto k = i.value().begin(); k != i.value().end(); ++k)
-                                        {
-                                            if (alikeColors(k.key().first, colors.at(2), hue_precision) && alikeColors(k.key().second, colors.at(3), hue_precision))
-                                            {
-                                                p_idx = k.value().at(k.value().count() * t);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            light_satur_precision += 16;
-                        }
-                        while (p_idx == -1 && light_satur_precision <= 64);
-                        hue_precision += 5;
-                    }
-                    while (p_idx == -1 && hue_precision < 100 / (colors.count()));
-
-                    dist4.erase(dist4.begin());
-                }
-                while (p_idx == -1 && !dist4.isEmpty());
-            }
-
+            int p_idx = current_scene->selectPalette(small_quad);
             if (p_idx != -1)
             {
                 current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
@@ -1020,20 +704,27 @@ void MainWindow::on_actionExport_scene_triggered()
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX Spectrum screen (*.scr0);;PNG image (*.png)");
+    QString filter;
+    QStringList filters = QStringList() << "ZX Spectrum screen (*.scr0)" << "PNG image (*.png)";
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), & filter);
     if (filename.isEmpty())
     {
         return;
     }
-    if (QFileInfo(filename).suffix().compare("png", Qt::CaseInsensitive) == 0)
-    {
+
+    if (filters.indexOf(filter) == 1)
+    {        
+        if (QFileInfo(filename).suffix().compare("png", Qt::CaseInsensitive) != 0)
+        {
+            filename = filename.replace("." + QFileInfo(filename).suffix(), ".png");
+        }
         current_scene->renderedImage().convertToFormat(QImage::Format_RGB32).save(filename, "PNG");
         return;
     }
 
-    if (QFileInfo(filename).suffix().isEmpty())
+    if (QFileInfo(filename).suffix().compare("scr0", Qt::CaseInsensitive) != 0)
     {
-        filename += ".scr0";
+        filename = filename.replace("." + QFileInfo(filename).suffix(), ".scr0");
     }
 
     QByteArray scr0(32 * 192 + 32 * 24, 0);
@@ -1121,3 +812,9 @@ void MainWindow::selectPalette(int p_idx)
 {
     ui->palettes->setCurrentRow(p_idx);
 }
+
+void MainWindow::on_paletteIndex_currentIndexChanged(int index)
+{
+    ui->palettes->setCurrentRow(index);
+}
+

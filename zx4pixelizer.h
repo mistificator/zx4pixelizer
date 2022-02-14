@@ -65,11 +65,18 @@ struct Zx4Palette
     QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
 
     void init();
+
+    QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4) const;
+    QMultiMap<double, int> selectPalette(QImage img) const;
 };
 
 struct Zx4Processing
 {
     static QImage scaleImage(QImage img, int w, int h);
+    static QMultiMap<int, QColor> colorDistribution(QImage img, bool use_alpha = true);
+    static bool alikeColors(QColor c1, QColor c2, int hue_precision = 20, int light_precision = 32, int satur_precision = 32);
+    static QMap<QColor, int> colorDistribution4(QImage img);
+    static QImage importImage(QImage img, QVector<QRgb> color_table, bool use_alpha);
 };
 
 #endif // ZX4PIXELIZER_H

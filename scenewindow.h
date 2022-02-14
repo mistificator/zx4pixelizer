@@ -38,7 +38,12 @@ public:
     void setAttr(QPoint, int p_idx);
     void setAttr(int p_idx);
 
+    int selectPalette(QImage small_quad) const;
     void importChar(QPoint, int p_idx, QImage small_quad);
+
+    void setCurrentColorIndex(int);
+    int currentColorIndex() const;
+    void setPixel(QPoint, int color_index);
 signals:
     void previewUpdateIsNeeded();
     void charSelected(int p_idx);
@@ -58,6 +63,7 @@ private:
     QImage src_imp_img, rdr_img;
     int grid_x = 1, grid_y = 1;
     QPoint selected_char, update_char;
+    int current_color_index = 0;
 };
 
 #endif // SCENEWINDOW_H
