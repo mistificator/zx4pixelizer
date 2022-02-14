@@ -10,5 +10,6 @@
         <file>invert.png</file>
         <file>resize_image.png</file>
         <file>about.png</file>
+        <file>GIGAVIEW.TAP</file>
     </qresource>
 </RCC>

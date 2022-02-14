@@ -44,6 +44,8 @@ public:
     void setCurrentColorIndex(int);
     int currentColorIndex() const;
     void setPixel(QPoint, int color_index);
+
+    QPair<QByteArray, QByteArray> makeScreens() const;
 signals:
     void previewUpdateIsNeeded();
     void charSelected(int p_idx);
