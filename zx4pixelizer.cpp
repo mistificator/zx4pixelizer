@@ -4,6 +4,7 @@
 
 void Zx4Palette::init()
 {
+#if 1
     color_table[ZxBlack] =          Qt::black;
     color_table[ZxBlue] =           Qt::darkBlue;
     color_table[ZxRed] =            Qt::darkRed;
@@ -20,6 +21,26 @@ void Zx4Palette::init()
     color_table[ZxBrightCyan] =     Qt::cyan;
     color_table[ZxBrightYellow] =   Qt::yellow;
     color_table[ZxBrightWhite] =    Qt::white;
+#else
+    int level = 0x80;
+    int high_level = 0xFF;
+    color_table[ZxBlack] =          QColor(0x00, 0x00, 0x00);
+    color_table[ZxBlue] =           QColor(0x00, 0x00, level);
+    color_table[ZxRed] =            QColor(level, 0x00, 0x00);
+    color_table[ZxMagenta] =        QColor(level, 0x00, level);
+    color_table[ZxGreen] =          QColor(0x00, level, 0x00);
+    color_table[ZxCyan] =           QColor(0x00, level, level);
+    color_table[ZxYellow] =         QColor(level, level, 0x00);
+    color_table[ZxWhite] =          QColor(level, level, level);
+    color_table[ZxBrightBlack] =    QColor(0x00, 0x00, 0x00);
+    color_table[ZxBrightBlue] =     QColor(0x00, 0x00, high_level);
+    color_table[ZxBrightRed] =      QColor(high_level, 0x00, 0x00);
+    color_table[ZxBrightMagenta] =  QColor(high_level, 0x00, high_level);
+    color_table[ZxBrightGreen] =    QColor(0x00, high_level, 0x00);
+    color_table[ZxBrightCyan] =     QColor(0x00, high_level, high_level);
+    color_table[ZxBrightYellow] =   QColor(high_level, high_level, 0x00);
+    color_table[ZxBrightWhite] =    QColor(high_level, high_level, high_level);
+#endif
 
     color_name[ZxBlack] =          "Black";
     color_name[ZxBlue] =           "Blue";
@@ -67,7 +88,7 @@ void Zx4Palette::init()
 
                             QList<QRgb> ml1;
                             ml1 << m[0].rgb() << m[1].rgb() << m[2].rgb() << m[3].rgb();
-                            if (ml1.toSet().count() < 2) // if (ml1.toSet().count() != 4)
+                            if (ml1.toSet().count() < 4) // if (ml1.toSet().count() != 4)
                             {
                                 continue;
                             }

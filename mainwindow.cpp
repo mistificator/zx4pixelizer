@@ -46,8 +46,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->actionNew->trigger();
 
-    //    ui->palettes->setCurrentRow(327 - 1);
-    ui->paletteIndex->setCurrentIndex(540 - 1);
+    ui->palettes->setCurrentRow(327 - 1);
+//    ui->paletteIndex->setCurrentIndex(540 - 1);
     QMetaObject::invokeMethod(this, "on_paletteIndex_currentIndexChanged", Qt::QueuedConnection, Q_ARG(int, ui->paletteIndex->currentIndex()));
 }
 
@@ -175,16 +175,21 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
 
 void MainWindow::on_palettes_itemSelectionChanged()
 {
-    QList<QColor> list = palettes.palettes[ui->palettes->currentRow()];
+    int p_idx = ui->palettes->currentRow();
+    QList<QColor> list = palettes.palettes[p_idx];
     QPixmap px(QSize(32, 32));
     px.fill(list[0]);
     ui->actionColor_00->setIcon(px);
+    ui->actionColor_00->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][0]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][2]]);
     px.fill(list[1]);
     ui->actionColor_01->setIcon(px);
+    ui->actionColor_01->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][0]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][3]]);
     px.fill(list[2]);
     ui->actionColor_10->setIcon(px);
+    ui->actionColor_10->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][1]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][2]]);
     px.fill(list[3]);
     ui->actionColor_11->setIcon(px);
+    ui->actionColor_11->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][1]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][3]]);
 
     if (ui->mdiArea->activeSubWindow())
     {
@@ -402,7 +407,7 @@ void MainWindow::on_actionExport_triggered()
     QString path = QFileInfo(current_sprite->fileName()).absolutePath();
     if (!path.isEmpty())
     {
-        path += "/" + QFileInfo(current_sprite->fileName()).fileName() + ".zx4";
+        path += "/" + QFileInfo(current_sprite->fileName()).baseName();
     }
     else
     {
@@ -526,7 +531,7 @@ void MainWindow::on_actionSave_as_triggered()
     QString path = QFileInfo(current_sprite->fileName()).absolutePath();
     if (!path.isEmpty())
     {
-        path += "/" + QFileInfo(current_sprite->fileName()).fileName() + ".zx4.png";
+        path += "/" + QFileInfo(current_sprite->fileName()).baseName();
     }
     else
     {
@@ -708,7 +713,7 @@ void MainWindow::on_actionExport_scene_triggered()
     QString path = QFileInfo(current_scene->fileName()).absolutePath();
     if (!path.isEmpty())
     {
-        path += "/" + QFileInfo(current_scene->fileName()).fileName() + ".scr0";
+        path += "/" + QFileInfo(current_scene->fileName()).baseName();
     }
     else
     {
