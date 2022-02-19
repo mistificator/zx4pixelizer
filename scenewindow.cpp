@@ -290,8 +290,12 @@ int SceneWindow::selectPalette(QImage small_quad) const
                     {
                         if (Zx4Processing::alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
                         {
-                            p_idx = i.value().at(i.value().count() * t);
-                            break;
+                            int _p_idx = i.value().at(i.value().count() * t);
+                            if (checkPalette(small_quad, _p_idx))
+                            {
+                                p_idx = _p_idx;
+                                break;
+                            }
                         }
                     }
                 }
@@ -306,8 +310,12 @@ int SceneWindow::selectPalette(QImage small_quad) const
                             {
                                 if (Zx4Processing::alikeColors(k.key(), colors.at(2)))
                                 {
-                                    p_idx = k.value().at(k.value().count() * t);
-                                    break;
+                                    int _p_idx = k.value().at(k.value().count() * t);
+                                    if (checkPalette(small_quad, _p_idx))
+                                    {
+                                        p_idx = _p_idx;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -324,8 +332,12 @@ int SceneWindow::selectPalette(QImage small_quad) const
                             {
                                 if (Zx4Processing::alikeColors(k.key().first, colors.at(2), hue_precision) && Zx4Processing::alikeColors(k.key().second, colors.at(3), hue_precision))
                                 {
-                                    p_idx = k.value().at(k.value().count() * t);
-                                    break;
+                                    int _p_idx = k.value().at(k.value().count() * t);
+                                    if (checkPalette(small_quad, _p_idx))
+                                    {
+                                        p_idx = _p_idx;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -343,6 +355,21 @@ int SceneWindow::selectPalette(QImage small_quad) const
     while (p_idx == -1 && !dist4.isEmpty());
 
     return p_idx;
+}
+
+bool SceneWindow::checkPalette(QImage small_quad, int p_idx) const
+{
+    if (p_idx == -1)
+    {
+        return false;
+    }
+    QVector<QRgb> v;
+    foreach (QColor c, palettes.palettes[p_idx])
+    {
+        v << c.rgb();
+    }
+    auto check_dist = Zx4Processing::colorDistribution(small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, v).convertToFormat(QImage::Format_RGB32), false);
+    return check_dist.count() > 1;
 }
 
 void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)

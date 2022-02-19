@@ -63,11 +63,11 @@ void Zx4Palette::init()
     for (int c0i = 0; c0i < 8; c0i++)
     {
         qApp->processEvents();
-        for (int c1i = 0; c1i < 8; c1i++)
+        for (int c1i = c0i; c1i < 8; c1i++)
         {
             for (int c2i = 0; c2i < 8; c2i++)
             {
-                for (int c3i = 0; c3i < 8; c3i++)
+                for (int c3i = c2i; c3i < 8; c3i++)
                 {
                     for (int b0 = 0; b0 < 2; b0++)
                     {

@@ -46,8 +46,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->actionNew->trigger();
 
-    ui->palettes->setCurrentRow(327 - 1);
-//    ui->paletteIndex->setCurrentIndex(540 - 1);
+    ui->palettes->setCurrentRow(291 - 1);
     QMetaObject::invokeMethod(this, "on_paletteIndex_currentIndexChanged", Qt::QueuedConnection, Q_ARG(int, ui->paletteIndex->currentIndex()));
 }
 

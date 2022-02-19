@@ -66,6 +66,7 @@ private:
     int grid_x = 1, grid_y = 1;
     QPoint selected_char, update_char;
     int current_color_index = 0;
+    bool checkPalette(QImage small_quad, int p_idx) const;
 };
 
 #endif // SCENEWINDOW_H
