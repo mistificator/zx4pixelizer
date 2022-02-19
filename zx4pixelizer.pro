@@ -9,6 +9,7 @@ CONFIG += c++11
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    lz4.c \
     main.cpp \
     zx4pixelizer.cpp \
     mainwindow.cpp \
@@ -16,6 +17,7 @@ SOURCES += \
     spritewindow.cpp
 
 HEADERS += \
+    lz4.h \
     zx4pixelizer.h \
     mainwindow.h \
     scenewindow.h \

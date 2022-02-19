@@ -47,7 +47,6 @@ private slots:
     void on_actionExport_triggered();
     void on_actionAbout_ZX4_Pixelizer_triggered();
     void on_mdiArea_subWindowActivated(QMdiSubWindow *msw);
-    void on_paletteIndex_currentIndexChanged(int index);
 
 private:
     Ui::MainWindow *ui;

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "lz4.h"
 
 #include <QPainter>
 #include <QResizeEvent>
@@ -46,8 +47,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->actionNew->trigger();
 
-    ui->palettes->setCurrentRow(291 - 1);
-    QMetaObject::invokeMethod(this, "on_paletteIndex_currentIndexChanged", Qt::QueuedConnection, Q_ARG(int, ui->paletteIndex->currentIndex()));
+//    selectPalette(291 - 1);
+    QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, 291 - 1));
 }
 
 MainWindow::~MainWindow()
@@ -174,37 +175,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
 
 void MainWindow::on_palettes_itemSelectionChanged()
 {
-    int p_idx = ui->palettes->currentRow();
-    QList<QColor> list = palettes.palettes[p_idx];
-    QPixmap px(QSize(32, 32));
-    px.fill(list[0]);
-    ui->actionColor_00->setIcon(px);
-    ui->actionColor_00->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][0]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][2]]);
-    px.fill(list[1]);
-    ui->actionColor_01->setIcon(px);
-    ui->actionColor_01->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][0]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][3]]);
-    px.fill(list[2]);
-    ui->actionColor_10->setIcon(px);
-    ui->actionColor_10->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][1]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][2]]);
-    px.fill(list[3]);
-    ui->actionColor_11->setIcon(px);
-    ui->actionColor_11->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][1]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][3]]);
-
-    if (ui->mdiArea->activeSubWindow())
-    {
-        if (current_sprite && ui->mdiArea->activeSubWindow()->widget() == current_sprite)
-        {
-            current_sprite->setPaletteIndex(ui->palettes->currentRow());
-            current_sprite->setColors(list);
-        }
-        if (current_scene && ui->mdiArea->activeSubWindow()->widget() == current_scene)
-        {
-            current_scene->setAttr(ui->palettes->currentRow());
-            current_scene->canvas()->update();
-        }
-    }
-
-    ui->paletteIndex->setCurrentIndex(ui->palettes->currentRow());
+    selectPalette(ui->palettes->currentRow());
 }
 
 void MainWindow::on_actionColor_00_toggled(bool)
@@ -306,7 +277,7 @@ QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
         return QImage();
     }
 
-    ui->palettes->setCurrentRow(palette_number);
+    selectPalette(palette_number);
 
     img = Zx4Processing::scaleImage(img, current_sprite->canvasSize().width(), current_sprite->canvasSize().height());
 
@@ -443,17 +414,26 @@ void MainWindow::on_actionExport_triggered()
         {
             for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
             {
-                zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(alpha[(8 * x) + (7 - bit)]) << bit));
-                zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
-                zx4[offs + 2 * layer_sz] =  static_cast<char>(zx4[offs + 2 * layer_sz] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
+                char alpha_value = alpha[(8 * x) + (7 - bit)];
+                zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(alpha_value) << bit));
+                if (alpha_value)
+                {
+                    zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
+                    zx4[offs + 2 * layer_sz] =  static_cast<char>(zx4[offs + 2 * layer_sz] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
+                }
             }
         }
     }
+    const int zx4_lz4max_count = ::LZ4_compressBound(zx4.count());
+    QByteArray zx4_lz4(zx4_lz4max_count, 0);
+    const int zx4_count = ::LZ4_compress(zx4.constData(), zx4_lz4.data(), zx4.count());
+    zx4_lz4.resize(zx4_count);
+    qDebug() << "sprite deflated from" << zx4.count() << "to" << zx4_lz4.count() << "by" << 100.0 * zx4_lz4.count() / zx4.count() << "%";
     QFile f(filename);
     f.open(QFile::WriteOnly);
     if (f.isOpen())
     {
-        f.write(zx4);
+        f.write(zx4_lz4);
     }
     f.close();
 
@@ -461,12 +441,6 @@ void MainWindow::on_actionExport_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-    if (!current_sprite)
-    {
-        ui->actionNew->trigger();
-        ui->actionResize_canvas->trigger();
-    }
-
     QString path = QFileInfo(current_sprite->fileName()).absolutePath();
     if (path.isEmpty())
     {
@@ -510,9 +484,14 @@ void MainWindow::on_actionOpen_triggered()
             p_idx = list.first();
         }
     }
-    current_sprite->setPaletteIndex(p_idx);
-    ui->palettes->setCurrentRow(p_idx);
+    selectPalette(p_idx);
 
+    if (!current_sprite)
+    {
+        ui->actionNew->trigger();
+    }
+
+    current_sprite->setPaletteIndex(p_idx);
     current_sprite->setFileName(filename);
     current_sprite->clearCanvas(QSize(qMin(src_imp_image.width(), 255), qMin(src_imp_image.height(), 192)));
     current_sprite->setSourceImage(src_imp_image);
@@ -841,7 +820,7 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
     if (SpriteWindow * sw = dynamic_cast<SpriteWindow *>(msw->widget()))
     {
         current_sprite = sw;
-        ui->palettes->setCurrentRow(current_sprite->paletteIndex());
+        selectPalette(current_sprite->paletteIndex());
         switch (current_sprite->currentColorIndex())
         {
         case 0:
@@ -868,10 +847,35 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
 void MainWindow::selectPalette(int p_idx)
 {
     ui->palettes->setCurrentRow(p_idx);
+
+    QList<QColor> list = palettes.palettes[p_idx];
+    QPixmap px(QSize(32, 32));
+    px.fill(list[0]);
+    ui->actionColor_00->setIcon(px);
+    ui->actionColor_00->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][0]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][2]]);
+    px.fill(list[1]);
+    ui->actionColor_01->setIcon(px);
+    ui->actionColor_01->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][0]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][3]]);
+    px.fill(list[2]);
+    ui->actionColor_10->setIcon(px);
+    ui->actionColor_10->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][1]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][2]]);
+    px.fill(list[3]);
+    ui->actionColor_11->setIcon(px);
+    ui->actionColor_11->setToolTip(palettes.color_name[palettes.color_palette_table[p_idx][1]] + " + " + palettes.color_name[palettes.color_palette_table[p_idx][3]]);
+
+    if (ui->mdiArea->activeSubWindow())
+    {
+        if (current_sprite && ui->mdiArea->activeSubWindow()->widget() == current_sprite)
+        {
+            current_sprite->setPaletteIndex(ui->palettes->currentRow());
+            current_sprite->setColors(list);
+        }
+        if (current_scene && ui->mdiArea->activeSubWindow()->widget() == current_scene)
+        {
+            current_scene->setAttr(ui->palettes->currentRow());
+            current_scene->canvas()->update();
+        }
+    }
 }
 
-void MainWindow::on_paletteIndex_currentIndexChanged(int index)
-{
-    ui->palettes->setCurrentRow(index);
-}
 
