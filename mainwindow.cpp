@@ -398,37 +398,44 @@ void MainWindow::on_actionExport_triggered()
     QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
 
     const int layer_sz = ((current_sprite->canvasSize().width() * current_sprite->canvasSize().height() + 7) / 8);
-    QByteArray zx4(4 + 3 * layer_sz, 0);
-    int offs = 0;
-    zx4[offs++] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
-    zx4[offs++] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
-    zx4[offs++] = current_sprite->canvasSize().width();
-    zx4[offs++] = current_sprite->canvasSize().height();
+    QByteArray zx4(4, 0);
+    zx4[0] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
+    zx4[1] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
+    zx4[2] = current_sprite->canvasSize().width();
+    zx4[3] = current_sprite->canvasSize().height();
 
-    for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+    int alpha_bit = 0, color_bit = 0;
+    QByteArray zx4_alpha(layer_sz, 0), zx4_color0(layer_sz, 0), zx4_color1(layer_sz, 0);
+    for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
     {
-        const QVector<char> & alpha = current_sprite->image().alpha_layer[y];
-        const QVector<char> & line0 = current_sprite->image().color_layer0[y];
-        const QVector<char> & line1 = current_sprite->image().color_layer1[y];
-        for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++, offs++)
+        for (int y = 0; y < current_sprite->canvasSize().height(); y++)
         {
+            const QVector<char> & alpha = current_sprite->image().alpha_layer[y];
+            const QVector<char> & line0 = current_sprite->image().color_layer0[y];
+            const QVector<char> & line1 = current_sprite->image().color_layer1[y];
             for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
             {
                 char alpha_value = alpha[(8 * x) + (7 - bit)];
-                zx4[offs] =                 static_cast<char>(zx4[offs] | (static_cast<int>(alpha_value) << bit));
+                zx4_alpha[alpha_bit / 8] =         static_cast<char>(zx4_alpha[alpha_bit / 8] | (static_cast<int>(alpha_value) << (alpha_bit % 8)));
                 if (alpha_value)
                 {
-                    zx4[offs + layer_sz] =      static_cast<char>(zx4[offs + layer_sz] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
-                    zx4[offs + 2 * layer_sz] =  static_cast<char>(zx4[offs + 2 * layer_sz] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
+                    zx4_color0[color_bit / 8] =    static_cast<char>(zx4_color0[color_bit / 8] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << (color_bit % 8)));
+                    zx4_color1[color_bit / 8] =    static_cast<char>(zx4_color1[color_bit / 8] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << (color_bit % 8)));
+                    ++color_bit;
                 }
+                ++alpha_bit;
             }
         }
     }
+    zx4_alpha.resize((alpha_bit + 7) / 8);
+    zx4_color0.resize((color_bit + 7) / 8);
+    zx4_color1.resize((color_bit + 7) / 8);
+    zx4 = zx4 + zx4_alpha + zx4_color0 + zx4_color1;
     const int zx4_lz4max_count = ::LZ4_compressBound(zx4.count());
     QByteArray zx4_lz4(zx4_lz4max_count, 0);
     const int zx4_count = ::LZ4_compress(zx4.constData(), zx4_lz4.data(), zx4.count());
     zx4_lz4.resize(zx4_count);
-    qDebug() << "sprite deflated from" << zx4.count() << "to" << zx4_lz4.count() << "by" << 100.0 * zx4_lz4.count() / zx4.count() << "%";
+    qDebug() << "sprite source size" << 4 + 3 *layer_sz << ", sprite deflated from" << zx4.count() << "to" << zx4_lz4.count() << ", total ratio" << 100.0 * zx4_lz4.count() / (3 * layer_sz + 4) << "%";
     QFile f(filename);
     f.open(QFile::WriteOnly);
     if (f.isOpen())
