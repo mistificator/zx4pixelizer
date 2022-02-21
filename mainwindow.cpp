@@ -343,7 +343,6 @@ void MainWindow::on_actionImport_triggered()
     if (!current_sprite)
     {
         ui->actionNew->trigger();
-        ui->actionResize_canvas->trigger();
     }
 
     QString path = QFileInfo(current_sprite->fileName()).absolutePath();
@@ -352,19 +351,103 @@ void MainWindow::on_actionImport_triggered()
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
+    QString filter;
+    QStringList filters = QStringList() << "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)" << "ZX4 Pixelizer sprites (*.zx4)";
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, filters.join(";;"), & filter);
     if (filename.isEmpty())
     {
         return;
     }
-    QImage src_imp_image = QImage(filename);
-    if (src_imp_image.isNull())
+
+    if (filters.indexOf(filter) == 0)
     {
-        QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
-        return;
+        ui->actionResize_canvas->trigger();
+
+        QImage src_imp_image = QImage(filename);
+        if (src_imp_image.isNull())
+        {
+            QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
+            return;
+        }
+        current_sprite->setSourceImage(src_imp_image);
+        ui->actionImportWizardApply->trigger();
     }
-    current_sprite->setSourceImage(src_imp_image);
-    ui->actionImportWizardApply->trigger();
+    else
+    if (filters.indexOf(filter) == 1)
+    {
+        QByteArray zx4;
+        QFile f(filename);
+        f.open(QFile::ReadOnly);
+        if (f.isOpen())
+        {
+            zx4 = f.readAll();
+        }
+        f.close();
+        if (zx4.isEmpty())
+        {
+            QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
+            return;
+        }
+        QList<ZxColorEnum> z;
+        z << static_cast<ZxColorEnum>((zx4[0] & 0x78) >> 3);
+        z << static_cast<ZxColorEnum>((zx4[0] & 0x07) | ((zx4[0] & 0x40) >> 3));
+        z << static_cast<ZxColorEnum>((zx4[1] & 0x78) >> 3);
+        z << static_cast<ZxColorEnum>((zx4[1] & 0x07) | ((zx4[1] & 0x40) >> 3));
+        int p_idx = palettes.color_palette_table.key(z, -1);
+        if (p_idx == -1)
+        {
+            QMessageBox::critical(this, "Error", QString("Error occured while applying palette for \"%1\"").arg(filename));
+            return;
+        }
+        current_sprite->setCanvasSize(QSize(z[2], z[3]));
+
+        QByteArray zx4_lz4 = zx4.mid(4);
+        zx4.resize(3 * current_sprite->canvasSize().width() * current_sprite->canvasSize().height());
+
+        int isize = zx4_lz4.count();
+        int osize = ::LZ4_uncompress_unknownOutputSize(zx4_lz4.constData(), zx4.data(), & isize, zx4.count());
+        if (osize <= 0)
+        {
+            QMessageBox::critical(this, "Error", QString("Error occured while decompressing \"%1\"").arg(filename));
+            return;
+        }
+        zx4.resize(osize);
+        int alpha_bit = 0;
+        for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
+        {
+            for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+            {
+                QVector<char> & alpha = const_cast<Zx4Image &>(current_sprite->image()).alpha_layer[y];
+                for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
+                {
+                    alpha[(8 * x) + (7 - bit)] = (zx4[alpha_bit / 8] >> (alpha_bit % 8)) & 0x01;
+                    ++alpha_bit;
+                }
+            }
+        }
+        zx4 = zx4.mid((alpha_bit + 7) / 8);
+        int color_bit = 0;
+        QByteArray zx4_color0 = zx4.left(zx4.count() / 2), zx4_color1 = zx4.mid(zx4.count() / 2);
+        for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
+        {
+            for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+            {
+                const QVector<char> & alpha = current_sprite->image().alpha_layer[y];
+                QVector<char> & line0 = const_cast<Zx4Image &>(current_sprite->image()).color_layer0[y];
+                QVector<char> & line1 = const_cast<Zx4Image &>(current_sprite->image()).color_layer1[y];
+                for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
+                {
+                    char alpha_value = alpha[(8 * x) + (7 - bit)];
+                    if (alpha_value)
+                    {
+                        line0[(8 * x) + (7 - bit)] = (zx4_color0[color_bit / 8] >> (color_bit % 8)) & 0x01;
+                        line1[(8 * x) + (7 - bit)] = (zx4_color1[color_bit / 8] >> (color_bit % 8)) & 0x01;
+                        ++color_bit;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void MainWindow::on_actionExport_triggered()
@@ -384,7 +467,7 @@ void MainWindow::on_actionExport_triggered()
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX4 Pixelizer images (*.zx4)");
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX4 Pixelizer sprites (*.zx4)");
     if (filename.isEmpty())
     {
         return;
@@ -398,11 +481,11 @@ void MainWindow::on_actionExport_triggered()
     QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
 
     const int layer_sz = ((current_sprite->canvasSize().width() * current_sprite->canvasSize().height() + 7) / 8);
-    QByteArray zx4(4, 0);
-    zx4[0] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
-    zx4[1] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
-    zx4[2] = current_sprite->canvasSize().width();
-    zx4[3] = current_sprite->canvasSize().height();
+    QByteArray zx4;
+    zx4 += static_cast<char>(z[1] & 0x07) | ((z[0] & 0x0F) << 3);
+    zx4 += static_cast<char>(z[3] & 0x07) | ((z[2] & 0x0F) << 3);
+    zx4 += static_cast<char>(current_sprite->canvasSize().width());
+    zx4 += static_cast<char>(current_sprite->canvasSize().height());
 
     int alpha_bit = 0, color_bit = 0;
     QByteArray zx4_alpha(layer_sz, 0), zx4_color0(layer_sz, 0), zx4_color1(layer_sz, 0);
@@ -430,17 +513,17 @@ void MainWindow::on_actionExport_triggered()
     zx4_alpha.resize((alpha_bit + 7) / 8);
     zx4_color0.resize((color_bit + 7) / 8);
     zx4_color1.resize((color_bit + 7) / 8);
-    zx4 = zx4 + zx4_alpha + zx4_color0 + zx4_color1;
-    const int zx4_lz4max_count = ::LZ4_compressBound(zx4.count());
+    const int zx4_lz4max_count = ::LZ4_compressBound(zx4_alpha.count() + zx4_color0.count() + zx4_color1.count());
     QByteArray zx4_lz4(zx4_lz4max_count, 0);
-    const int zx4_count = ::LZ4_compress(zx4.constData(), zx4_lz4.data(), zx4.count());
+    const int zx4_count = ::LZ4_compress((zx4_alpha + zx4_color0 + zx4_color1).constData(), zx4_lz4.data(), zx4.count());
     zx4_lz4.resize(zx4_count);
-    qDebug() << "sprite source size" << 4 + 3 *layer_sz << ", sprite deflated from" << zx4.count() << "to" << zx4_lz4.count() << ", total ratio" << 100.0 * zx4_lz4.count() / (3 * layer_sz + 4) << "%";
+    zx4 += zx4_lz4;
+    qDebug() << "sprite deflated from" << 4 + 3 * layer_sz << "to" << zx4.count() << ", total ratio" << 100.0 * zx4.count() / (3 * layer_sz + 4) << "%";
     QFile f(filename);
     f.open(QFile::WriteOnly);
     if (f.isOpen())
     {
-        f.write(zx4_lz4);
+        f.write(zx4);
     }
     f.close();
 
