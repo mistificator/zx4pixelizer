@@ -399,7 +399,9 @@ void MainWindow::on_actionImport_triggered()
             QMessageBox::critical(this, "Error", QString("Error occured while applying palette for \"%1\"").arg(filename));
             return;
         }
-        current_sprite->setCanvasSize(QSize(z[2], z[3]));
+        selectPalette(p_idx);
+        current_sprite->setPaletteIndex(p_idx);
+        current_sprite->setCanvasSize(QSize(zx4[2], zx4[3]));
 
         QByteArray zx4_lz4 = zx4.mid(4);
         zx4.resize(3 * current_sprite->canvasSize().width() * current_sprite->canvasSize().height());
@@ -447,6 +449,7 @@ void MainWindow::on_actionImport_triggered()
                 }
             }
         }
+        current_sprite->update();
     }
 }
 
@@ -514,8 +517,8 @@ void MainWindow::on_actionExport_triggered()
     zx4_color0.resize((color_bit + 7) / 8);
     zx4_color1.resize((color_bit + 7) / 8);
     const int zx4_lz4max_count = ::LZ4_compressBound(zx4_alpha.count() + zx4_color0.count() + zx4_color1.count());
-    QByteArray zx4_lz4(zx4_lz4max_count, 0);
-    const int zx4_count = ::LZ4_compress((zx4_alpha + zx4_color0 + zx4_color1).constData(), zx4_lz4.data(), zx4.count());
+    QByteArray zx4_data = zx4_alpha + zx4_color0 + zx4_color1, zx4_lz4(zx4_lz4max_count, 0);
+    const int zx4_count = ::LZ4_compress(zx4_data.constData(), zx4_lz4.data(), zx4_data.count());
     zx4_lz4.resize(zx4_count);
     zx4 += zx4_lz4;
     qDebug() << "sprite deflated from" << 4 + 3 * layer_sz << "to" << zx4.count() << ", total ratio" << 100.0 * zx4.count() / (3 * layer_sz + 4) << "%";
@@ -531,7 +534,11 @@ void MainWindow::on_actionExport_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    QString path;
+    if (current_sprite)
+    {
+        path = QFileInfo(current_sprite->fileName()).absolutePath();
+    }
     if (path.isEmpty())
     {
         path = QDir::homePath() + "/Pictures/";
@@ -937,6 +944,7 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
 void MainWindow::selectPalette(int p_idx)
 {
     ui->palettes->setCurrentRow(p_idx);
+    ui->paletteIndex->setCurrentIndex(p_idx);
 
     QList<QColor> list = palettes.palettes[p_idx];
     QPixmap px(QSize(32, 32));

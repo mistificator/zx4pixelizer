@@ -22,7 +22,7 @@ void Zx4Palette::init()
     color_table[ZxBrightYellow] =   Qt::yellow;
     color_table[ZxBrightWhite] =    Qt::white;
 #else
-    int level = 0x80;
+    int level = 0xC0;
     int high_level = 0xFF;
     color_table[ZxBlack] =          QColor(0x00, 0x00, 0x00);
     color_table[ZxBlue] =           QColor(0x00, 0x00, level);
