@@ -10,6 +10,7 @@ CONFIG += c++11
 
 SOURCES += \
     lz4.c \
+    lz4hc.c \
     main.cpp \
     zx4pixelizer.cpp \
     mainwindow.cpp \
@@ -18,6 +19,7 @@ SOURCES += \
 
 HEADERS += \
     lz4.h \
+    lz4hc.h \
     zx4pixelizer.h \
     mainwindow.h \
     scenewindow.h \
