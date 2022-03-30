@@ -327,7 +327,7 @@ void MainWindow::on_actionImportWizardApply_triggered()
         p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
     }
     current_sprite->setPaletteIndex(p_idx);
-    current_sprite->drawImage(importImage(current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32),  p_idx, ui->alphaBox->isChecked()));
+    current_sprite->drawImage(importImage(current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
 }
 
 
@@ -340,82 +340,6 @@ void MainWindow::on_actionInvert_colors_triggered()
 }
 
 //#define USE_RLE8
-
-#ifdef USE_RLE8
-QByteArray deflateRle8(QByteArray ba)
-{
-    QByteArray out;
-    const char sep = (char)0x80;
-    for (int i = 0; i < ba.count();)
-    {
-        char current_char = ba[i];
-        int count = 0;
-        while (i < ba.count() && ba[i] == current_char)
-        {
-            ++count;
-            ++i;
-        }
-        if (count == 1)
-        {
-            out += current_char;
-            if (current_char == sep)
-            {
-                out += (char)0x00;
-            }
-        }
-        else
-        if (count == 2 && current_char != sep)
-        {
-            out += current_char;
-            out += current_char;
-        }
-        else
-        {
-            do
-            {
-                out += sep;
-                out += (char)qMin(255, count);
-                out += current_char;
-            }
-            while ((count -= 255) > 0);
-        }
-    }
-    qDebug() << "RLE8 deflate from" << ba.count() << "to" << out.count();
-    return out;
-}
-
-QByteArray inflateRle8(QByteArray ba)
-{
-    QByteArray out;
-    const char sep = (char)0x80;
-    for (int i = 0; i < ba.count(); ++i)
-    {
-        if (ba[i] != sep)
-        {
-            out += ba[i];
-        }
-        else
-        {
-            if (++i < ba.count())
-            {
-                int count = ba[i];
-                if (count == 0)
-                {
-                    out += sep;
-                }
-                else
-                {
-                    if (++i < ba.count())
-                    {
-                        out += QByteArray(count, ba[i]);
-                    }
-                }
-            }
-        }
-    }
-    return out;
-}
-#endif
 
 void MainWindow::on_actionImport_triggered()
 {
@@ -496,7 +420,7 @@ void MainWindow::on_actionImport_triggered()
         }
         zx4.resize(osize);
 #else
-        zx4 = inflateRle8(zx4_data);
+        zx4 = Zx4Processing::inflateRle8(zx4_data);
 #endif
         int alpha_bit = 0;
         for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
@@ -606,7 +530,7 @@ void MainWindow::on_actionExport_triggered()
 
     QByteArray zx4_data = zx4_alpha + zx4_color0 + zx4_color1;
 #ifdef USE_RLE8
-    zx4_data = deflateRle8(zx4_data);
+    zx4_data = Zx4Processing::deflateRle8(zx4_data);
 #else
     const int zx4_lz4max_count = ::LZ4_compressBound(zx4_data.count());
     QByteArray zx4_lz4(zx4_lz4max_count, 0);

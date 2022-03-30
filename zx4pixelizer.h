@@ -77,6 +77,8 @@ struct Zx4Processing
     static bool alikeColors(QColor c1, QColor c2, int hue_precision = 20, int light_precision = 32, int satur_precision = 32);
     static QMap<QColor, int> colorDistribution4(QImage img);
     static QImage importImage(QImage img, QVector<QRgb> color_table, bool use_alpha);
+    static QByteArray deflateRle8(QByteArray ba);
+    static QByteArray inflateRle8(QByteArray ba);
 };
 
 #endif // ZX4PIXELIZER_H

@@ -452,3 +452,76 @@ QImage Zx4Processing::importImage(QImage img, QVector<QRgb> color_table, bool us
 
     return img;
 }
+
+QByteArray Zx4Processing::deflateRle8(QByteArray ba)
+{
+    QByteArray out;
+    const char sep = (char)0x80;
+    for (int i = 0; i < ba.count();)
+    {
+        char current_char = ba[i];
+        int count = 0;
+        while (i < ba.count() && ba[i] == current_char)
+        {
+            ++count;
+            ++i;
+        }
+        if (count == 1)
+        {
+            out += current_char;
+            if (current_char == sep)
+            {
+                out += (char)0x00;
+            }
+        }
+        else
+        if (count == 2 && current_char != sep)
+        {
+            out += current_char;
+            out += current_char;
+        }
+        else
+        {
+            do
+            {
+                out += sep;
+                out += (char)qMin(255, count);
+                out += current_char;
+            }
+            while ((count -= 255) > 0);
+        }
+    }
+    return out;
+}
+
+QByteArray Zx4Processing::inflateRle8(QByteArray ba)
+{
+    QByteArray out;
+    const char sep = (char)0x80;
+    for (int i = 0; i < ba.count(); ++i)
+    {
+        if (ba[i] != sep)
+        {
+            out += ba[i];
+        }
+        else
+        {
+            if (++i < ba.count())
+            {
+                int count = ba[i];
+                if (count == 0)
+                {
+                    out += sep;
+                }
+                else
+                {
+                    if (++i < ba.count())
+                    {
+                        out += QByteArray(count, ba[i]);
+                    }
+                }
+            }
+        }
+    }
+    return out;
+}
