@@ -29,6 +29,9 @@ namespace CIEDE2000
         float a;
 		/** Color-opponent b dimension */
         float b;
+
+        LAB(): l(0), a(0), b(0) {}
+        LAB(float _l, float _a, float _b): l(_l), a(_a), b(_b) {}
 	};
 	/** Convenience definition for struct LAB */
 	using LAB = struct LAB;

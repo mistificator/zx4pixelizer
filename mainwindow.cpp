@@ -321,21 +321,87 @@ void MainWindow::on_actionNew_triggered()
 void MainWindow::on_actionImportWizardApply_triggered()
 {
     ui->paletteNumberBox->setToolTip(QString());
-    if (!current_sprite)
+    if (current_sprite)
     {
-        return;
+        auto sel_method = selectPaletteMethod();
+        int p_idx = ui->palettes->currentRow();
+        if (ui->wizardPaletteBox->currentIndex() == 0)
+        {
+            QMultiMap<double, int> dist = palettes.selectPalette(current_sprite->sourceImage(), sel_method);
+            ui->paletteNumberBox->setRange(1, dist.count());
+            ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
+            p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
+        }
+        current_sprite->setPaletteIndex(p_idx);
+        current_sprite->drawImage(importImage(current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
     }
-    auto sel_method = selectPaletteMethod();
-    int p_idx = ui->palettes->currentRow();
-    if (ui->wizardPaletteBox->currentIndex() == 0)
+    else
+    if (current_scene)
     {
-        QMultiMap<double, int> dist = palettes.selectPalette(current_sprite->sourceImage(), sel_method);
-        ui->paletteNumberBox->setRange(1, dist.count());
-        ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
-        p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
+        QProgressDialog pd(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
+        pd.setWindowIcon(QPixmap(":/sonic.zx4.png"));
+        pd.setWindowTitle("ZX4 Pixelizer");
+        pd.setLabelText("Importing scene" + (ui->actionHSL_color_difference->actionGroup() ? "\n(" + ui->actionHSL_color_difference->actionGroup()->checkedAction()->text() + ")" : QString()));
+        pd.setRange(0, 0);
+        pd.setCancelButton(0);
+        pd.show();
+        qApp->processEvents();
+
+        QImage img = current_scene->sourceImage();
+        QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
+
+    #if 0
+        auto img8_dist = colorDistribution(img8, false);
+        qDebug() << img8_dist.count() << img8_dist;
+
+        auto img_dist = colorDistribution(img, false);
+        qDebug() << img_dist.count() << img_dist;
+    #endif
+
+        Zx4Image scene;
+        scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
+        QMap<int, QMap<int, int>> scene_attr;
+
+        QImage out(img.width(), img.height(), QImage::Format_RGB32);
+        QPainter p(& out);
+
+        auto sel_method = selectPaletteMethod();
+        for (int y = 0; y < img.height(); y += 8)
+        {
+            for (int x = 0; x < img.width(); x += 8)
+            {
+                QImage small_quad = img8.copy(QRect(x, y, 8, 8));
+                int p_idx = current_scene->selectPalette(small_quad, sel_method);
+                if (p_idx != -1)
+                {
+                    current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
+                }
+            }
+        }
+        current_scene->canvas()->update();
+
+        foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
+        {
+            if (msw->widget() == current_scene)
+            {
+                msw->resize(out.width() * 4, out.height() * 4);
+                break;
+            }
+        }
+
+        pd.hide();
+
+    #if 0
+        QLabel * w = new QLabel();
+        w->addAction(ui->actionExport_scene);
+        w->setContextMenuPolicy(Qt::ActionsContextMenu);
+        w->setScaledContents(true);
+        w->setPixmap(QPixmap::fromImage(out));
+        w->resize(4 * out.width(), 4 * out.height());
+        w->show();
+    #endif
+
     }
-    current_sprite->setPaletteIndex(p_idx);
-    current_sprite->drawImage(importImage(current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
 }
 
 
@@ -720,15 +786,6 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
 
-    QProgressDialog pd(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
-    pd.setWindowIcon(QPixmap(":/sonic.zx4.png"));
-    pd.setWindowTitle("ZX4 Pixelizer");
-    pd.setLabelText("Importing scene");
-    pd.setRange(0, 0);
-    pd.setCancelButton(0);
-    pd.show();
-    qApp->processEvents();
-
     if (current_scene == 0)
     {
         current_scene = new SceneWindow(palettes);
@@ -738,64 +795,13 @@ void MainWindow::on_actionImport_scene_triggered()
         connect(current_scene, SIGNAL(previewUpdateIsNeeded()), ui->preview, SLOT(update()));
         connect(current_scene, SIGNAL(previewUpdateIsNeeded()), ui->sourceImage, SLOT(update()));
     }
+
     current_scene->setFileName(filename);
 
-//    img = scaleImage(img, qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192));
     img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio);
     current_scene->setSourceImage(img);
 
-    QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
-
-#if 0
-    auto img8_dist = colorDistribution(img8, false);
-    qDebug() << img8_dist.count() << img8_dist;
-
-    auto img_dist = colorDistribution(img, false);
-    qDebug() << img_dist.count() << img_dist;
-#endif
-
-    Zx4Image scene;
-    scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
-    QMap<int, QMap<int, int>> scene_attr;
-
-    QImage out(img.width(), img.height(), QImage::Format_RGB32);
-    QPainter p(& out);
-
-    auto sel_method = selectPaletteMethod();
-    for (int y = 0; y < img.height(); y += 8)
-    {
-        for (int x = 0; x < img.width(); x += 8)
-        {
-            QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-            int p_idx = current_scene->selectPalette(small_quad, sel_method);
-            if (p_idx != -1)
-            {
-                current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
-            }
-        }
-    }
-    current_scene->canvas()->update();
-
-    foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
-    {
-        if (msw->widget() == current_scene)
-        {
-            msw->resize(out.width() * 4, out.height() * 4);
-            break;
-        }
-    }
-
-    pd.hide();
-
-#if 0
-    QLabel * w = new QLabel();
-    w->addAction(ui->actionExport_scene);
-    w->setContextMenuPolicy(Qt::ActionsContextMenu);
-    w->setScaledContents(true);
-    w->setPixmap(QPixmap::fromImage(out));
-    w->resize(4 * out.width(), 4 * out.height());
-    w->show();
-#endif
+    ui->actionImportWizardApply->trigger();
 }
 
 void MainWindow::on_actionExport_scene_triggered()

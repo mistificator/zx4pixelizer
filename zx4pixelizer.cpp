@@ -195,13 +195,13 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib
                 switch (method)
                 {
                 case SelectPaletteCIE76:
-                    d += RGB_color_Lab_difference_CIE76(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue());
+                    d += RGB_color_Lab_difference_CIE76(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue()) / c.value();
                     break;
                 case SelectPaletteCIE94:
-                    d += RGB_color_Lab_difference_CIE94(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue());
+                    d += RGB_color_Lab_difference_CIE94(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue()) / c.value();
                     break;
                 case SelectPaletteCIEDE2000:
-                    d += RGB_color_Lab_difference_CIEDE2000(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue());
+                    d += RGB_color_Lab_difference_CIEDE2000(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue()) / c.value();
                     break;
                 default:
                     QColor c_hsl = c.key().toHsl();

@@ -226,15 +226,19 @@ float RGB_color_Lab_difference_CIE76( int R1, int G1, int B1, int R2, int G2, in
  ***************************************************/
 float Lab_color_difference_CIE94( float inL1, float ina1, float  inb1, float inL2, float ina2, float inb2){
 	// case Application.GraphicArts:
-		float Kl = 1.0;
-		float K1 = 0.045;
-		float K2 = 0.015;
+    //	float Kl = 1.0;
+    //	float K1 = 0.045;
+    //	float K2 = 0.015;
 	// 	break;
 	// case Application.Textiles:
-	// 	Kl = 2.0;
-	// 	K1 = .048;
-	// 	K2 = .014;
+    //  float Kl = 2.0;
+    //  float K1 = 0.048;
+    //  float K2 = 0.014;
 	// break;
+
+    float Kl = CIE94_Kl;
+    float K1 = 0.045;
+    float K2 = 0.015;
 
 	float deltaL = inL1 - inL2;
 	float deltaA = ina1 - ina2;
@@ -291,15 +295,7 @@ float RGB_color_Lab_difference_CIE94( int R1, int G1, int B1, int R2, int G2, in
 
 
 float Lab_color_difference_CIEDE2000( float inL1, float ina1, float  inb1, float inL2, float ina2, float inb2) {
-    CIEDE2000::LAB l1;
-    l1.l = inL1;
-    l1.a = ina1;
-    l1.b = inb1;
-    CIEDE2000::LAB l2;
-    l2.l = inL2;
-    l2.a = ina2;
-    l2.b = inb2;
-    return CIEDE2000::CIEDE2000(l1, l2);
+    return CIEDE2000::CIEDE2000(CIEDE2000::LAB(inL1, ina1, inb1), CIEDE2000::LAB(inL2, ina2, inb2));
 }
 
 float RGB_color_Lab_difference_CIEDE2000( int R1, int G1, int B1, int R2, int G2, int B2) {

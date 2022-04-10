@@ -266,33 +266,43 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
     case Zx4Palette::SelectPaletteCIEDE2000:
     {
         QMap<double, int> sorted_p_idx;
-        int k = 0;
-        foreach (QList<QColor> colors, palettes.palettes)
+        do
         {
-            double d = 0;
-            foreach (QColor color, colors)
+            int k = 0;
+            foreach (QList<QColor> colors, palettes.palettes)
             {
-                for (auto i = dist4.begin(); i != dist4.end(); ++i)
+                double d = 0;
+                foreach (QColor color, colors)
                 {
-                    const float m = i.key(); //::sqrtf(i.key() + 1);
-                    switch (method)
+                    for (auto i = dist4.begin(); i != dist4.end(); ++i)
                     {
-                    case Zx4Palette::SelectPaletteCIE76:
-                        d += RGB_color_Lab_difference_CIE76(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
-                        break;
-                    case Zx4Palette::SelectPaletteCIE94:
-                        d += RGB_color_Lab_difference_CIE94(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
-                        break;
-                    case Zx4Palette::SelectPaletteCIEDE2000:
-                        d += RGB_color_Lab_difference_CIEDE2000(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
-                        break;
-                    default:
-                        break;
+                        const float m = i.key(); //::sqrtf(i.key() + 1);
+                        switch (method)
+                        {
+                        case Zx4Palette::SelectPaletteCIE76:
+                            d += RGB_color_Lab_difference_CIE76(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                            break;
+                        case Zx4Palette::SelectPaletteCIE94:
+                            d += RGB_color_Lab_difference_CIE94(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                            break;
+                        case Zx4Palette::SelectPaletteCIEDE2000:
+                            d += RGB_color_Lab_difference_CIEDE2000(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                            break;
+                        default:
+                            break;
+                        }
                     }
                 }
+                d /= dist4.count();
+                while (sorted_p_idx.contains(d))
+                {
+                    d += 1e-6;
+                }
+                sorted_p_idx[d] = k++;
             }
-            sorted_p_idx[d] = k++;
+            dist4.erase(dist4.begin());
         }
+        while (dist4.count() > 1);
         if (!sorted_p_idx.isEmpty())
         {
             p_idx = * sorted_p_idx.begin();
