@@ -1,6 +1,7 @@
 #include <QSet>
 #include <QApplication>
 #include "zx4pixelizer.h"
+#include "color_conversions.h"
 
 void Zx4Palette::init()
 {
@@ -171,7 +172,7 @@ void Zx4Palette::init()
     }
 }
 
-QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib4) const
+QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib4, SelectPaletteMethod method) const
 {
     QMultiMap<double, int> dist;
     for (int i = 0; i < palettes.count(); i++)
@@ -182,6 +183,7 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib
             continue;
         }
         double d = 0;
+
         foreach (QColor p, pal)
         {
             QColor p_hsl = p.toHsl();
@@ -190,41 +192,46 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib
             int p_l = p_hsl.lightness();
             for(QMap<QColor, int>::iterator c = color_distrib4.begin(); c != color_distrib4.end(); ++c)
             {
-                QColor c_hsl = c.key().toHsl();
-                int c_h = c_hsl.hslHue();
-                int c_s = c_hsl.hslSaturation();
-                int c_l = c_hsl.lightness();
-
-                double _d = 0;
-                if (p_h != -1 && c_h != -1)
+                switch (method)
                 {
-                    if (p_h < c_h)
+                case SelectPaletteCIE76:
+                    d += RGB_color_Lab_difference_CIE76(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue());
+                    break;
+                case SelectPaletteCIE94:
+                    d += RGB_color_Lab_difference_CIE94(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue());
+                    break;
+                case SelectPaletteCIEDE2000:
+                    d += RGB_color_Lab_difference_CIEDE2000(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue());
+                    break;
+                default:
+                    QColor c_hsl = c.key().toHsl();
+                    int c_h = c_hsl.hslHue();
+                    int c_s = c_hsl.hslSaturation();
+                    int c_l = c_hsl.lightness();
+
+                    double _d = 0;
+                    if (p_h != -1 && c_h != -1)
                     {
-                        p_h += 360;
+                        if (p_h < c_h)
+                        {
+                            p_h += 360;
+                        }
+                        _d = p_h - c_h;
+                        if (_d > 180)
+                        {
+                            _d = 360 - _d;
+                        }
                     }
-                    _d = p_h - c_h;
-                    if (_d > 180)
+                    else
+                    if (p_h != c_h)
                     {
-                        _d = 360 - _d;
+                        _d += 90;
                     }
-                }
-                else
-                if (p_h != c_h)
-                {
-                    _d += 90;
-                }
 
-//                _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
-                _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
-//
-                /*
-                if (qAbs(p_s - c_s) + qAbs(p_l - c_l) > 96)
-                {
-                    _d += 90;
+                    _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
+                    d += _d / c.value();
+                    break;
                 }
-                */
-
-                d += _d / c.value();
             }
         }
         if (d > 0)
@@ -238,7 +245,7 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib
     return dist;
 }
 
-QMultiMap<double, int> Zx4Palette::selectPalette(QImage img) const
+QMultiMap<double, int> Zx4Palette::selectPalette(QImage img, SelectPaletteMethod method) const
 {
     if (img.colorCount() >= 4)
     {
@@ -255,7 +262,7 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QImage img) const
             }
         }
     }
-    return selectPalette(Zx4Processing::colorDistribution4(img));
+    return selectPalette(Zx4Processing::colorDistribution4(img), method);
 }
 
 

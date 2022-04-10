@@ -133,9 +133,19 @@
      <addaction name="actionColor_10"/>
      <addaction name="actionColor_11"/>
     </widget>
+    <widget class="QMenu" name="menuImport_tools">
+     <property name="title">
+      <string>Import tools</string>
+     </property>
+     <addaction name="actionHSL_color_difference"/>
+     <addaction name="actionCIE76_color_difference"/>
+     <addaction name="actionCIE94_color_difference"/>
+     <addaction name="actionCIEDE2000_color_difference"/>
+    </widget>
     <addaction name="menuDraw_tools"/>
     <addaction name="menuColor_tools"/>
     <addaction name="menuTransform_tools"/>
+    <addaction name="menuImport_tools"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
@@ -626,6 +636,41 @@
    </property>
    <property name="text">
     <string>About ZX4 Pixelizer</string>
+   </property>
+  </action>
+  <action name="actionHSL_color_difference">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>HSL color model difference</string>
+   </property>
+  </action>
+  <action name="actionCIE76_color_difference">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>CIE76 color difference</string>
+   </property>
+  </action>
+  <action name="actionCIE94_color_difference">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>CIE94 color difference</string>
+   </property>
+  </action>
+  <action name="actionCIEDE2000_color_difference">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>CIEDE2000 color difference</string>
    </property>
   </action>
  </widget>

@@ -9,6 +9,8 @@ CONFIG += c++11
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    CIEDE2000.cpp \
+    color_conversions.cpp \
     lz4.c \
     lz4hc.c \
     main.cpp \
@@ -18,6 +20,8 @@ SOURCES += \
     spritewindow.cpp
 
 HEADERS += \
+    CIEDE2000.h \
+    color_conversions.h \
     lz4.h \
     lz4hc.h \
     zx4pixelizer.h \

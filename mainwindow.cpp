@@ -34,6 +34,13 @@ MainWindow::MainWindow(QWidget *parent)
     ag->addAction(ui->actionColor_10);
     ag->addAction(ui->actionColor_11);
 
+    ag = new QActionGroup(this);
+    ag->setExclusive(true);
+    ag->addAction(ui->actionHSL_color_difference);
+    ag->addAction(ui->actionCIE76_color_difference);
+    ag->addAction(ui->actionCIE94_color_difference);
+    ag->addAction(ui->actionCIEDE2000_color_difference);
+
     ui->importWizardApply->setDefaultAction(ui->actionImportWizardApply);
 
     ui->menuWindow->addAction(ui->dockPalette->toggleViewAction());
@@ -318,10 +325,11 @@ void MainWindow::on_actionImportWizardApply_triggered()
     {
         return;
     }
+    auto sel_method = selectPaletteMethod();
     int p_idx = ui->palettes->currentRow();
     if (ui->wizardPaletteBox->currentIndex() == 0)
     {
-        QMultiMap<double, int> dist = palettes.selectPalette(current_sprite->sourceImage());
+        QMultiMap<double, int> dist = palettes.selectPalette(current_sprite->sourceImage(), sel_method);
         ui->paletteNumberBox->setRange(1, dist.count());
         ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
         p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
@@ -753,12 +761,13 @@ void MainWindow::on_actionImport_scene_triggered()
     QImage out(img.width(), img.height(), QImage::Format_RGB32);
     QPainter p(& out);
 
+    auto sel_method = selectPaletteMethod();
     for (int y = 0; y < img.height(); y += 8)
     {
         for (int x = 0; x < img.width(); x += 8)
         {
             QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-            int p_idx = current_scene->selectPalette(small_quad);
+            int p_idx = current_scene->selectPalette(small_quad, sel_method);
             if (p_idx != -1)
             {
                 current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
@@ -995,4 +1004,19 @@ void MainWindow::selectPalette(int p_idx)
     }
 }
 
-
+Zx4Palette::SelectPaletteMethod MainWindow::selectPaletteMethod() const
+{
+    if (ui->actionCIE76_color_difference->isChecked())
+    {
+        return Zx4Palette::SelectPaletteCIE76;
+    }
+    if (ui->actionCIE94_color_difference->isChecked())
+    {
+        return Zx4Palette::SelectPaletteCIE94;
+    }
+    if (ui->actionCIEDE2000_color_difference->isChecked())
+    {
+        return Zx4Palette::SelectPaletteCIEDE2000;
+    }
+    return Zx4Palette::SelectPaletteHSL;
+}

@@ -61,5 +61,7 @@ private:
 
     void showEvent(QShowEvent *);
     void resizeEvent(QResizeEvent *);
+
+    Zx4Palette::SelectPaletteMethod selectPaletteMethod() const;
 };
 #endif // MAINWINDOW_H

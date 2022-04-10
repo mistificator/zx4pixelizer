@@ -2,6 +2,7 @@
 #include <QPainter>
 #include <QDebug>
 #include <QMouseEvent>
+#include "color_conversions.h"
 #include "scenewindow.h"
 #include "ui_scenewindow.h"
 
@@ -232,7 +233,7 @@ void SceneWindow::drawGrid()
     QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
 }
 
-int SceneWindow::selectPalette(QImage small_quad) const
+int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMethod method) const
 {
     auto small_dist = Zx4Processing::colorDistribution(small_quad, false);
 
@@ -258,101 +259,145 @@ int SceneWindow::selectPalette(QImage small_quad) const
         }
     }
 
-    do
+    switch (method)
     {
-        QList<QColor> colors = dist4.values();
-        qSort(colors); // indexes "palettes_by_color" sorted by color
-
-        const double ls = 0.85;
-        const double t = 0.1;
-
-        int hue_precision = 10;
-        do
+    case Zx4Palette::SelectPaletteCIE76:
+    case Zx4Palette::SelectPaletteCIE94:
+    case Zx4Palette::SelectPaletteCIEDE2000:
+    {
+        QMap<double, int> sorted_p_idx;
+        int k = 0;
+        foreach (QList<QColor> colors, palettes.palettes)
         {
-            int light_satur_precision = 16;
-            do
+            double d = 0;
+            foreach (QColor color, colors)
             {
-                if (colors.count() == 1)
+                for (auto i = dist4.begin(); i != dist4.end(); ++i)
                 {
-                    for (auto i = palettes.palettes_by_color.begin(); i != palettes.palettes_by_color.end(); ++i)
+                    const float m = i.key(); //::sqrtf(i.key() + 1);
+                    switch (method)
                     {
-                        if (Zx4Processing::alikeColors(i.key(), colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision))
-                        {
-                            p_idx = i.value().at(i.value().count() * t);
-                            break;
-                        }
+                    case Zx4Palette::SelectPaletteCIE76:
+                        d += RGB_color_Lab_difference_CIE76(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                        break;
+                    case Zx4Palette::SelectPaletteCIE94:
+                        d += RGB_color_Lab_difference_CIE94(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                        break;
+                    case Zx4Palette::SelectPaletteCIEDE2000:
+                        d += RGB_color_Lab_difference_CIEDE2000(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                        break;
+                    default:
+                        break;
                     }
                 }
-                else
-                if (colors.count() == 2)
+            }
+            sorted_p_idx[d] = k++;
+        }
+        if (!sorted_p_idx.isEmpty())
+        {
+            p_idx = * sorted_p_idx.begin();
+        }
+        break;
+    }
+    default:
+        do
+        {
+            QList<QColor> colors = dist4.values();
+            qSort(colors); // indexes "palettes_by_color" sorted by color
+
+            const double ls = 0.85;
+            const double t = 0.1;
+
+            int hue_precision = 10;
+            do
+            {
+                int light_satur_precision = 16;
+                do
                 {
-                    for (auto i = palettes.palettes_by_2colors.begin(); i != palettes.palettes_by_2colors.end(); ++i)
+                    if (colors.count() == 1)
                     {
-                        if (Zx4Processing::alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        for (auto i = palettes.palettes_by_color.begin(); i != palettes.palettes_by_color.end(); ++i)
                         {
-                            int _p_idx = i.value().at(i.value().count() * t);
-                            if (checkPalette(small_quad, _p_idx))
+                            if (Zx4Processing::alikeColors(i.key(), colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision))
                             {
-                                p_idx = _p_idx;
+                                p_idx = i.value().at(i.value().count() * t);
                                 break;
                             }
                         }
                     }
-                }
-                else
-                if (colors.count() == 3)
-                {
-                    for (auto i = palettes.palettes_by_3colors.begin(); i != palettes.palettes_by_3colors.end() && p_idx == -1; ++i)
+                    else
+                    if (colors.count() == 2)
                     {
-                        if (Zx4Processing::alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        for (auto i = palettes.palettes_by_2colors.begin(); i != palettes.palettes_by_2colors.end(); ++i)
                         {
-                            for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                            if (Zx4Processing::alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
                             {
-                                if (Zx4Processing::alikeColors(k.key(), colors.at(2)))
+                                int _p_idx = i.value().at(i.value().count() * t);
+                                if (checkPalette(small_quad, _p_idx))
                                 {
-                                    int _p_idx = k.value().at(k.value().count() * t);
-                                    if (checkPalette(small_quad, _p_idx))
+                                    p_idx = _p_idx;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    if (colors.count() == 3)
+                    {
+                        for (auto i = palettes.palettes_by_3colors.begin(); i != palettes.palettes_by_3colors.end() && p_idx == -1; ++i)
+                        {
+                            if (Zx4Processing::alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
+                            {
+                                for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                                {
+                                    if (Zx4Processing::alikeColors(k.key(), colors.at(2)))
                                     {
-                                        p_idx = _p_idx;
-                                        break;
+                                        int _p_idx = k.value().at(k.value().count() * t);
+                                        if (checkPalette(small_quad, _p_idx))
+                                        {
+                                            p_idx = _p_idx;
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                else
-                if (colors.count() == 4)
-                {
-                    for (auto i = palettes.palettes_by_4colors.begin(); i != palettes.palettes_by_4colors.end() && p_idx == -1; ++i)
+                    else
+                    if (colors.count() == 4)
                     {
-                        if (Zx4Processing::alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
+                        for (auto i = palettes.palettes_by_4colors.begin(); i != palettes.palettes_by_4colors.end() && p_idx == -1; ++i)
                         {
-                            for (auto k = i.value().begin(); k != i.value().end(); ++k)
+                            if (Zx4Processing::alikeColors(i.key().first, colors.at(0), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.at(1), hue_precision, light_satur_precision, ls * light_satur_precision))
                             {
-                                if (Zx4Processing::alikeColors(k.key().first, colors.at(2), hue_precision) && Zx4Processing::alikeColors(k.key().second, colors.at(3), hue_precision))
+                                for (auto k = i.value().begin(); k != i.value().end(); ++k)
                                 {
-                                    int _p_idx = k.value().at(k.value().count() * t);
-                                    if (checkPalette(small_quad, _p_idx))
+                                    if (Zx4Processing::alikeColors(k.key().first, colors.at(2), hue_precision) && Zx4Processing::alikeColors(k.key().second, colors.at(3), hue_precision))
                                     {
-                                        p_idx = _p_idx;
-                                        break;
+                                        int _p_idx = k.value().at(k.value().count() * t);
+                                        if (checkPalette(small_quad, _p_idx))
+                                        {
+                                            p_idx = _p_idx;
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    light_satur_precision += 16;
                 }
-                light_satur_precision += 16;
+                while (p_idx == -1 && light_satur_precision <= 64);
+                hue_precision += 5;
             }
-            while (p_idx == -1 && light_satur_precision <= 64);
-            hue_precision += 5;
-        }
-        while (p_idx == -1 && hue_precision < 100 / (colors.count()));
+            while (p_idx == -1 && hue_precision < 100 / (colors.count()));
 
-        dist4.erase(dist4.begin());
+            dist4.erase(dist4.begin());
+        }
+        while (p_idx == -1 && !dist4.isEmpty());
+
+        break;
     }
-    while (p_idx == -1 && !dist4.isEmpty());
 
     return p_idx;
 }
