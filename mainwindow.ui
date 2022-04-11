@@ -133,19 +133,9 @@
      <addaction name="actionColor_10"/>
      <addaction name="actionColor_11"/>
     </widget>
-    <widget class="QMenu" name="menuImport_tools">
-     <property name="title">
-      <string>Import tools</string>
-     </property>
-     <addaction name="actionHSL_color_difference"/>
-     <addaction name="actionCIE76_color_difference"/>
-     <addaction name="actionCIE94_color_difference"/>
-     <addaction name="actionCIEDE2000_color_difference"/>
-    </widget>
     <addaction name="menuDraw_tools"/>
     <addaction name="menuColor_tools"/>
     <addaction name="menuTransform_tools"/>
-    <addaction name="menuImport_tools"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
@@ -368,6 +358,13 @@
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_5">
     <layout class="QGridLayout" name="gridLayout_6">
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Index in sequence</string>
+       </property>
+      </widget>
+     </item>
      <item row="1" column="0">
       <widget class="QLabel" name="label">
        <property name="text">
@@ -375,7 +372,7 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="2">
+     <item row="5" column="2">
       <spacer name="verticalSpacer_2">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
@@ -387,6 +384,39 @@
         </size>
        </property>
       </spacer>
+     </item>
+     <item row="4" column="2">
+      <widget class="QToolButton" name="importWizardApply">
+       <property name="layoutDirection">
+        <enum>Qt::LeftToRight</enum>
+       </property>
+       <property name="text">
+        <string>Reimport</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="QSpinBox" name="paletteNumberBox">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>1</number>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0" colspan="3">
+      <widget class="QCheckBox" name="alphaBox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked ithen import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Alpha channel</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
      <item row="1" column="1" colspan="2">
       <widget class="QComboBox" name="wizardPaletteBox">
@@ -408,36 +438,34 @@
        </item>
       </widget>
      </item>
-     <item row="3" column="2">
-      <widget class="QToolButton" name="importWizardApply">
-       <property name="layoutDirection">
-        <enum>Qt::LeftToRight</enum>
-       </property>
-       <property name="text">
-        <string>Reimport</string>
-       </property>
+     <item row="3" column="1" colspan="2">
+      <widget class="QComboBox" name="colorPickBox">
+       <item>
+        <property name="text">
+         <string>HSL-based color pick</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>CIE76-based color pick</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>CIE94-based color pick</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>CIEDE2000-based color pick</string>
+        </property>
+       </item>
       </widget>
      </item>
-     <item row="0" column="0" colspan="3">
-      <widget class="QCheckBox" name="alphaBox">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked ithen import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>Alpha channel</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="2">
-      <widget class="QSpinBox" name="paletteNumberBox">
-       <property name="minimum">
-        <number>1</number>
-       </property>
-       <property name="maximum">
-        <number>1</number>
+        <string>Color pick method</string>
        </property>
       </widget>
      </item>
@@ -636,41 +664,6 @@
    </property>
    <property name="text">
     <string>About ZX4 Pixelizer</string>
-   </property>
-  </action>
-  <action name="actionHSL_color_difference">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>HSL color model difference</string>
-   </property>
-  </action>
-  <action name="actionCIE76_color_difference">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>CIE76 color difference</string>
-   </property>
-  </action>
-  <action name="actionCIE94_color_difference">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>CIE94 color difference</string>
-   </property>
-  </action>
-  <action name="actionCIEDE2000_color_difference">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>CIEDE2000 color difference</string>
    </property>
   </action>
  </widget>

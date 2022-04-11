@@ -15,6 +15,7 @@ SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
     ui->canvas->installEventFilter(this);
 
     setFileName(QString());
+    selected_char = update_char = QPoint(-1, -1);
 }
 
 SceneWindow::~SceneWindow()
@@ -146,7 +147,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                 {
                     if (me->modifiers().testFlag(Qt::ShiftModifier))
                     {
-                        if (!selected_char.isNull())
+                        if (selected_char != QPoint(-1, -1))
                         {
                             update_char = QPoint(x / 8, y / 8);
                             importChar(
@@ -160,7 +161,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                     {
                         if (me->type() == QMouseEvent::MouseButtonDblClick && selected_char == QPoint(x / 8, y / 8))
                         {
-                            selected_char = QPoint();
+                            selected_char = QPoint(-1, -1);
                         }
                         else
                         {
@@ -183,7 +184,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             case QEvent::MouseButtonRelease:
             {
                 QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
-                update_char = QPoint();
+                update_char = QPoint(-1, -1);
                 QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
             }
             break;
@@ -223,7 +224,7 @@ void SceneWindow::drawGrid()
     auto list = QList<QPair<QPoint, QColor> >() << QPair<QPoint, QColor>(selected_char, QColor(0, 255, 0, 128)) << QPair<QPoint, QColor>(update_char, QColor(255, 0, 0, 128));
     for (auto i = list.begin(); i != list.end(); ++i)
     {
-        if (!i->first.isNull())
+        if (i->first != QPoint(-1, -1))
         {
             p.setPen(QPen(i->second, 3, Qt::DotLine, Qt::RoundCap));
             p.drawRect(i->first.x() * kx, i->first.y() * ky, kx, ky);

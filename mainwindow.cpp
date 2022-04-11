@@ -34,13 +34,6 @@ MainWindow::MainWindow(QWidget *parent)
     ag->addAction(ui->actionColor_10);
     ag->addAction(ui->actionColor_11);
 
-    ag = new QActionGroup(this);
-    ag->setExclusive(true);
-    ag->addAction(ui->actionHSL_color_difference);
-    ag->addAction(ui->actionCIE76_color_difference);
-    ag->addAction(ui->actionCIE94_color_difference);
-    ag->addAction(ui->actionCIEDE2000_color_difference);
-
     ui->importWizardApply->setDefaultAction(ui->actionImportWizardApply);
 
     ui->menuWindow->addAction(ui->dockPalette->toggleViewAction());
@@ -70,7 +63,10 @@ void MainWindow::createPalettes()
 
     for (int p_idx = 0; p_idx < palettes.palettes.count(); p_idx++)
     {
-        qApp->processEvents();
+        if (p_idx % 50 == 0)
+        {
+            qApp->processEvents();
+        }
 
         QList<QColor> m = palettes.palettes[p_idx];
         QPixmap px(64, 64);
@@ -341,7 +337,7 @@ void MainWindow::on_actionImportWizardApply_triggered()
         QProgressDialog pd(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
         pd.setWindowIcon(QPixmap(":/sonic.zx4.png"));
         pd.setWindowTitle("ZX4 Pixelizer");
-        pd.setLabelText("Importing scene" + (ui->actionHSL_color_difference->actionGroup() ? "\n(" + ui->actionHSL_color_difference->actionGroup()->checkedAction()->text() + ")" : QString()));
+        pd.setLabelText("Importing scene\n" + ui->colorPickBox->currentText());
         pd.setRange(0, 0);
         pd.setCancelButton(0);
         pd.show();
@@ -1017,17 +1013,6 @@ void MainWindow::selectPalette(int p_idx)
 
 Zx4Palette::SelectPaletteMethod MainWindow::selectPaletteMethod() const
 {
-    if (ui->actionCIE76_color_difference->isChecked())
-    {
-        return Zx4Palette::SelectPaletteCIE76;
-    }
-    if (ui->actionCIE94_color_difference->isChecked())
-    {
-        return Zx4Palette::SelectPaletteCIE94;
-    }
-    if (ui->actionCIEDE2000_color_difference->isChecked())
-    {
-        return Zx4Palette::SelectPaletteCIEDE2000;
-    }
-    return Zx4Palette::SelectPaletteHSL;
+    return static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
 }
+
