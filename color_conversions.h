@@ -91,9 +91,6 @@ float RGB_color_Lab_difference_CIE76( int R1, int G1, int B1, int R2, int G2, in
  *				 between 2 Lab colors based on the CIE94 formula
  *
  ***************************************************/
-#ifndef CIE94_Kl
-    #define CIE94_Kl 4.0
-#endif
 float Lab_color_difference_CIE94( float inL1, float ina1, float  inb1, float inL2, float ina2, float inb2);
 
 /***************************************************

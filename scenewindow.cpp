@@ -243,6 +243,8 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
         return p_idx;
     }
 
+    qApp->processEvents();
+
     int k = 0;
     QMap<int, QColor> dist4;
     for (auto i = --small_dist.end(); k < 4; --i, ++k)
@@ -272,25 +274,32 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
             foreach (QList<QColor> colors, palettes.palettes)
             {
                 double d = 0;
+                auto _dist4 = dist4;
                 foreach (QColor color, colors)
                 {
-                    for (auto i = dist4.begin(); i != dist4.end(); ++i)
+                    QMap<double, int> d_map;
+                    for (auto i = _dist4.begin(); i != _dist4.end(); ++i)
                     {
-                        const float m = i.key(); //::sqrtf(i.key() + 1);
                         switch (method)
                         {
                         case Zx4Palette::SelectPaletteCIE76:
-                            d += RGB_color_Lab_difference_CIE76(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                            d_map[RGB_color_Lab_difference_CIE76(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue())] = i.key();
                             break;
                         case Zx4Palette::SelectPaletteCIE94:
-                            d += RGB_color_Lab_difference_CIE94(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                            d_map[RGB_color_Lab_difference_CIE94(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue())] = i.key();
                             break;
                         case Zx4Palette::SelectPaletteCIEDE2000:
-                            d += RGB_color_Lab_difference_CIEDE2000(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue()) * m;
+                            d_map[RGB_color_Lab_difference_CIEDE2000(color.red(), color.green(), color.blue(), i->red(), i->green(), i->blue())] = i.key();
                             break;
                         default:
                             break;
                         }
+                    }
+                    _dist4.remove(d_map.begin().value());
+                    d += d_map.begin().key() * d_map.begin().value();
+                    if (_dist4.isEmpty())
+                    {
+                        break;
                     }
                 }
                 d /= dist4.count();
