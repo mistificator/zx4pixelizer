@@ -45,3 +45,5 @@ RESOURCES += \
 win32:RC_ICONS += sonic.zx4.ico
 VERSION = 0.0.0.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
+
+QMAKE_CXXFLAGS+= -openmp

@@ -12,6 +12,8 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 
+#include <omp.h>
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -317,22 +319,22 @@ void MainWindow::on_actionNew_triggered()
 void MainWindow::on_actionImportWizardApply_triggered()
 {
     ui->paletteNumberBox->setToolTip(QString());
-    if (current_sprite)
+    if (SpriteWindow * _current_sprite = current_sprite)
     {
         auto sel_method = selectPaletteMethod();
         int p_idx = ui->palettes->currentRow();
         if (ui->wizardPaletteBox->currentIndex() == 0)
         {
-            QMultiMap<double, int> dist = palettes.selectPalette(current_sprite->sourceImage(), sel_method);
+            QMultiMap<double, int> dist = palettes.selectPalette(_current_sprite->sourceImage(), sel_method);
             ui->paletteNumberBox->setRange(1, dist.count());
             ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
             p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
         }
-        current_sprite->setPaletteIndex(p_idx);
-        current_sprite->drawImage(importImage(current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
+        _current_sprite->setPaletteIndex(p_idx);
+        _current_sprite->drawImage(importImage(_current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
     }
     else
-    if (current_scene)
+    if (SceneWindow * _current_scene = current_scene)
     {
         QProgressDialog pd(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
         pd.setWindowIcon(QPixmap(":/sonic.zx4.png"));
@@ -343,7 +345,7 @@ void MainWindow::on_actionImportWizardApply_triggered()
         pd.show();
         qApp->processEvents();
 
-        QImage img = current_scene->sourceImage();
+        QImage img = _current_scene->sourceImage();
         QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
 
         pd.setRange(0, (img.width() / 8) * (img.height() / 8));
@@ -363,31 +365,34 @@ void MainWindow::on_actionImportWizardApply_triggered()
         QImage out(img.width(), img.height(), QImage::Format_RGB32);
         QPainter p(& out);
 
-        int progress = 0;
-        auto sel_method = selectPaletteMethod();
-        for (int y = 0; y < img.height(); y += 8)
-        {
-            for (int x = 0; x < img.width(); x += 8)
-            {
-                progress++;
-                QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-                int p_idx = current_scene->selectPalette(small_quad, sel_method);
-                if (p_idx != -1)
-                {
-                    current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
-                }
-            }
-            pd.setValue(progress);
-        }
-        current_scene->canvas()->update();
-
         foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
         {
-            if (msw->widget() == current_scene)
+            if (msw->widget() == _current_scene)
             {
                 msw->resize(out.width() * 4, out.height() * 4);
                 break;
             }
+        }
+
+        int progress = 0;
+        auto sel_method = selectPaletteMethod();
+
+        #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, img.height() / 8))
+        for (int y = 0; y < img.height(); y += 8)
+        {
+            for (int x = 0; x < img.width(); x += 8)
+            {
+                #pragma omp atomic
+                    progress++;
+                QImage small_quad = img8.copy(QRect(x, y, 8, 8));
+                int p_idx = _current_scene->selectPalette(small_quad, sel_method);
+                if (p_idx != -1)
+                {
+                    _current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
+                }
+            }
+            QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
+            QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
         }
 
         pd.hide();
