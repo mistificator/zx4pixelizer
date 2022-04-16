@@ -988,7 +988,10 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
 void MainWindow::selectPalette(int p_idx)
 {
     ui->palettes->setCurrentRow(p_idx);
+
+    ui->paletteIndex->blockSignals(true);
     ui->paletteIndex->setCurrentIndex(p_idx);
+    ui->paletteIndex->blockSignals(false);
 
     QList<QColor> list = palettes.palettes[p_idx];
     QPixmap px(QSize(32, 32));
@@ -1025,3 +1028,8 @@ Zx4Palette::SelectPaletteMethod MainWindow::selectPaletteMethod() const
     return static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
 }
 
+
+void MainWindow::on_paletteIndex_currentIndexChanged(int index)
+{
+    selectPalette(index);
+}

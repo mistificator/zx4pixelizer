@@ -26,27 +26,34 @@ private slots:
     void selectPalette(int p_idx);
 
     void on_actionQuit_triggered();
-    void on_palettes_itemSelectionChanged();
     void on_actionResize_canvas_triggered();
     void on_actionResize_image_triggered();
-    void on_actionImport_triggered();
+    void on_actionAbout_ZX4_Pixelizer_triggered();
+
+    void on_palettes_itemSelectionChanged();
     void on_palettes_itemClicked(QListWidgetItem *item);
-    void on_actionNew_triggered();
-    void on_actionImportWizardApply_triggered();
-    void on_actionInvert_colors_triggered();
-    void on_actionOpen_triggered();
-    void on_actionSave_as_triggered();
     void on_wizardPaletteBox_currentIndexChanged(int index);
-    void on_actionSave_triggered();
-    void on_actionImport_scene_triggered();
-    void on_actionExport_scene_triggered();
+
+    void on_actionInvert_colors_triggered();
     void on_actionColor_00_toggled(bool);
     void on_actionColor_01_toggled(bool);
     void on_actionColor_10_toggled(bool);
     void on_actionColor_11_toggled(bool);
+
+    void on_actionNew_triggered();
+    void on_actionOpen_triggered();
+    void on_actionSave_as_triggered();
+
+    void on_actionImport_triggered();
+    void on_actionImportWizardApply_triggered();
+    void on_actionSave_triggered();
+    void on_actionImport_scene_triggered();
+    void on_actionExport_scene_triggered();
     void on_actionExport_triggered();
-    void on_actionAbout_ZX4_Pixelizer_triggered();
+
     void on_mdiArea_subWindowActivated(QMdiSubWindow *msw);
+    void on_paletteIndex_currentIndexChanged(int index);
+
 private:
     Ui::MainWindow *ui;
     SpriteWindow * current_sprite = 0;
