@@ -3,83 +3,111 @@
 #include "zx4pixelizer.h"
 #include "color_conversions.h"
 
+template <class T>
+inline T & deconst_cast(const T & m)
+{
+    return * const_cast<T *>(& m);
+}
+
+Zx4Palette::Zx4Palette()
+{
+
+}
+
 void Zx4Palette::init()
 {
-#if 1
-    color_table[ZxBlack] =          Qt::black;
-    color_table[ZxBlue] =           Qt::darkBlue;
-    color_table[ZxRed] =            Qt::darkRed;
-    color_table[ZxMagenta] =        Qt::darkMagenta;
-    color_table[ZxGreen] =          Qt::darkGreen;
-    color_table[ZxCyan] =           Qt::darkCyan;
-    color_table[ZxYellow] =         Qt::darkYellow;
-    color_table[ZxWhite] =          Qt::lightGray;
-    color_table[ZxBrightBlack] =    Qt::black;
-    color_table[ZxBrightBlue] =     Qt::blue;
-    color_table[ZxBrightRed] =      Qt::red;
-    color_table[ZxBrightMagenta] =  Qt::magenta;
-    color_table[ZxBrightGreen] =    Qt::green;
-    color_table[ZxBrightCyan] =     Qt::cyan;
-    color_table[ZxBrightYellow] =   Qt::yellow;
-    color_table[ZxBrightWhite] =    Qt::white;
+    auto & _color_table = deconst_cast(color_table);
+#if 0
+    _color_table[ZxBlack] =          Qt::black;
+    _color_table[ZxBlue] =           Qt::darkBlue;
+    _color_table[ZxRed] =            Qt::darkRed;
+    _color_table[ZxMagenta] =        Qt::darkMagenta;
+    _color_table[ZxGreen] =          Qt::darkGreen;
+    _color_table[ZxCyan] =           Qt::darkCyan;
+    _color_table[ZxYellow] =         Qt::darkYellow;
+    _color_table[ZxWhite] =          Qt::lightGray;
+    _color_table[ZxBrightBlack] =    Qt::black;
+    _color_table[ZxBrightBlue] =     Qt::blue;
+    _color_table[ZxBrightRed] =      Qt::red;
+    _color_table[ZxBrightMagenta] =  Qt::magenta;
+    _color_table[ZxBrightGreen] =    Qt::green;
+    _color_table[ZxBrightCyan] =     Qt::cyan;
+    _color_table[ZxBrightYellow] =   Qt::yellow;
+    _color_table[ZxBrightWhite] =    Qt::white;
+
+    deconst_cast(grayscale_index) = 492;
 #else
-    int level = 0xC0;
-    int high_level = 0xFF;
-    color_table[ZxBlack] =          QColor(0x00, 0x00, 0x00);
-    color_table[ZxBlue] =           QColor(0x00, 0x00, level);
-    color_table[ZxRed] =            QColor(level, 0x00, 0x00);
-    color_table[ZxMagenta] =        QColor(level, 0x00, level);
-    color_table[ZxGreen] =          QColor(0x00, level, 0x00);
-    color_table[ZxCyan] =           QColor(0x00, level, level);
-    color_table[ZxYellow] =         QColor(level, level, 0x00);
-    color_table[ZxWhite] =          QColor(level, level, level);
-    color_table[ZxBrightBlack] =    QColor(0x00, 0x00, 0x00);
-    color_table[ZxBrightBlue] =     QColor(0x00, 0x00, high_level);
-    color_table[ZxBrightRed] =      QColor(high_level, 0x00, 0x00);
-    color_table[ZxBrightMagenta] =  QColor(high_level, 0x00, high_level);
-    color_table[ZxBrightGreen] =    QColor(0x00, high_level, 0x00);
-    color_table[ZxBrightCyan] =     QColor(0x00, high_level, high_level);
-    color_table[ZxBrightYellow] =   QColor(high_level, high_level, 0x00);
-    color_table[ZxBrightWhite] =    QColor(high_level, high_level, high_level);
+    const int level = 0xC0;
+    const int high_level = 0xFF;
+    _color_table[ZxBlack] =          QColor(0x00, 0x00, 0x00);
+    _color_table[ZxBlue] =           QColor(0x00, 0x00, level);
+    _color_table[ZxRed] =            QColor(level, 0x00, 0x00);
+    _color_table[ZxMagenta] =        QColor(level, 0x00, level);
+    _color_table[ZxGreen] =          QColor(0x00, level, 0x00);
+    _color_table[ZxCyan] =           QColor(0x00, level, level);
+    _color_table[ZxYellow] =         QColor(level, level, 0x00);
+    _color_table[ZxWhite] =          QColor(level, level, level);
+    _color_table[ZxBrightBlack] =    QColor(0x00, 0x00, 0x00);
+    _color_table[ZxBrightBlue] =     QColor(0x00, 0x00, high_level);
+    _color_table[ZxBrightRed] =      QColor(high_level, 0x00, 0x00);
+    _color_table[ZxBrightMagenta] =  QColor(high_level, 0x00, high_level);
+    _color_table[ZxBrightGreen] =    QColor(0x00, high_level, 0x00);
+    _color_table[ZxBrightCyan] =     QColor(0x00, high_level, high_level);
+    _color_table[ZxBrightYellow] =   QColor(high_level, high_level, 0x00);
+    _color_table[ZxBrightWhite] =    QColor(high_level, high_level, high_level);
+
+    deconst_cast(grayscale_index) = 486;
 #endif
 
-    color_name[ZxBlack] =          "Black";
-    color_name[ZxBlue] =           "Blue";
-    color_name[ZxRed] =            "Red";
-    color_name[ZxMagenta] =        "Magenta";
-    color_name[ZxGreen] =          "Green";
-    color_name[ZxCyan] =           "Cyan";
-    color_name[ZxYellow] =         "Yellow";
-    color_name[ZxWhite] =          "White";
-    color_name[ZxBrightBlack] =    "Bright black";
-    color_name[ZxBrightBlue] =     "Bright blue";
-    color_name[ZxBrightRed] =      "Bright red";
-    color_name[ZxBrightMagenta] =  "Bright magenta";
-    color_name[ZxBrightGreen] =    "Bright green";
-    color_name[ZxBrightCyan] =     "Bright cyan";
-    color_name[ZxBrightYellow] =   "Bright yellow";
-    color_name[ZxBrightWhite] =    "Bright white";
+    auto & _color_name = deconst_cast(color_name);
+    _color_name[ZxBlack] =          "Black";
+    _color_name[ZxBlue] =           "Blue";
+    _color_name[ZxRed] =            "Red";
+    _color_name[ZxMagenta] =        "Magenta";
+    _color_name[ZxGreen] =          "Green";
+    _color_name[ZxCyan] =           "Cyan";
+    _color_name[ZxYellow] =         "Yellow";
+    _color_name[ZxWhite] =          "White";
+    _color_name[ZxBrightBlack] =    "Bright black";
+    _color_name[ZxBrightBlue] =     "Bright blue";
+    _color_name[ZxBrightRed] =      "Bright red";
+    _color_name[ZxBrightMagenta] =  "Bright magenta";
+    _color_name[ZxBrightGreen] =    "Bright green";
+    _color_name[ZxBrightCyan] =     "Bright cyan";
+    _color_name[ZxBrightYellow] =   "Bright yellow";
+    _color_name[ZxBrightWhite] =    "Bright white";
 
+    auto & _palettes = deconst_cast(palettes);
+    auto & _palettes_by_color = deconst_cast(palettes_by_color);
+    auto & _palettes_by_2colors = deconst_cast(palettes_by_2colors);
+    auto & _palettes_by_3colors = deconst_cast(palettes_by_3colors);
+    auto & _palettes_by_4colors = deconst_cast(palettes_by_4colors);
+    auto & _color_palette_table = deconst_cast(color_palette_table);
     int color_num = 0;
     for (int c0i = 0; c0i < 8; c0i++)
     {
         qApp->processEvents();
         for (int c1i = c0i; c1i < 8; c1i++)
         {
-            for (int c2i = 0; c2i < 8; c2i++)
+            for (int c2i = c0i; c2i < 8; c2i++)
             {
                 for (int c3i = c2i; c3i < 8; c3i++)
                 {
                     for (int b0 = 0; b0 < 2; b0++)
                     {
-                        for (int b1 = 0; b1 < 2; b1++)
+                        for (int b1 = b0; b1 < 2; b1++)
                         {
                             QColor c[4];
                             ZxColorEnum z[4];
-                            c[0] = color_table[z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0)];
-                            c[1] = color_table[z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0)];
-                            c[2] = color_table[z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1)];
-                            c[3] = color_table[z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1)];
+                            z[0] = static_cast<ZxColorEnum>(c0i + 8 * b0);
+                            z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0);
+                            z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1);
+                            z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1);
+
+                            c[0] = color_table[z[0]];
+                            c[1] = color_table[z[1]];
+                            c[2] = color_table[z[2]];
+                            c[3] = color_table[z[3]];
 
                             QColor m[4];
                             m[0] = QColor::fromRgb((c[0].red() + c[2].red()) / 2, (c[0].green() + c[2].green()) / 2, (c[0].blue() + c[2].blue()) / 2);
@@ -93,12 +121,6 @@ void Zx4Palette::init()
                             {
                                 continue;
                             }
-                            QList<QRgb> ml2 = ml1;
-                            qSort(ml1);
-                            if (ml1 != ml2)
-                            {
-                                continue;
-                            }
 
                             QList<QColor> list;
                             list << m[0] << m[1] << m[2] << m[3];
@@ -106,14 +128,14 @@ void Zx4Palette::init()
                             {
                                 continue;
                             }
-                            palettes << list;
+                            _palettes << list;
 
-                            palettes_by_color[m[0]] << color_num;
-                            palettes_by_color[m[1]] << color_num;
-                            palettes_by_color[m[2]] << color_num;
-                            palettes_by_color[m[3]] << color_num;
+                            _palettes_by_color[m[0]] << color_num;
+                            _palettes_by_color[m[1]] << color_num;
+                            _palettes_by_color[m[2]] << color_num;
+                            _palettes_by_color[m[3]] << color_num;
 
-                            color_palette_table[color_num] << z[0] << z[1] << z[2] << z[3];
+                            _color_palette_table[color_num] << z[0] << z[1] << z[2] << z[3];
 
                             color_num++;
                         }
@@ -122,7 +144,7 @@ void Zx4Palette::init()
             }
         }
     }
-    for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
+    for (auto i = _palettes_by_color.begin(); i != _palettes_by_color.end(); ++i)
     {
         qSort(i.value() = i.value().toSet().toList());
     }
@@ -134,7 +156,7 @@ void Zx4Palette::init()
             auto list = i.value().toSet().intersect(k.value().toSet()).toList();
             if (!list.isEmpty())
             {
-                qSort(palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = list);
+                qSort(_palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = list);
             }
         }
     }
@@ -150,7 +172,7 @@ void Zx4Palette::init()
             auto list = i.value().toSet().intersect(k.value().toSet()).toList();
             if (!list.isEmpty())
             {
-                qSort(palettes_by_3colors[i.key()][k.key()] = list);
+                qSort(_palettes_by_3colors[i.key()][k.key()] = list);
             }
         }
     }
@@ -166,7 +188,7 @@ void Zx4Palette::init()
             auto list = i.value().toSet().intersect(k.value().toSet()).toList();
             if (!list.isEmpty())
             {
-                qSort(palettes_by_4colors[i.key()][k.key()] = list);
+                qSort(_palettes_by_4colors[i.key()][k.key()] = list);
             }
         }
     }

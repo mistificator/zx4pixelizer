@@ -111,11 +111,11 @@ int SceneWindow::currentColorIndex() const
 
 void SceneWindow::setPixel(QPoint p, int color_index)
 {
-    if (p.y() < 0 || p.y() >= scene.color_layer0.count())
+    if (p.y() < 0 || p.y() >= scene.height())
     {
         return;
     }
-    if (p.x() < 0 || p.x() >= scene.color_layer0[p.y()].count())
+    if (p.x() < 0 || p.x() >= scene.width())
     {
         return;
     }
@@ -484,7 +484,7 @@ QPair<QByteArray, QByteArray> SceneWindow::makeScreens() const
 {
     QByteArray scr0(32 * 192 + 32 * 24, 0);
     QByteArray scr1 = scr0;
-    for (int y = 0; y < scene.color_layer0.count(); y++)
+    for (int y = 0; y < scene.height(); y++)
     {
         const QVector<char> & line0 = scene.color_layer0[y];
         const QVector<char> & line1 = scene.color_layer1[y];
@@ -499,9 +499,9 @@ QPair<QByteArray, QByteArray> SceneWindow::makeScreens() const
         }
     }
     int attr_offs = 192 * 32;
-    for (int y = 0; y < (scene.color_layer0.count() + 7) / 8; y++)
+    for (int y = 0; y < (scene.height() + 7) / 8; y++)
     {
-        for (int x = 0; x < scene.color_layer0[y].count() / 8; x++)
+        for (int x = 0; x < scene.width() / 8; x++)
         {
             int p_idx = scene_attr[x][y];
             QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
@@ -510,4 +510,23 @@ QPair<QByteArray, QByteArray> SceneWindow::makeScreens() const
         }
     }
     return QPair<QByteArray, QByteArray>(scr0, scr1);
+}
+
+void SceneWindow::invertColors()
+{
+    if (selected_char == QPoint(-1, -1))
+    {
+        return;
+    }
+    for (int y = selected_char.y() * 8; y < qMin((selected_char.y() + 1) * 8, scene.height()); y++)
+    {
+        for (int x = selected_char.x() * 8; x < qMin((selected_char.x() + 1) * 8, scene.width()); x++)
+        {
+            auto & l0 = scene.color_layer0[y][x];
+            auto & l1 = scene.color_layer1[y][x];
+            l0 = l0 ? 0 : 1;
+            l1 = l1 ? 0 : 1;
+        }
+    }
+    ui->canvas->update();
 }

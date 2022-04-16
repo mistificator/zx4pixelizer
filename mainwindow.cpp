@@ -51,7 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->actionNew->trigger();
 
 //    selectPalette(291 - 1);
-    QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, 291 - 1));
+    QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, palettes.grayscale_index));
 }
 
 MainWindow::~MainWindow()
@@ -110,7 +110,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
         switch (ev->type())
         {
             case QEvent::Paint:
-            if (current_sprite && !current_sprite->image().isNull() && current_sprite->image().alpha_layer.count() == current_sprite->canvasSize().height())
+            if (current_sprite && !current_sprite->image().isNull() && current_sprite->image().height() == current_sprite->canvasSize().height())
             {               
                 int step = qMin(ui->preview->width() / current_sprite->canvasSize().width(), ui->preview->height() / current_sprite->canvasSize().height());
                 int side_x = step * current_sprite->canvasSize().width();
@@ -416,6 +416,10 @@ void MainWindow::on_actionInvert_colors_triggered()
     if (current_sprite)
     {
         current_sprite->invertColors();
+    }
+    if (current_scene)
+    {
+        current_scene->invertColors();
     }
 }
 
@@ -792,7 +796,7 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
 
-    if (current_scene == 0)
+//    if (current_scene == 0)
     {
         current_scene = new SceneWindow(palettes);
         ui->mdiArea->addSubWindow(current_scene);

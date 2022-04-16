@@ -24,6 +24,8 @@ struct Zx4Image
             alpha_layer[y].resize(w);
         }
     }
+    int width() const { return color_layer0.isEmpty() ? 0 : color_layer0[0].count(); }
+    int height() const { return color_layer0.count(); }
 };
 
 template <> inline bool qMapLessThanKey<QColor>(const QColor &key1, const QColor &key2)
@@ -54,16 +56,19 @@ public:
 
 struct Zx4Palette
 {
-    QMap<ZxColorEnum, QColor> color_table;
-    QMap<ZxColorEnum, QString> color_name;
-    QMap<int, QList<ZxColorEnum>> color_palette_table;
+    const QMap<ZxColorEnum, QColor> color_table;
+    const QMap<ZxColorEnum, QString> color_name;
+    const QMap<int, QList<ZxColorEnum>> color_palette_table;
 
-    QList<QList<QColor>> palettes;
-    QMap<QColor, QList<int>> palettes_by_color;
-    QMap<QPair<QColor, QColor>, QList<int>> palettes_by_2colors;
-    QMap<QPair<QColor, QColor>, QMap<QColor, QList<int>>> palettes_by_3colors;
-    QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
+    const QList<QList<QColor>> palettes;
+    const QMap<QColor, QList<int>> palettes_by_color;
+    const QMap<QPair<QColor, QColor>, QList<int>> palettes_by_2colors;
+    const QMap<QPair<QColor, QColor>, QMap<QColor, QList<int>>> palettes_by_3colors;
+    const QMap<QPair<QColor, QColor>, QMap<QPair<QColor, QColor>, QList<int>>> palettes_by_4colors;
 
+    const int grayscale_index = -1;
+
+    Zx4Palette();
     void init();
 
     enum SelectPaletteMethod {SelectPaletteHSL = 0, SelectPaletteCIE76, SelectPaletteCIE94, SelectPaletteCIEDE2000, DefaultSelectPaletteMethod = SelectPaletteHSL};
