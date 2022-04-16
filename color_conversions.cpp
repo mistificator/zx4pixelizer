@@ -236,9 +236,9 @@ float Lab_color_difference_CIE94( float inL1, float ina1, float  inb1, float inL
     //  float K2 = 0.014;
 	// break;
 
-    const float Kl = 1.0;
-    const float K1 = 0.045;
-    const float K2 = 0.015;
+    const float Kl = 2.0;
+    const float K1 = 0.048;
+    const float K2 = 0.014;
 
 	float deltaL = inL1 - inL2;
 	float deltaA = ina1 - ina2;

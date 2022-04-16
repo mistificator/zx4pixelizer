@@ -74,6 +74,7 @@ struct Zx4Palette
     enum SelectPaletteMethod {SelectPaletteHSL = 0, SelectPaletteCIE76, SelectPaletteCIE94, SelectPaletteCIEDE2000, DefaultSelectPaletteMethod = SelectPaletteHSL};
     QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4, SelectPaletteMethod method = DefaultSelectPaletteMethod) const;
     QMultiMap<double, int> selectPalette(QImage img, SelectPaletteMethod method = DefaultSelectPaletteMethod) const;
+    QVector<QRgb> colorTable(int p_idx) const;
 };
 
 struct Zx4Processing
@@ -83,6 +84,7 @@ struct Zx4Processing
     static bool alikeColors(QColor c1, QColor c2, int hue_precision = 20, int light_precision = 32, int satur_precision = 32);
     static QMap<QColor, int> colorDistribution4(QImage img);
     static QImage importImage(QImage img, QVector<QRgb> color_table, bool use_alpha);
+    static QImage importImage(QImage small_quad, QVector<QRgb> color_table);
     static QByteArray deflateRle8(QByteArray ba);
     static QByteArray inflateRle8(QByteArray ba);
 };

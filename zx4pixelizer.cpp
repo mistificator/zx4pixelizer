@@ -287,6 +287,20 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QImage img, SelectPaletteMethod
     return selectPalette(Zx4Processing::colorDistribution4(img), method);
 }
 
+QVector<QRgb> Zx4Palette::colorTable(int p_idx) const
+{
+    QVector<QRgb> color_table;
+    if (p_idx < 0 || p_idx >= palettes.count())
+    {
+        return color_table;
+    }
+    foreach(QColor c, palettes[p_idx])
+    {
+        color_table << c.rgb();
+    }
+    return color_table;
+}
+
 
 QImage Zx4Processing::scaleImage(QImage img, int w, int h)
 {
@@ -457,7 +471,7 @@ QImage Zx4Processing::importImage(QImage img, QVector<QRgb> color_table, bool us
         color_table << alpha_pixel;
     }
 
-    img = img.convertToFormat(QImage::Format_Indexed8, color_table);
+    img = importImage(img, color_table);
 
     if (use_alpha)
     {
@@ -480,6 +494,44 @@ QImage Zx4Processing::importImage(QImage img, QVector<QRgb> color_table, bool us
     }
 
     return img;
+}
+
+#include <QDebug>
+QImage Zx4Processing::importImage(QImage small_quad, QVector<QRgb> color_table)
+{
+#if 0
+    small_quad = small_quad.convertToFormat(QImage::Format_Indexed8, color_table);
+#else
+    QImage converted(small_quad.size(), QImage::Format_Indexed8);
+    converted.setColorTable(color_table);
+    for (int iy = 0; iy < converted.height(); iy++)
+    {
+        for (int ix = 0; ix < converted.width(); ix++)
+        {
+            int i_diff = 0;
+            double color_diff = -1, alpha_diff = -1;
+            QColor px = small_quad.pixelColor(ix, iy);
+            for (int i = 0; i < color_table.count(); i++)
+            {
+                QColor ct(qRed(color_table[i]), qGreen(color_table[i]), qBlue(color_table[i]), qAlpha(color_table[i]));
+                double _color_diff = RGB_color_Lab_difference_CIEDE2000(px.red(), px.green(), px.blue(), ct.red(), ct.green(), ct.blue());
+                if (color_diff < 0 || _color_diff <= color_diff)
+                {
+                    color_diff = _color_diff;
+                    double _alpha_diff = qAbs(px.alphaF() - ct.alphaF());
+                    if (alpha_diff < 0 || _alpha_diff <= alpha_diff)
+                    {
+                        alpha_diff = _alpha_diff;
+                        i_diff = i;
+                    }
+                }
+            }
+            converted.setPixel(ix, iy, i_diff);
+        }
+    }
+    small_quad = converted;
+#endif
+    return small_quad;
 }
 
 QByteArray Zx4Processing::deflateRle8(QByteArray ba)

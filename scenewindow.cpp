@@ -140,8 +140,8 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                 double step = qMin(1.0 * grid_x / src_imp_img.width(), 1.0 * grid_y / src_imp_img.height());
 
                 QPoint pt = me->pos();
-                int x = (pt.x() - 1) / step;
-                int y = (pt.y() - 1) / step;
+                int x = pt.x() / step;
+                int y = pt.y() / step;
 
                 if (me->buttons().testFlag(Qt::LeftButton))
                 {
@@ -221,13 +221,14 @@ void SceneWindow::drawGrid()
 
     double kx = 8.0 * grid_x / src_imp_img.width();
     double ky = 8.0 * grid_y / src_imp_img.height();
-    auto list = QList<QPair<QPoint, QColor> >() << QPair<QPoint, QColor>(selected_char, QColor(0, 255, 0, 128)) << QPair<QPoint, QColor>(update_char, QColor(255, 0, 0, 128));
+    const auto list = QList<QPair<QPoint, QColor> >() << QPair<QPoint, QColor>(selected_char, QColor(0, 255, 0, 128)) << QPair<QPoint, QColor>(update_char, QColor(255, 0, 0, 128));
+    const int pen_width = 3;
     for (auto i = list.begin(); i != list.end(); ++i)
     {
         if (i->first != QPoint(-1, -1))
         {
-            p.setPen(QPen(i->second, 3, Qt::DotLine, Qt::RoundCap));
-            p.drawRect(i->first.x() * kx, i->first.y() * ky, kx, ky);
+            p.setPen(QPen(i->second, pen_width, Qt::DotLine, Qt::RoundCap));
+            p.drawRect(i->first.x() * kx - pen_width / 2.0, i->first.y() * ky - pen_width / 2.0, kx + pen_width, ky + pen_width);
         }
     }
 
@@ -444,12 +445,7 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
         return;
     }
 
-    QVector<QRgb> color_table;
-    foreach(QColor c, palettes.palettes[p_idx])
-    {
-        color_table << c.rgb();
-    }
-    small_quad = small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, color_table);
+    small_quad = Zx4Processing::importImage(small_quad.convertToFormat(QImage::Format_RGB32), palettes.colorTable(p_idx));
 
     scene_attr[char_pos.x()][char_pos.y()] = p_idx;
     for (int iy = 0; iy < 8; iy++)
