@@ -24,22 +24,7 @@
    </size>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout_2">
-    <property name="leftMargin">
-     <number>0</number>
-    </property>
-    <property name="topMargin">
-     <number>0</number>
-    </property>
-    <property name="rightMargin">
-     <number>0</number>
-    </property>
-    <property name="bottomMargin">
-     <number>0</number>
-    </property>
-    <property name="spacing">
-     <number>0</number>
-    </property>
+   <layout class="QGridLayout" name="gridLayout_4">
     <item row="0" column="0">
      <widget class="QMdiArea" name="mdiArea">
       <property name="verticalScrollBarPolicy">
@@ -357,22 +342,8 @@
     <number>2</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_5">
-    <layout class="QGridLayout" name="gridLayout_6">
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Index in sequence</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Palette</string>
-       </property>
-      </widget>
-     </item>
-     <item row="5" column="2">
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="7" column="3" colspan="2">
       <spacer name="verticalSpacer_2">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
@@ -385,40 +356,27 @@
        </property>
       </spacer>
      </item>
-     <item row="4" column="2">
-      <widget class="QToolButton" name="importWizardApply">
-       <property name="layoutDirection">
-        <enum>Qt::LeftToRight</enum>
-       </property>
-       <property name="text">
-        <string>Reimport</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="2">
-      <widget class="QSpinBox" name="paletteNumberBox">
+     <item row="4" column="3">
+      <widget class="QDoubleSpinBox" name="yShift">
        <property name="minimum">
-        <number>1</number>
+        <double>-192.000000000000000</double>
        </property>
        <property name="maximum">
-        <number>1</number>
+        <double>192.000000000000000</double>
        </property>
       </widget>
      </item>
-     <item row="0" column="0" colspan="3">
-      <widget class="QCheckBox" name="alphaBox">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked ithen import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     <item row="4" column="1">
+      <widget class="QDoubleSpinBox" name="xShift">
+       <property name="minimum">
+        <double>-256.000000000000000</double>
        </property>
-       <property name="text">
-        <string>Alpha channel</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
+       <property name="maximum">
+        <double>256.000000000000000</double>
        </property>
       </widget>
      </item>
-     <item row="1" column="1" colspan="2">
+     <item row="1" column="2" colspan="4">
       <widget class="QComboBox" name="wizardPaletteBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -438,7 +396,30 @@
        </item>
       </widget>
      </item>
-     <item row="3" column="1" colspan="2">
+     <item row="2" column="2">
+      <widget class="QSpinBox" name="paletteNumberBox">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>1</number>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0" colspan="2">
+      <widget class="QCheckBox" name="alphaBox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked ithen import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Alpha channel</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2" colspan="4">
       <widget class="QComboBox" name="colorPickBox">
        <item>
         <property name="text">
@@ -462,10 +443,112 @@
        </item>
       </widget>
      </item>
-     <item row="3" column="0">
+     <item row="1" column="0">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Palette</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="label_6">
+       <property name="text">
+        <string>X shift</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="5">
+      <widget class="QDoubleSpinBox" name="rotate">
+       <property name="minimum">
+        <double>-360.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>360.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0" colspan="2">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Index in sequence</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="2">
+      <widget class="QLabel" name="label_5">
+       <property name="text">
+        <string>Y shift</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="4">
+      <widget class="QLabel" name="label_7">
+       <property name="text">
+        <string>Rotate</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0" colspan="2">
       <widget class="QLabel" name="label_4">
        <property name="text">
         <string>Color pick method</string>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="5">
+      <widget class="QToolButton" name="importWizardApply">
+       <property name="layoutDirection">
+        <enum>Qt::LeftToRight</enum>
+       </property>
+       <property name="text">
+        <string>Reimport</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="0">
+      <widget class="QLabel" name="label_8">
+       <property name="text">
+        <string>X scale</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="1">
+      <widget class="QDoubleSpinBox" name="xScale">
+       <property name="minimum">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1000.000000000000000</double>
+       </property>
+       <property name="value">
+        <double>1.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="2">
+      <widget class="QLabel" name="label_9">
+       <property name="text">
+        <string>Y scale</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="3">
+      <widget class="QDoubleSpinBox" name="yScale">
+       <property name="minimum">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1000.000000000000000</double>
+       </property>
+       <property name="value">
+        <double>1.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="4" colspan="2">
+      <widget class="QCheckBox" name="mirrored">
+       <property name="text">
+        <string>Mirrored</string>
        </property>
       </widget>
      </item>

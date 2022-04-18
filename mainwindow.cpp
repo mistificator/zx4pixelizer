@@ -316,9 +316,31 @@ void MainWindow::on_actionNew_triggered()
     connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->sourceImage, SLOT(update()));
 }
 
+QImage MainWindow::applyTransforms(const QImage & src, QColor bg_color) const
+{
+    int mirror = ui->mirrored->isChecked() ? -1 : 1;
+    QImage img(src.size(), src.format());
+    img.fill(bg_color);
+
+    QPainter pmx(& img);
+
+    QTransform mx;
+    mx.translate(ui->xShift->value(), ui->yShift->value());
+    mx.translate(img.width() / 2, img.height() / 2);
+    mx.rotate(ui->rotate->value());
+    mx.translate(-img.width() / 2, -img.height() / 2);
+    mx.scale(ui->xScale->value() * mirror, ui->yScale->value());
+
+    pmx.setTransform(mx);
+    pmx.drawImage(QPoint(mirror > 0 ? 0 : -img.width(), 0), src);
+
+    return img;
+}
+
 void MainWindow::on_actionImportWizardApply_triggered()
 {
     ui->paletteNumberBox->setToolTip(QString());
+
     if (SpriteWindow * _current_sprite = current_sprite)
     {
         auto sel_method = selectPaletteMethod();
@@ -330,8 +352,10 @@ void MainWindow::on_actionImportWizardApply_triggered()
             ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
             p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
         }
+        QImage saved_img = _current_sprite->sourceImage();
         _current_sprite->setPaletteIndex(p_idx);
-        _current_sprite->drawImage(importImage(_current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
+        _current_sprite->drawImage(importImage(applyTransforms(_current_sprite->sourceImage()).convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
+        const_cast<QImage &>(_current_sprite->sourceImage()) = saved_img;
     }
     else
     if (SceneWindow * _current_scene = current_scene)
@@ -345,10 +369,12 @@ void MainWindow::on_actionImportWizardApply_triggered()
         pd.show();
         qApp->processEvents();
 
-        QImage img = _current_scene->sourceImage();
+        QImage saved_img = _current_scene->sourceImage();
+        QImage img = applyTransforms(_current_scene->sourceImage());
+        _current_scene->setSourceImage(img);
+        const_cast<QImage &>(_current_scene->sourceImage()) = saved_img;
         QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
-
-        pd.setRange(0, (img.width() / 8) * (img.height() / 8));
+        pd.setRange(0, (img8.width() / 8) * (img8.height() / 8));
 
     #if 0
         auto img8_dist = colorDistribution(img8, false);
@@ -358,11 +384,7 @@ void MainWindow::on_actionImportWizardApply_triggered()
         qDebug() << img_dist.count() << img_dist;
     #endif
 
-        Zx4Image scene;
-        scene.resize(((img.width() + 7) / 8) * 8, ((img.height() + 7) / 8) * 8);
-        QMap<int, QMap<int, int>> scene_attr;
-
-        QImage out(img.width(), img.height(), QImage::Format_RGB32);
+        QImage out(img8.width(), img8.height(), QImage::Format_RGB32);
         QPainter p(& out);
 
         foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
@@ -377,10 +399,10 @@ void MainWindow::on_actionImportWizardApply_triggered()
         int progress = 0;
         auto sel_method = selectPaletteMethod();
 
-        #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, img.height() / 8))
-        for (int y = 0; y < img.height(); y += 8)
+        #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, img8.height() / 8))
+        for (int y = 0; y < img8.height(); y += 8)
         {
-            for (int x = 0; x < img.width(); x += 8)
+            for (int x = 0; x < img8.width(); x += 8)
             {
                 #pragma omp atomic
                     progress++;

@@ -69,5 +69,6 @@ private:
     void resizeEvent(QResizeEvent *);
 
     Zx4Palette::SelectPaletteMethod selectPaletteMethod() const;
+    QImage applyTransforms(const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
 };
 #endif // MAINWINDOW_H
