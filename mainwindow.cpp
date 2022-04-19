@@ -352,10 +352,8 @@ void MainWindow::on_actionImportWizardApply_triggered()
             ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
             p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
         }
-        QImage saved_img = _current_sprite->sourceImage();
         _current_sprite->setPaletteIndex(p_idx);
-        _current_sprite->drawImage(importImage(applyTransforms(_current_sprite->sourceImage()).convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
-        const_cast<QImage &>(_current_sprite->sourceImage()) = saved_img;
+        _current_sprite->drawImage(importImage(applyTransforms(_current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32)).convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
     }
     else
     if (SceneWindow * _current_scene = current_scene)
@@ -369,11 +367,8 @@ void MainWindow::on_actionImportWizardApply_triggered()
         pd.show();
         qApp->processEvents();
 
-        QImage saved_img = _current_scene->sourceImage();
-        QImage img = applyTransforms(_current_scene->sourceImage());
-        _current_scene->setSourceImage(img);
-        const_cast<QImage &>(_current_scene->sourceImage()) = saved_img;
-        QImage img8 = img.convertToFormat(QImage::Format_Indexed8);
+        _current_scene->transformedImage() = applyTransforms(_current_scene->sourceImage());
+        QImage img8 = _current_scene->transformedImage().convertToFormat(QImage::Format_Indexed8);
         pd.setRange(0, (img8.width() / 8) * (img8.height() / 8));
 
     #if 0

@@ -51,12 +51,17 @@ const Zx4Image & SpriteWindow::image() const
 
 void SpriteWindow::setSourceImage(QImage i)
 {
-    src_imp_img = i;
+    src_imp_img = transformed_img = i;
 }
 
 const QImage & SpriteWindow::sourceImage() const
 {
     return src_imp_img;
+}
+
+QImage & SpriteWindow::transformedImage()
+{
+    return transformed_img;
 }
 
 void SpriteWindow::setAction(ActionEnum e, QAction * a)

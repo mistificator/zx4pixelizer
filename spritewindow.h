@@ -27,6 +27,7 @@ public:
 
     void setSourceImage(QImage);
     const QImage & sourceImage() const;
+    QImage & transformedImage();
 
     enum ActionEnum {ActionPencil = 0, ActionBrush, ActionMove, ActionEraser};
     void setAction(ActionEnum, QAction *);
@@ -70,7 +71,7 @@ private:
     Zx4Image img, stored_img;
     QPoint old_grid_pos;
     QString file_name;
-    QImage src_imp_img;
+    QImage src_imp_img, transformed_img;
 
     QMap<ActionEnum, QAction *> acts;
     QList<QColor> clrs;

@@ -23,6 +23,7 @@ public:
 
     void setSourceImage(const QImage &);
     const QImage & sourceImage() const;
+    QImage & transformedImage();
     const QImage & renderedImage() const;
 
     virtual QSize sizeHint() const;
@@ -63,7 +64,7 @@ private:
     Zx4Image scene;
     QMap<int, QMap<int, int>> scene_attr; // 32x24
 
-    QImage src_imp_img, rdr_img;
+    QImage src_imp_img, transformed_img, rdr_img;
     int grid_x = 1, grid_y = 1;
     QPoint selected_char, update_char;
     int current_color_index = 0;
