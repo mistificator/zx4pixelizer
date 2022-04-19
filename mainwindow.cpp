@@ -46,7 +46,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->dockPreview->raise();
 
     createPalettes();
-    ui->palettes->setStyleSheet("QListWidget::item:selected { background: rgb(100, 255, 100); }");
 
     ui->actionNew->trigger();
 
@@ -354,7 +353,6 @@ void MainWindow::on_actionImportWizardApply_triggered()
                 ui->paletteNumberBox->setRange(1, dist.count());
                 ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
                 p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
-                qDebug() << "on_actionImportWizardApply_triggered" << (dist.begin() + (ui->paletteNumberBox->value() - 1)).key() << (dist.begin() + (ui->paletteNumberBox->value() - 1)).value();
             }
         }
         _current_sprite->setPaletteIndex(p_idx);

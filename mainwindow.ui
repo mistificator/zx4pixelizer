@@ -208,8 +208,8 @@
        </property>
        <property name="gridSize">
         <size>
-         <width>55</width>
-         <height>55</height>
+         <width>60</width>
+         <height>60</height>
         </size>
        </property>
        <property name="viewMode">
