@@ -347,13 +347,18 @@ void MainWindow::on_actionImportWizardApply_triggered()
         int p_idx = ui->palettes->currentRow();
         if (ui->wizardPaletteBox->currentIndex() == 0)
         {
-            QMultiMap<double, int> dist = palettes.selectPalette(_current_sprite->sourceImage(), sel_method);
-            ui->paletteNumberBox->setRange(1, dist.count());
-            ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
-            p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
+            p_idx = palettes.exactPalette(_current_sprite->sourceImage());
+            if (p_idx < 0)
+            {
+                QMultiMap<double, int> dist = palettes.selectPalette(_current_sprite->sourceImage(), sel_method);
+                ui->paletteNumberBox->setRange(1, dist.count());
+                ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
+                p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
+                qDebug() << "on_actionImportWizardApply_triggered" << (dist.begin() + (ui->paletteNumberBox->value() - 1)).key() << (dist.begin() + (ui->paletteNumberBox->value() - 1)).value();
+            }
         }
         _current_sprite->setPaletteIndex(p_idx);
-        _current_sprite->drawImage(importImage(applyTransforms(_current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32)).convertToFormat(QImage::Format_ARGB32), p_idx, ui->alphaBox->isChecked()));
+        _current_sprite->drawImage(importImage(applyTransforms(_current_sprite->sourceImage().convertToFormat(QImage::Format_ARGB32)), p_idx, ui->alphaBox->isChecked()));
     }
     else
     if (SceneWindow * _current_scene = current_scene)
@@ -690,16 +695,10 @@ void MainWindow::on_actionOpen_triggered()
         QMessageBox::critical(this, "Error", "Wrong image color table");
         return;
     }
-    QVector<QRgb> colors = src_imp_image.colorTable().mid(0, 4);
-    qSort(colors);
-    int p_idx = ui->palettes->currentRow();
-    if (palettes.palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+    int p_idx = palettes.exactPalette(src_imp_image);
+    if (p_idx < 0)
     {
-        QList<int> list = palettes.palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
-        if (!list.isEmpty())
-        {
-            p_idx = list.first();
-        }
+        p_idx = ui->palettes->currentRow();
     }
     selectPalette(p_idx);
 

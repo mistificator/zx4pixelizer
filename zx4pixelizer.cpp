@@ -267,22 +267,36 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib
     return dist;
 }
 
-QMultiMap<double, int> Zx4Palette::selectPalette(QImage img, SelectPaletteMethod method) const
+int Zx4Palette::exactPalette(const QImage & img) const
 {
     if (img.colorCount() >= 4)
     {
-        QVector<QRgb> colors = img.colorTable();
-        if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])) && palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+        QVector<QRgb> colors = img.colorTable().mid(0, 4);
+        qSort(colors);
+        if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])))
         {
-            QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
-            if (!list.isEmpty())
+            if(palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
             {
-                int p_idx = list.first();
-                QMultiMap<double, int> map;
-                map.insert(0, p_idx);
-                return map;
+                QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+                if (!list.isEmpty())
+                {
+                    const int p_idx = list.first();
+                    return p_idx;
+                }
             }
         }
+    }
+    return -1;
+}
+
+QMultiMap<double, int> Zx4Palette::selectPalette(const QImage & img, SelectPaletteMethod method) const
+{
+    const int p_idx = exactPalette(img);
+    if (p_idx >= 0)
+    {
+        QMultiMap<double, int> map;
+        map.insert(0, p_idx);
+        return map;
     }
     return selectPalette(Zx4Processing::colorDistribution4(img), method);
 }

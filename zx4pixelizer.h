@@ -72,8 +72,9 @@ struct Zx4Palette
     void init();
 
     enum SelectPaletteMethod {SelectPaletteHSL = 0, SelectPaletteCIE76, SelectPaletteCIE94, SelectPaletteCIEDE2000, DefaultSelectPaletteMethod = SelectPaletteHSL};
+    int exactPalette(const QImage & img) const;
     QMultiMap<double, int> selectPalette(QMap<QColor, int> color_distrib4, SelectPaletteMethod method = DefaultSelectPaletteMethod) const;
-    QMultiMap<double, int> selectPalette(QImage img, SelectPaletteMethod method = DefaultSelectPaletteMethod) const;
+    QMultiMap<double, int> selectPalette(const QImage & img, SelectPaletteMethod method = DefaultSelectPaletteMethod) const;
     QVector<QRgb> colorTable(int p_idx) const;
 };
 
