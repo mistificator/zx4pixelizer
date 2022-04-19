@@ -395,21 +395,57 @@ void MainWindow::on_actionImportWizardApply_triggered()
         }
 
         int progress = 0;
-        auto sel_method = selectPaletteMethod();
+        const auto sel_method = selectPaletteMethod();
+        const bool multipass = ui->multipass->isChecked();
+        const int multipass_offset = 2;
+        const int multipass_step = 2;
+        const int width = img8.width();
+        const int height = img8.height();
 
         #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, img8.height() / 8))
-        for (int y = 0; y < img8.height(); y += 8)
+        for (int y = 0; y < height; y += 8)
         {
-            for (int x = 0; x < img8.width(); x += 8)
+            for (int x = 0; x < width; x += 8)
             {
                 #pragma omp atomic
                     progress++;
+
+                int p_idx = -1;
                 QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-                int p_idx = _current_scene->selectPalette(small_quad, sel_method);
-                if (p_idx != -1)
+                if (!multipass)
                 {
-                    _current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
+                    p_idx = _current_scene->selectPalette(small_quad, sel_method);
                 }
+                else
+                {
+                    QMap<int, int> map;
+                    for (int y1 = -multipass_offset; y1 <= multipass_offset; y1 += multipass_step)
+                    {
+                        for (int x1 = -multipass_offset; x1 <= multipass_offset; x1 += multipass_step)
+                        {
+                            map[_current_scene->selectPalette(
+                                img8.copy(QRect(qMax(x + x1, 0), qMax(y + y1, 0), qMin(8, width - (x + x1)), qMin(8, height - (y + y1)))),
+                                sel_method)]++;
+                        }
+                    }
+                    int map_max = 0;
+                    for (auto i = map.begin(); i != map.end(); ++i)
+                    {
+                        if (i.value() > map_max)
+                        {
+                            map_max = i.value();
+                            p_idx = i.key();
+                        }
+                    }
+
+                    QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
+                    QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
+                }
+                if (p_idx < 0)
+                {
+                    p_idx = palettes.grayscale_index;
+                }
+                _current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
             }
             QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
             QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);

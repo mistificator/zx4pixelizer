@@ -552,6 +552,13 @@
        </property>
       </widget>
      </item>
+     <item row="2" column="3" colspan="2">
+      <widget class="QCheckBox" name="multipass">
+       <property name="text">
+        <string>Multipass</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </widget>
   </widget>
