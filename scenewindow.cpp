@@ -145,8 +145,8 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                 double step = qMin(1.0 * grid_x / transformed_img.width(), 1.0 * grid_y / transformed_img.height());
 
                 QPoint pt = me->pos();
-                int x = pt.x() / step;
-                int y = pt.y() / step;
+                int x = qMin<int>(qMax<int>(pt.x() / step, 0), transformed_img.width() - 1);
+                int y = qMin<int>(qMax<int>(pt.y() / step, 0), transformed_img.height() - 1);
 
                 if (me->buttons().testFlag(Qt::LeftButton))
                 {

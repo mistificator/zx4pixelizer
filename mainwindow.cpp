@@ -383,17 +383,18 @@ void MainWindow::on_actionImportWizardApply_triggered()
     #endif
 
         QImage out(img8.width(), img8.height(), QImage::Format_RGB32);
-        QPainter p(& out);
 
         foreach(QMdiSubWindow * msw, ui->mdiArea->subWindowList())
         {
             if (msw->widget() == _current_scene)
             {
-                msw->resize(out.width() * 4, out.height() * 4);
+                QPoint pos = _current_scene->canvas()->mapTo(msw, QPoint(0, 0));
+                msw->resize(out.width() * 4 + pos.x(), out.height() * 4 + pos.y());
                 break;
             }
         }
 
+        QPainter p(& out);
         int progress = 0;
         const auto sel_method = selectPaletteMethod();
         const bool multipass = ui->multipass->isChecked();
@@ -859,7 +860,12 @@ void MainWindow::on_actionImport_scene_triggered()
     current_scene->setFileName(filename);
 
     img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio);
-    current_scene->setSourceImage(img);
+
+    QImage dst_img(256, 192, img.format());
+    dst_img.fill(0);
+    QPainter p(& dst_img);
+    p.drawImage((dst_img.width() - img.width()) / 2, (dst_img.height() - img.height()) / 2, img);
+    current_scene->setSourceImage(dst_img);
 
     ui->actionImportWizardApply->trigger();
 }
