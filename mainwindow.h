@@ -70,5 +70,7 @@ private:
 
     Zx4Palette::SelectPaletteMethod selectPaletteMethod() const;
     QImage applyTransforms(const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
+
+    void importScene(QImage img, QString filename = QString());
 };
 #endif // MAINWINDOW_H

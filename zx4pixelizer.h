@@ -13,6 +13,7 @@ struct Zx4Image
     enum Bit {BitOff = 0, BitOn = 1};
     typedef QMap<int, QMap<int, Bit>> Layer; // x, y, bit
     Layer color_layer0, color_layer1, alpha_layer;
+    virtual ~Zx4Image() {}
     bool isNull() const { return h <= 0 || w <= 0; }
     virtual void resize(int _w, int _h)
     {

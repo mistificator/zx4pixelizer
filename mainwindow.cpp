@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QMimeData>
 
 #include <omp.h>
 
@@ -21,6 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     ui->preview->installEventFilter(this);
     ui->sourceImage->installEventFilter(this);
+    ui->mdiArea->installEventFilter(this);
 
     QActionGroup * ag = new QActionGroup(this);
     ag->setExclusive(true);
@@ -170,6 +172,51 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                 QPainter p(ui->sourceImage);
                 p.drawImage(0, 0, current_scene->sourceImage().scaled(ui->sourceImage->size(), Qt::KeepAspectRatio));
             }
+            break;
+            default:
+            break;
+        }
+    }
+    else
+    if (o == ui->mdiArea)
+    {
+        QDropEvent * de;
+        switch (ev->type())
+        {
+            case QEvent::DragEnter:
+                de = dynamic_cast<QDragEnterEvent *>(ev);
+                if (de->mimeData() && (de->mimeData()->hasUrls()/* || de->mimeData()->hasImage()*/))
+                {
+                    de->acceptProposedAction();
+                    return true;
+                }
+            break;
+            case QEvent::Drop:
+                de = dynamic_cast<QDropEvent *>(ev);
+                if (de->mimeData())
+                {
+                    /*
+                    if (de->mimeData()->hasImage())
+                    {
+                        importScene(qvariant_cast<QImage>(de->mimeData()->imageData()));
+                        de->acceptProposedAction();
+                        return true;
+                    }
+                    */
+                    if (de->mimeData()->hasUrls())
+                    {
+                        foreach (auto url, de->mimeData()->urls())
+                        {
+                            if (url.isLocalFile())
+                            {
+                                QString filename = url.toLocalFile();
+                                importScene(QImage(filename), filename);
+                            }
+                        }
+                        de->acceptProposedAction();
+                        return true;
+                    }
+                }
             break;
             default:
             break;
@@ -455,10 +502,13 @@ void MainWindow::on_actionImportWizardApply_triggered()
                         qApp->processEvents();
                 }
             }
-            QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
-            QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
-            #pragma omp critical
-                qApp->processEvents();
+            if (!multipass)
+            {
+                QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
+                QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
+                #pragma omp critical
+                    qApp->processEvents();
+            }
         }
 
         pd.hide();
@@ -836,20 +886,9 @@ void MainWindow::on_wizardPaletteBox_currentIndexChanged(int)
     ui->paletteNumberBox->setEnabled(ui->wizardPaletteBox->currentIndex() == 0);
 }
 
-void MainWindow::on_actionImport_scene_triggered()
-{       
-    QString path = current_scene ? QFileInfo(current_scene->fileName()).absolutePath() : QString();
-    if (path.isEmpty())
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
-
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
-    if (filename.isEmpty())
-    {
-        return;
-    }
-    QImage img = QImage(filename).convertToFormat(QImage::Format_RGB32);
+void MainWindow::importScene(QImage img, QString filename)
+{
+    img = img.convertToFormat(QImage::Format_RGB32);
     if (img.isNull())
     {
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
@@ -877,6 +916,22 @@ void MainWindow::on_actionImport_scene_triggered()
     current_scene->setSourceImage(dst_img);
 
     ui->actionImportWizardApply->trigger();
+}
+
+void MainWindow::on_actionImport_scene_triggered()
+{       
+    QString path = current_scene ? QFileInfo(current_scene->fileName()).absolutePath() : QString();
+    if (path.isEmpty())
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)");
+    if (filename.isEmpty())
+    {
+        return;
+    }
+    importScene(QImage(filename), filename);
 }
 
 void MainWindow::on_actionExport_scene_triggered()
