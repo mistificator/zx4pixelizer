@@ -403,7 +403,7 @@ void MainWindow::on_actionImportWizardApply_triggered()
         const int width = img8.width();
         const int height = img8.height();
 
-        #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, img8.height() / 8))
+        #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, height / 8))
         for (int y = 0; y < height; y += 8)
         {
             for (int x = 0; x < width; x += 8)
@@ -438,15 +438,18 @@ void MainWindow::on_actionImportWizardApply_triggered()
                             p_idx = i.key();
                         }
                     }
-
-                    QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
-                    QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
                 }
                 if (p_idx < 0)
                 {
                     p_idx = palettes.grayscale_index;
                 }
                 _current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
+
+                if (multipass)
+                {
+                    QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
+                    QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
+                }
             }
             QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
             QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);

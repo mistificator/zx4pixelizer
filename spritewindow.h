@@ -68,7 +68,7 @@ private:
     bool eventFilter(QObject *, QEvent *);
 
     int grid_x = 64, grid_y = 64;
-    Zx4Image img, stored_img;
+    Zx4Image sprite, stored_sprite;
     QPoint old_grid_pos;
     QString file_name;
     QImage src_imp_img, transformed_img;

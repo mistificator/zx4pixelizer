@@ -46,7 +46,7 @@ QLabel * SpriteWindow::canvas() const
 
 const Zx4Image & SpriteWindow::image() const
 {
-    return img;
+    return sprite;
 }
 
 void SpriteWindow::setSourceImage(QImage i)
@@ -108,8 +108,8 @@ int SpriteWindow::paletteIndex() const
 void SpriteWindow::clearCanvas(QSize s)
 {
     setFileName(QString());
-    img = Zx4Image();
-    img.resize(grid_x = s.width(), grid_y = s.height());
+    sprite = Zx4Image();
+    sprite.resize(grid_x = s.width(), grid_y = s.height());
     ui->canvas->update();
 }
 
@@ -130,13 +130,13 @@ void SpriteWindow::resizeImage(QSize s)
     int new_image_x = s.width();
     int new_image_y = s.height();
 
-    stored_img = img;
+    stored_sprite = sprite;
     int old_grid_x = grid_x;
     if (new_image_x > old_grid_x)
     {
         grid_x = new_image_x;
     }
-    img.resize(grid_x, grid_y);
+    sprite.resize(grid_x, grid_y);
 
     if (new_image_x > old_grid_x)
     {
@@ -144,9 +144,9 @@ void SpriteWindow::resizeImage(QSize s)
         {
             for (int x = 0; x < grid_x; x++)
             {
-                img.color_layer0[y][x] = stored_img.color_layer0[y][x * old_grid_x / grid_x];
-                img.color_layer1[y][x] = stored_img.color_layer1[y][x * old_grid_x / grid_x];
-                img.alpha_layer[y][x] = stored_img.alpha_layer[y][x * old_grid_x / grid_x];
+                sprite.color_layer0[y][x] = stored_sprite.color_layer0[y][x * old_grid_x / grid_x];
+                sprite.color_layer1[y][x] = stored_sprite.color_layer1[y][x * old_grid_x / grid_x];
+                sprite.alpha_layer[y][x] = stored_sprite.alpha_layer[y][x * old_grid_x / grid_x];
             }
         }
     }
@@ -158,32 +158,32 @@ void SpriteWindow::resizeImage(QSize s)
             int x = 0;
             for (; x < new_image_x; x++)
             {
-                img.color_layer0[y][x] = stored_img.color_layer0[y][x * old_grid_x / new_image_x];
-                img.color_layer1[y][x] = stored_img.color_layer1[y][x * old_grid_x / new_image_x];
-                img.alpha_layer[y][x] = stored_img.alpha_layer[y][x * old_grid_x / new_image_x];
+                sprite.color_layer0[y][x] = stored_sprite.color_layer0[y][x * old_grid_x / new_image_x];
+                sprite.color_layer1[y][x] = stored_sprite.color_layer1[y][x * old_grid_x / new_image_x];
+                sprite.alpha_layer[y][x] = stored_sprite.alpha_layer[y][x * old_grid_x / new_image_x];
             }
             for (; x < grid_x; x++)
             {
-                img.alpha_layer[y][x] = 0;
+                sprite.alpha_layer[y][x] = 0;
             }
         }
     }
 
-    stored_img = img;
+    stored_sprite = sprite;
     int old_grid_y = grid_y;
     if (new_image_y > old_grid_y)
     {
         grid_y = new_image_y;
     }
-    img.resize(grid_x, grid_y);
+    sprite.resize(grid_x, grid_y);
 
     if (new_image_y > old_grid_y)
     {
         for (int y = 0; y < grid_y; y++)
         {
-            img.color_layer0[y] = stored_img.color_layer0[y * old_grid_y / grid_y];
-            img.color_layer1[y] = stored_img.color_layer1[y * old_grid_y / grid_y];
-            img.alpha_layer[y] = stored_img.alpha_layer[y * old_grid_y / grid_y];
+            sprite.color_layer0[y] = stored_sprite.color_layer0[y * old_grid_y / grid_y];
+            sprite.color_layer1[y] = stored_sprite.color_layer1[y * old_grid_y / grid_y];
+            sprite.alpha_layer[y] = stored_sprite.alpha_layer[y * old_grid_y / grid_y];
         }
     }
     else
@@ -192,13 +192,13 @@ void SpriteWindow::resizeImage(QSize s)
         int y = 0;
         for (; y < new_image_y; y++)
         {
-            img.color_layer0[y] = stored_img.color_layer0[y * old_grid_y / new_image_y];
-            img.color_layer1[y] = stored_img.color_layer1[y * old_grid_y / new_image_y];
-            img.alpha_layer[y] = stored_img.alpha_layer[y * old_grid_y / new_image_y];
+            sprite.color_layer0[y] = stored_sprite.color_layer0[y * old_grid_y / new_image_y];
+            sprite.color_layer1[y] = stored_sprite.color_layer1[y * old_grid_y / new_image_y];
+            sprite.alpha_layer[y] = stored_sprite.alpha_layer[y * old_grid_y / new_image_y];
         }
         for (; y < grid_y; y++)
         {
-            img.alpha_layer[y] = QVector<char>(grid_x);
+            sprite.alpha_layer[y] = QVector<char>(grid_x);
         }
     }
 
@@ -242,7 +242,7 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                     {
                         if (ev->type() == QEvent::MouseButtonPress)
                         {
-                            stored_img = img;
+                            stored_sprite = sprite;
                             old_grid_pos = QPoint(x, y);
                         }
                         else
@@ -301,9 +301,9 @@ void SpriteWindow::drawPixels(QPainter * p, int step)
     {
         for (int x = 0; x < grid_x; x++)
         {
-            if (img.alpha_layer[y][x])
+            if (sprite.alpha_layer[y][x])
             {
-                p->fillRect(x * step, y * step, step, step, clrs[colorIndex(img, x, y)]);
+                p->fillRect(x * step, y * step, step, step, clrs[colorIndex(sprite, x, y)]);
             }
         }
     }
@@ -311,7 +311,7 @@ void SpriteWindow::drawPixels(QPainter * p, int step)
 
 void SpriteWindow::drawGrid()
 {
-    img.resize(grid_x, grid_y);
+    sprite.resize(grid_x, grid_y);
 
     int step = qMin((ui->canvas->width() - 1) / grid_x, (ui->canvas->height() - 1) / grid_y);
     int side_x = step * grid_x;
@@ -344,27 +344,27 @@ void SpriteWindow::drawDot(int x, int y)
 
     if (current_color_index == 0)
     {
-        img.color_layer0[y][x] = 0;
-        img.color_layer1[y][x] = 0;
+        sprite.color_layer0[y][x] = 0;
+        sprite.color_layer1[y][x] = 0;
     }
     else
     if (current_color_index == 1)
     {
-        img.color_layer0[y][x] = 0;
-        img.color_layer1[y][x] = 1;
+        sprite.color_layer0[y][x] = 0;
+        sprite.color_layer1[y][x] = 1;
     }
     else
     if (current_color_index == 2)
     {
-        img.color_layer0[y][x] = 1;
-        img.color_layer1[y][x] = 0;
+        sprite.color_layer0[y][x] = 1;
+        sprite.color_layer1[y][x] = 0;
     }
     else
     {
-        img.color_layer0[y][x] = 1;
-        img.color_layer1[y][x] = 1;
+        sprite.color_layer0[y][x] = 1;
+        sprite.color_layer1[y][x] = 1;
     }
-    img.alpha_layer[y][x] = 1;
+    sprite.alpha_layer[y][x] = 1;
 }
 
 void SpriteWindow::eraseDot(int x, int y)
@@ -373,7 +373,7 @@ void SpriteWindow::eraseDot(int x, int y)
     {
         return;
     }
-    img.alpha_layer[y][x] = 0;
+    sprite.alpha_layer[y][x] = 0;
 }
 
 void SpriteWindow::drawBrush(int x, int y)
@@ -411,26 +411,26 @@ void SpriteWindow::moveImage(int dx, int dy)
     {
         if (my + dy >= 0 && my + dy < grid_y)
         {
-            img.color_layer0[my] = stored_img.color_layer0[my + dy];
-            img.color_layer1[my] = stored_img.color_layer1[my + dy];
-            img.alpha_layer[my] = stored_img.alpha_layer[my + dy];
+            sprite.color_layer0[my] = stored_sprite.color_layer0[my + dy];
+            sprite.color_layer1[my] = stored_sprite.color_layer1[my + dy];
+            sprite.alpha_layer[my] = stored_sprite.alpha_layer[my + dy];
         }
         else
         {
-            img.alpha_layer[my] = QVector<char>(grid_x);
+            sprite.alpha_layer[my] = QVector<char>(grid_x);
         }
         if (dx > 0)
         {
-            img.color_layer0[my] = img.color_layer0[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-            img.color_layer1[my] = img.color_layer1[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-            img.alpha_layer[my] = img.alpha_layer[my].mid(dx, grid_x - dx) + QVector<char>(dx);
+            sprite.color_layer0[my] = sprite.color_layer0[my].mid(dx, grid_x - dx) + QVector<char>(dx);
+            sprite.color_layer1[my] = sprite.color_layer1[my].mid(dx, grid_x - dx) + QVector<char>(dx);
+            sprite.alpha_layer[my] = sprite.alpha_layer[my].mid(dx, grid_x - dx) + QVector<char>(dx);
         }
         else
         if (dx < 0)
         {
-            img.color_layer0[my] = QVector<char>(-dx) + img.color_layer0[my].mid(0, grid_x + dx);
-            img.color_layer1[my] = QVector<char>(-dx) + img.color_layer1[my].mid(0, grid_x + dx);
-            img.alpha_layer[my] = QVector<char>(-dx) + img.alpha_layer[my].mid(0, grid_x + dx);
+            sprite.color_layer0[my] = QVector<char>(-dx) + sprite.color_layer0[my].mid(0, grid_x + dx);
+            sprite.color_layer1[my] = QVector<char>(-dx) + sprite.color_layer1[my].mid(0, grid_x + dx);
+            sprite.alpha_layer[my] = QVector<char>(-dx) + sprite.alpha_layer[my].mid(0, grid_x + dx);
         }
     }
 }
@@ -468,14 +468,14 @@ void SpriteWindow::drawImage(QImage img)
 
 void SpriteWindow::invertColors()
 {
-    if (img.isNull())
+    if (sprite.isNull())
     {
         return;
     }
     for (int y = 0; y < grid_y; y++)
     {
-        QVector<char> & line0 = img.color_layer0[y];
-        QVector<char> & line1 = img.color_layer1[y];
+        QVector<char> & line0 = sprite.color_layer0[y];
+        QVector<char> & line1 = sprite.color_layer1[y];
         for (int x = 0; x < grid_x; x++)
         {
             line0[x] = line0[x] ? 0 : 1;
