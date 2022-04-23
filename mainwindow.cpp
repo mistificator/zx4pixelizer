@@ -412,6 +412,7 @@ void MainWindow::on_actionImportWizardApply_triggered()
                     progress++;
 
                 int p_idx = -1;
+
                 QImage small_quad = img8.copy(QRect(x, y, 8, 8));
                 if (!multipass)
                 {
@@ -443,16 +444,21 @@ void MainWindow::on_actionImportWizardApply_triggered()
                 {
                     p_idx = palettes.grayscale_index;
                 }
+
                 _current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
 
                 if (multipass)
                 {
                     QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
                     QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
+                    #pragma omp critical
+                        qApp->processEvents();
                 }
             }
             QMetaObject::invokeMethod(& pd, "setValue", Qt::QueuedConnection, Q_ARG(int, progress));
             QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
+            #pragma omp critical
+                qApp->processEvents();
         }
 
         pd.hide();
@@ -571,10 +577,10 @@ void MainWindow::on_actionImport_triggered()
         {
             for (int y = 0; y < current_sprite->canvasSize().height(); y++)
             {
-                QVector<char> & alpha = const_cast<Zx4Image &>(current_sprite->image()).alpha_layer[y];
+                auto & alpha = const_cast<Zx4Image &>(current_sprite->image()).alpha_layer;
                 for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
                 {
-                    alpha[(8 * x) + (7 - bit)] = (zx4[alpha_bit / 8] >> (alpha_bit % 8)) & 0x01;
+                    alpha[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4[alpha_bit / 8] >> (alpha_bit % 8)) & 0x01);
                     ++alpha_bit;
                 }
             }
@@ -586,16 +592,16 @@ void MainWindow::on_actionImport_triggered()
         {
             for (int y = 0; y < current_sprite->canvasSize().height(); y++)
             {
-                const QVector<char> & alpha = current_sprite->image().alpha_layer[y];
-                QVector<char> & line0 = const_cast<Zx4Image &>(current_sprite->image()).color_layer0[y];
-                QVector<char> & line1 = const_cast<Zx4Image &>(current_sprite->image()).color_layer1[y];
+                auto & alpha = const_cast<Zx4Image &>(current_sprite->image()).alpha_layer;
+                auto & layer0 = const_cast<Zx4Image &>(current_sprite->image()).color_layer0;
+                auto & layer1 = const_cast<Zx4Image &>(current_sprite->image()).color_layer1;
                 for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
                 {
-                    char alpha_value = alpha[(8 * x) + (7 - bit)];
+                    char alpha_value = alpha[(8 * x) + (7 - bit)][y];
                     if (alpha_value)
                     {
-                        line0[(8 * x) + (7 - bit)] = (zx4_color0[color_bit / 8] >> (color_bit % 8)) & 0x01;
-                        line1[(8 * x) + (7 - bit)] = (zx4_color1[color_bit / 8] >> (color_bit % 8)) & 0x01;
+                        layer0[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4_color0[color_bit / 8] >> (color_bit % 8)) & 0x01);
+                        layer1[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4_color1[color_bit / 8] >> (color_bit % 8)) & 0x01);
                         ++color_bit;
                     }
                 }
@@ -644,23 +650,23 @@ void MainWindow::on_actionExport_triggered()
 
     int alpha_bit = 0, color_bit = 0;
     QByteArray zx4_alpha(layer_sz, 0), zx4_color0(layer_sz, 0), zx4_color1(layer_sz, 0);
-    QVector<char> alpha_t;
+    QVector<Zx4Image::Bit> alpha_t;
     for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
     {
         for (int y = 0; y < current_sprite->canvasSize().height(); y++)
         {
-            const QVector<char> & alpha = current_sprite->image().alpha_layer[y];
-            const QVector<char> & line0 = current_sprite->image().color_layer0[y];
-            const QVector<char> & line1 = current_sprite->image().color_layer1[y];
+            const auto & alpha = current_sprite->image().alpha_layer;
+            const auto & layer0 = current_sprite->image().color_layer0;
+            const auto & layer1 = current_sprite->image().color_layer1;
             for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
             {
-                char alpha_value = alpha[(8 * x) + (7 - bit)];
+                auto alpha_value = alpha[(8 * x) + (7 - bit)][y];
                 alpha_t << alpha_value;
                 zx4_alpha[alpha_bit / 8] =         static_cast<char>(zx4_alpha[alpha_bit / 8] | (static_cast<int>(alpha_value) << (alpha_bit % 8)));
                 if (alpha_value)
                 {
-                    zx4_color0[color_bit / 8] =    static_cast<char>(zx4_color0[color_bit / 8] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << (color_bit % 8)));
-                    zx4_color1[color_bit / 8] =    static_cast<char>(zx4_color1[color_bit / 8] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << (color_bit % 8)));
+                    zx4_color0[color_bit / 8] =    static_cast<char>(zx4_color0[color_bit / 8] | (static_cast<int>(layer0[(8 * x) + (7 - bit)][y]) << (color_bit % 8)));
+                    zx4_color1[color_bit / 8] =    static_cast<char>(zx4_color1[color_bit / 8] | (static_cast<int>(layer1[(8 * x) + (7 - bit)][y]) << (color_bit % 8)));
                     ++color_bit;
                 }
                 ++alpha_bit;
@@ -738,12 +744,12 @@ void MainWindow::on_actionOpen_triggered()
     {
         p_idx = ui->palettes->currentRow();
     }
-    selectPalette(p_idx);
-
     if (!current_sprite)
     {
         ui->actionNew->trigger();
     }
+
+    selectPalette(p_idx);
 
     current_sprite->setPaletteIndex(p_idx);
     current_sprite->setFileName(filename);
@@ -809,7 +815,7 @@ void MainWindow::on_actionSave_triggered()
     {
         for (int x = 0; x < current_sprite->canvasSize().width(); x++)
         {
-            if (!current_sprite->image().alpha_layer[y][x])
+            if (!current_sprite->image().alpha_layer[x][y])
             {
                 img.setPixel(x, y, 4);
             }
@@ -881,7 +887,7 @@ void MainWindow::on_actionExport_scene_triggered()
     }
 
     Zx4Image scene = current_scene->image();
-    QMap<int, QMap<int, int>> scene_attr = current_scene->attr();
+    auto scene_attr = current_scene->attr();
 
     if (scene.isNull() || scene_attr.isEmpty())
     {

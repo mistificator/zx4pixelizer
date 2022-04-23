@@ -29,11 +29,11 @@ public:
     virtual QSize sizeHint() const;
     QLabel * canvas() const;
 
-    void setImage(const Zx4Image &);
-    const Zx4Image & image() const;
+    void setImage(const Zx4ImageWithAttributes &);
+    const Zx4ImageWithAttributes & image() const;
 
-    void setAttr(QMap<int, QMap<int, int>>);
-    QMap<int, QMap<int, int>> attr() const;
+    void setAttr(Zx4ImageWithAttributes::Attr);
+    Zx4ImageWithAttributes::Attr attr() const;
 
     QPoint currentChar() const;
     void setAttr(QPoint, int p_idx);
@@ -61,8 +61,7 @@ private:
 
     QString file_name;
 
-    Zx4Image scene;
-    QMap<int, QMap<int, int>> scene_attr; // 32x24
+    Zx4ImageWithAttributes scene;
 
     QImage src_imp_img, transformed_img, rdr_img;
     int grid_x = 1, grid_y = 1;

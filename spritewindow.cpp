@@ -144,9 +144,9 @@ void SpriteWindow::resizeImage(QSize s)
         {
             for (int x = 0; x < grid_x; x++)
             {
-                sprite.color_layer0[y][x] = stored_sprite.color_layer0[y][x * old_grid_x / grid_x];
-                sprite.color_layer1[y][x] = stored_sprite.color_layer1[y][x * old_grid_x / grid_x];
-                sprite.alpha_layer[y][x] = stored_sprite.alpha_layer[y][x * old_grid_x / grid_x];
+                sprite.color_layer0[x][y] = stored_sprite.color_layer0[x * old_grid_x / grid_x][y];
+                sprite.color_layer1[x][y] = stored_sprite.color_layer1[x * old_grid_x / grid_x][y];
+                sprite.alpha_layer[x][y] = stored_sprite.alpha_layer[x * old_grid_x / grid_x][y];
             }
         }
     }
@@ -158,13 +158,13 @@ void SpriteWindow::resizeImage(QSize s)
             int x = 0;
             for (; x < new_image_x; x++)
             {
-                sprite.color_layer0[y][x] = stored_sprite.color_layer0[y][x * old_grid_x / new_image_x];
-                sprite.color_layer1[y][x] = stored_sprite.color_layer1[y][x * old_grid_x / new_image_x];
-                sprite.alpha_layer[y][x] = stored_sprite.alpha_layer[y][x * old_grid_x / new_image_x];
+                sprite.color_layer0[x][y] = stored_sprite.color_layer0[x * old_grid_x / new_image_x][y];
+                sprite.color_layer1[x][y] = stored_sprite.color_layer1[x * old_grid_x / new_image_x][y];
+                sprite.alpha_layer[x][y] = stored_sprite.alpha_layer[x * old_grid_x / new_image_x][y];
             }
             for (; x < grid_x; x++)
             {
-                sprite.alpha_layer[y][x] = 0;
+                sprite.alpha_layer[x][y] = Zx4Image::BitOff;
             }
         }
     }
@@ -181,9 +181,12 @@ void SpriteWindow::resizeImage(QSize s)
     {
         for (int y = 0; y < grid_y; y++)
         {
-            sprite.color_layer0[y] = stored_sprite.color_layer0[y * old_grid_y / grid_y];
-            sprite.color_layer1[y] = stored_sprite.color_layer1[y * old_grid_y / grid_y];
-            sprite.alpha_layer[y] = stored_sprite.alpha_layer[y * old_grid_y / grid_y];
+            for (int x = 0; x < grid_x; x++)
+            {
+                sprite.color_layer0[x][y] = stored_sprite.color_layer0[x][y * old_grid_y / grid_y];
+                sprite.color_layer1[x][y] = stored_sprite.color_layer1[x][y * old_grid_y / grid_y];
+                sprite.alpha_layer[x][y] = stored_sprite.alpha_layer[x][y * old_grid_y / grid_y];
+            }
         }
     }
     else
@@ -192,13 +195,19 @@ void SpriteWindow::resizeImage(QSize s)
         int y = 0;
         for (; y < new_image_y; y++)
         {
-            sprite.color_layer0[y] = stored_sprite.color_layer0[y * old_grid_y / new_image_y];
-            sprite.color_layer1[y] = stored_sprite.color_layer1[y * old_grid_y / new_image_y];
-            sprite.alpha_layer[y] = stored_sprite.alpha_layer[y * old_grid_y / new_image_y];
+            for (int x = 0; x < grid_x; x++)
+            {
+                sprite.color_layer0[x][y] = stored_sprite.color_layer0[x][y * old_grid_y / new_image_y];
+                sprite.color_layer1[x][y] = stored_sprite.color_layer1[x][y * old_grid_y / new_image_y];
+                sprite.alpha_layer[x][y] = stored_sprite.alpha_layer[x][y * old_grid_y / new_image_y];
+            }
         }
         for (; y < grid_y; y++)
         {
-            sprite.alpha_layer[y] = QVector<char>(grid_x);
+            for (int x = 0; x < grid_x; x++)
+            {
+                sprite.alpha_layer[x][y] = Zx4Image::BitOff;
+            }
         }
     }
 
@@ -274,17 +283,17 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
 int SpriteWindow::colorIndex(const Zx4Image & img, int x, int y) const
 {
     int i;
-    if (!img.color_layer0[y][x] && !img.color_layer1[y][x])
+    if (!img.color_layer0[x][y] && !img.color_layer1[x][y])
     {
         i = 0;
     }
     else
-    if (!img.color_layer0[y][x] && img.color_layer1[y][x])
+    if (!img.color_layer0[x][y] && img.color_layer1[x][y])
     {
         i = 1;
     }
     else
-    if (img.color_layer0[y][x] && !img.color_layer1[y][x])
+    if (img.color_layer0[x][y] && !img.color_layer1[x][y])
     {
         i = 2;
     }
@@ -301,7 +310,7 @@ void SpriteWindow::drawPixels(QPainter * p, int step)
     {
         for (int x = 0; x < grid_x; x++)
         {
-            if (sprite.alpha_layer[y][x])
+            if (sprite.alpha_layer[x][y])
             {
                 p->fillRect(x * step, y * step, step, step, clrs[colorIndex(sprite, x, y)]);
             }
@@ -344,27 +353,27 @@ void SpriteWindow::drawDot(int x, int y)
 
     if (current_color_index == 0)
     {
-        sprite.color_layer0[y][x] = 0;
-        sprite.color_layer1[y][x] = 0;
+        sprite.color_layer0[x][y] = Zx4Image::BitOff;
+        sprite.color_layer1[x][y] = Zx4Image::BitOff;
     }
     else
     if (current_color_index == 1)
     {
-        sprite.color_layer0[y][x] = 0;
-        sprite.color_layer1[y][x] = 1;
+        sprite.color_layer0[x][y] = Zx4Image::BitOff;
+        sprite.color_layer1[x][y] = Zx4Image::BitOn;
     }
     else
     if (current_color_index == 2)
     {
-        sprite.color_layer0[y][x] = 1;
-        sprite.color_layer1[y][x] = 0;
+        sprite.color_layer0[x][y] = Zx4Image::BitOn;
+        sprite.color_layer1[x][y] = Zx4Image::BitOff;
     }
     else
     {
-        sprite.color_layer0[y][x] = 1;
-        sprite.color_layer1[y][x] = 1;
+        sprite.color_layer0[x][y] = Zx4Image::BitOn;
+        sprite.color_layer1[x][y] = Zx4Image::BitOn;
     }
-    sprite.alpha_layer[y][x] = 1;
+    sprite.alpha_layer[x][y] = Zx4Image::BitOn;
 }
 
 void SpriteWindow::eraseDot(int x, int y)
@@ -373,7 +382,7 @@ void SpriteWindow::eraseDot(int x, int y)
     {
         return;
     }
-    sprite.alpha_layer[y][x] = 0;
+    sprite.alpha_layer[x][y] = Zx4Image::BitOff;
 }
 
 void SpriteWindow::drawBrush(int x, int y)
@@ -409,28 +418,20 @@ void SpriteWindow::moveImage(int dx, int dy)
 {
     for (int my = 0; my < grid_y; my++)
     {
-        if (my + dy >= 0 && my + dy < grid_y)
+        for (int mx = 0; mx < grid_x; mx++)
         {
-            sprite.color_layer0[my] = stored_sprite.color_layer0[my + dy];
-            sprite.color_layer1[my] = stored_sprite.color_layer1[my + dy];
-            sprite.alpha_layer[my] = stored_sprite.alpha_layer[my + dy];
-        }
-        else
-        {
-            sprite.alpha_layer[my] = QVector<char>(grid_x);
-        }
-        if (dx > 0)
-        {
-            sprite.color_layer0[my] = sprite.color_layer0[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-            sprite.color_layer1[my] = sprite.color_layer1[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-            sprite.alpha_layer[my] = sprite.alpha_layer[my].mid(dx, grid_x - dx) + QVector<char>(dx);
-        }
-        else
-        if (dx < 0)
-        {
-            sprite.color_layer0[my] = QVector<char>(-dx) + sprite.color_layer0[my].mid(0, grid_x + dx);
-            sprite.color_layer1[my] = QVector<char>(-dx) + sprite.color_layer1[my].mid(0, grid_x + dx);
-            sprite.alpha_layer[my] = QVector<char>(-dx) + sprite.alpha_layer[my].mid(0, grid_x + dx);
+            if (my + dy >= 0 && my + dy < grid_y && mx + dx >= 0 && mx + dx < grid_x)
+            {
+                sprite.color_layer0[mx][my] = stored_sprite.color_layer0[mx + dx][my + dy];
+                sprite.color_layer1[mx][my] = stored_sprite.color_layer1[mx + dx][my + dy];
+                sprite.alpha_layer[mx][my] = stored_sprite.alpha_layer[mx + dx][my + dy];
+            }
+            else
+            {
+                sprite.color_layer0[mx][my] = Zx4Image::BitOff;
+                sprite.color_layer1[mx][my] = Zx4Image::BitOff;
+                sprite.alpha_layer[mx][my] = Zx4Image::BitOff;
+            }
         }
     }
 }
@@ -474,12 +475,10 @@ void SpriteWindow::invertColors()
     }
     for (int y = 0; y < grid_y; y++)
     {
-        QVector<char> & line0 = sprite.color_layer0[y];
-        QVector<char> & line1 = sprite.color_layer1[y];
         for (int x = 0; x < grid_x; x++)
         {
-            line0[x] = line0[x] ? 0 : 1;
-            line1[x] = line1[x] ? 0 : 1;
+            sprite.color_layer0[x][y] = sprite.color_layer0[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
+            sprite.color_layer1[x][y] = sprite.color_layer1[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
         }
     }
     ui->canvas->update();

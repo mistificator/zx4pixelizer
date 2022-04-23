@@ -66,28 +66,27 @@ QLabel * SceneWindow::canvas() const
     return ui->canvas;
 }
 
-void SceneWindow::setImage(const Zx4Image & i)
+void SceneWindow::setImage(const Zx4ImageWithAttributes & i)
 {
     scene = i;
     ui->canvas->update();
 }
 
-const Zx4Image & SceneWindow::image() const
+const Zx4ImageWithAttributes & SceneWindow::image() const
 {
     return scene;
 }
 
-void SceneWindow::setAttr(QMap<int, QMap<int, int>> a)
+void SceneWindow::setAttr(Zx4ImageWithAttributes::Attr a)
 {
-    scene_attr = a;
+    scene.attr = a;
     ui->canvas->update();
 }
 
-QMap<int, QMap<int, int>> SceneWindow::attr() const
+Zx4ImageWithAttributes::Attr SceneWindow::attr() const
 {
-    return scene_attr;
+    return scene.attr;
 }
-
 
 QPoint SceneWindow::currentChar() const
 {
@@ -96,7 +95,7 @@ QPoint SceneWindow::currentChar() const
 
 void SceneWindow::setAttr(QPoint p, int p_idx)
 {
-    scene_attr[p.x()][p.y()] = p_idx;
+    scene.attr[p.x()][p.y()] = p_idx;
 }
 
 void SceneWindow::setAttr(int p_idx)
@@ -124,8 +123,8 @@ void SceneWindow::setPixel(QPoint p, int color_index)
     {
         return;
     }
-    scene.color_layer0[p.y()][p.x()] = color_index == 0 || color_index == 1 ? 0 : 1;
-    scene.color_layer1[p.y()][p.x()] = color_index == 0 || color_index == 2 ? 0 : 1;
+    scene.color_layer0[p.x()][p.y()] = color_index == 0 || color_index == 1 ? Zx4Image::BitOff : Zx4Image::BitOn;
+    scene.color_layer1[p.x()][p.y()] = color_index == 0 || color_index == 2 ? Zx4Image::BitOff : Zx4Image::BitOn;
 }
 
 bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
@@ -157,7 +156,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                             update_char = QPoint(x / 8, y / 8);
                             importChar(
                                 update_char,
-                                scene_attr[update_char.x()][update_char.y()] = scene_attr[selected_char.x()][selected_char.y()],
+                                scene.attr[update_char.x()][update_char.y()] = scene.attr[selected_char.x()][selected_char.y()],
                                 transformed_img.convertToFormat(QImage::Format_Indexed8).copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
                         }
                     }
@@ -171,7 +170,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                         else
                         {
                             selected_char = QPoint(x / 8, y / 8);
-                            emit charSelected(scene_attr[selected_char.x()][selected_char.y()]);
+                            emit charSelected(scene.attr[selected_char.x()][selected_char.y()]);
                         }
                     }
                     else
@@ -208,11 +207,11 @@ void SceneWindow::drawGrid()
     {
         for (int x = 0; x < rdr_img.width(); x++)
         {
-            int p_idx = scene_attr[x / 8][y / 8];
+            int p_idx = scene.attr[x / 8][y / 8];
             auto c = palettes.palettes[p_idx];
 
-            char l0 = scene.color_layer0[y][x];
-            char l1 = scene.color_layer1[y][x];
+            char l0 = scene.color_layer0[x][y];
+            char l1 = scene.color_layer1[x][y];
             rdr_img.setPixelColor(x, y, !l0 && !l1 ? c[0] : l0 && !l1 ? c[2] : !l0 && l1 ? c[1] : c[3]);
         }
     }
@@ -249,8 +248,6 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
     {
         return p_idx;
     }
-
-    qApp->processEvents();
 
     int k = 0;
     QMap<int, QColor> dist4;
@@ -452,7 +449,9 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
 
     small_quad = Zx4Processing::importImage(small_quad.convertToFormat(QImage::Format_RGB32), palettes.colorTable(p_idx));
 
-    scene_attr[char_pos.x()][char_pos.y()] = p_idx;
+    #pragma omp critical
+        scene.attr[char_pos.x()][char_pos.y()] = p_idx;
+
     for (int iy = 0; iy < 8; iy++)
     {
         int y = iy + char_pos.y() * 8;
@@ -464,10 +463,11 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
             {
                 int idx = small_quad.pixelIndex(ix, iy);
                 if (idx >= 0 && idx < 4)
+                #pragma omp critical
                 {
-                    scene.color_layer0[y][x] = idx == 0 || idx == 1 ? 0 : 1;
-                    scene.color_layer1[y][x] = idx == 0 || idx == 2 ? 0 : 1;
-                    scene.alpha_layer[y][x] = 1;
+                    scene.color_layer0[x][y] = idx == 0 || idx == 1 ? Zx4Image::BitOff : Zx4Image::BitOn;
+                    scene.color_layer1[x][y] = idx == 0 || idx == 2 ? Zx4Image::BitOff : Zx4Image::BitOn;
+                    scene.alpha_layer[x][y] = Zx4Image::BitOn;
                 }
                 else
                 {
@@ -487,15 +487,13 @@ QPair<QByteArray, QByteArray> SceneWindow::makeScreens() const
     QByteArray scr1 = scr0;
     for (int y = 0; y < scene.height(); y++)
     {
-        const QVector<char> & line0 = scene.color_layer0[y];
-        const QVector<char> & line1 = scene.color_layer1[y];
-        for (int x = 0; x < line0.count() / 8; x++)
+        for (int x = 0; x < scene.width() / 8; x++)
         {
             int xy = GetXY(x, y);
             for (int bit = 0; bit < 8; bit++)
             {
-                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(line0[(8 * x) + (7 - bit)]) << bit));
-                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(line1[(8 * x) + (7 - bit)]) << bit));
+                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(scene.color_layer0[(8 * x) + (7 - bit)][y]) << bit));
+                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(scene.color_layer1[(8 * x) + (7 - bit)][y]) << bit));
             }
         }
     }
@@ -504,7 +502,7 @@ QPair<QByteArray, QByteArray> SceneWindow::makeScreens() const
     {
         for (int x = 0; x < scene.width() / 8; x++)
         {
-            int p_idx = scene_attr[x][y];
+            int p_idx = scene.attr[x][y];
             QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
             scr0[attr_offs + y * 32 + x] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
             scr1[attr_offs + y * 32 + x] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
@@ -523,10 +521,8 @@ void SceneWindow::invertColors()
     {
         for (int x = selected_char.x() * 8; x < qMin((selected_char.x() + 1) * 8, scene.width()); x++)
         {
-            auto & l0 = scene.color_layer0[y][x];
-            auto & l1 = scene.color_layer1[y][x];
-            l0 = l0 ? 0 : 1;
-            l1 = l1 ? 0 : 1;
+            scene.color_layer0[x][y] = scene.color_layer0[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
+            scene.color_layer1[x][y] = scene.color_layer1[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
         }
     }
     ui->canvas->update();
