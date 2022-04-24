@@ -46,7 +46,6 @@ public:
     int currentColorIndex() const;
     void setPixel(QPoint, int color_index);
 
-    QPair<QByteArray, QByteArray> makeScreens() const;
     void invertColors();
 signals:
     void previewUpdateIsNeeded();

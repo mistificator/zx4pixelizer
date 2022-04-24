@@ -107,7 +107,6 @@ int SpriteWindow::paletteIndex() const
 
 void SpriteWindow::clearCanvas(QSize s)
 {
-    setFileName(QString());
     sprite = Zx4Image();
     sprite.resize(grid_x = s.width(), grid_y = s.height());
     ui->canvas->update();

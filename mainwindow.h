@@ -75,5 +75,9 @@ private:
     void openSprite(QImage img, QString filename = QString());
     void importSprite(QImage img, QString filename = QString());
     void importSpriteZx4Format(QString filename);
+    void exportSpriteZx4Format(QString filename);
+
+    void exportScreens(const Zx4ImageWithAttributes & image, QString filename_scr0, QString filename_scr1 = QString());
+    void exportTape(const Zx4ImageWithAttributes & image, QString filename);
 };
 #endif // MAINWINDOW_H

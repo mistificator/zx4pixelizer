@@ -681,24 +681,8 @@ void MainWindow::on_actionImport_triggered()
     }
 }
 
-void MainWindow::on_actionExport_triggered()
+void MainWindow::exportSpriteZx4Format(QString filename)
 {
-    if (!current_sprite)
-    {
-        return;
-    }
-
-    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
-    if (!path.isEmpty())
-    {
-        path += "/" + QFileInfo(current_sprite->fileName()).baseName();
-    }
-    else
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
-
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX4 Pixelizer sprites (*.zx4)");
     if (filename.isEmpty())
     {
         return;
@@ -768,7 +752,46 @@ void MainWindow::on_actionExport_triggered()
         f.write(zx4);
     }
     f.close();
+}
 
+void MainWindow::on_actionExport_triggered()
+{
+    if (!current_sprite)
+    {
+        return;
+    }
+
+    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    if (!path.isEmpty())
+    {
+        path += "/" + QFileInfo(current_sprite->fileName()).baseName();
+    }
+    else
+    {
+        path = QDir::homePath() + "/Pictures/";
+    }
+
+    QString filter;
+    QStringList filters = QStringList() << "ZX4 Pixelizer sprites (*.zx4)" << "ZX Spectrum tape (*.tap)";
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), & filter);
+    if (filters.indexOf(filter) == 0)
+    {
+        exportSpriteZx4Format(filename);
+    }
+    else
+    if (filters.indexOf(filter) == 1)
+    {
+        Zx4ImageWithAttributes image(current_sprite->image(), current_sprite->paletteIndex());
+        Zx4ImageWithAttributes scene(255, 192);
+        for (int x = 0; x < scene.width(); x += image.width())
+        {
+            for (int y = 0; y < scene.height(); y += image.height())
+            {
+                scene.copy(image, QPoint(x, y));
+            }
+        }
+        exportTape(scene, filename);
+    }
 }
 
 void MainWindow::openSprite(QImage src_imp_image, QString filename)
@@ -805,8 +828,8 @@ void MainWindow::openSprite(QImage src_imp_image, QString filename)
     selectPalette(p_idx);
 
     current_sprite->setPaletteIndex(p_idx);
-    current_sprite->setFileName(filename);
     current_sprite->clearCanvas(QSize(qMin(src_imp_image.width(), 255), qMin(src_imp_image.height(), 192)));
+    current_sprite->setFileName(filename);
     current_sprite->setSourceImage(src_imp_image);
     current_sprite->drawImage(src_imp_image);
 
@@ -960,6 +983,98 @@ void MainWindow::on_actionImport_scene_triggered()
     importScene(QImage(filename), filename);
 }
 
+void MainWindow::exportScreens(const Zx4ImageWithAttributes & image, QString filename_scr0, QString filename_scr1)
+{
+    if (QFileInfo(filename_scr0).suffix().compare("scr0", Qt::CaseInsensitive) != 0)
+    {
+        filename_scr0 = filename_scr0.replace("." + QFileInfo(filename_scr0).suffix(), ".scr0");
+    }
+    if (filename_scr1.isEmpty())
+    {
+        filename_scr1 = filename_scr0;
+    }
+    if (QFileInfo(filename_scr1).suffix().compare("scr1", Qt::CaseInsensitive) != 0)
+    {
+        filename_scr1 = filename_scr1.replace("." + QFileInfo(filename_scr1).suffix(), ".scr1");
+    }
+
+    auto screens = image.makeScreens(palettes);
+
+    QFile f0(filename_scr0), f1(filename_scr1);
+    f0.open(QFile::WriteOnly);
+    f1.open(QFile::WriteOnly);
+    if (f0.isOpen() && f1.isOpen())
+    {
+        f0.write(screens.first);
+        f1.write(screens.second);
+    }
+    f0.close();
+    f1.close();
+}
+
+void MainWindow::exportTape(const Zx4ImageWithAttributes & image, QString filename)
+{
+    if (QFileInfo(filename).suffix().compare("tap", Qt::CaseInsensitive) != 0)
+    {
+        filename = filename.replace("." + QFileInfo(filename).suffix(), ".tap");
+    }
+    QFile f(filename);
+    f.open(QFile::WriteOnly);
+
+    QFile ggf(":/GIGAVIEW.TAP");
+    ggf.open(QFile::ReadOnly);
+    f.write(ggf.readAll());
+    ggf.close();
+
+    auto screens = image.makeScreens(palettes);
+    int offset = 0xC0;
+    foreach (QByteArray scr, QList<QByteArray>() << screens.first << screens.second)
+    {
+        unsigned short sz = scr.count();
+
+        QByteArray h;
+        h += (char)0x13;
+        h += (char)0x00;
+        h += (char)0x00;
+        h += (char)0x03;
+        h += "SCREEN    ";
+        h += ((char *)& sz)[0];
+        h += ((char *)& sz)[1];
+        h += (char)0x00;
+        h += (char)offset;
+        h += (char)0x00;
+        h += (char)0x00;
+
+        char checksum = h[2];
+        for (int i = 3; i < h.count(); i++)
+        {
+            checksum ^= h[i];
+        }
+        h += (char)checksum;
+        offset += 0x1B;
+
+        f.write(h);
+
+        sz += 2;
+
+        QByteArray d;
+        d += ((char *)& sz)[0];
+        d += ((char *)& sz)[1];
+        d += (char)0xFF;
+        d += scr;
+        checksum = d[2];
+        for (int i = 3; i < d.count(); i++)
+        {
+            checksum ^= d[i];
+        }
+        d += (char)checksum;
+
+        f.write(d);
+    }
+
+    f.close();
+}
+
 void MainWindow::on_actionExport_scene_triggered()
 {
     if (!current_scene)
@@ -1000,92 +1115,16 @@ void MainWindow::on_actionExport_scene_triggered()
             filename = filename.replace("." + QFileInfo(filename).suffix(), ".png");
         }
         current_scene->renderedImage().convertToFormat(QImage::Format_RGB32).save(filename, "PNG");
-        return;
     }
     else
     if (filters.indexOf(filter) == 1)
     {
-        if (QFileInfo(filename).suffix().compare("tap", Qt::CaseInsensitive) != 0)
-        {
-            filename = filename.replace("." + QFileInfo(filename).suffix(), ".tap");
-        }
-        QFile f(filename);
-        f.open(QFile::WriteOnly);
-
-        QFile ggf(":/GIGAVIEW.TAP");
-        ggf.open(QFile::ReadOnly);
-        f.write(ggf.readAll());
-        ggf.close();
-
-        auto screens = current_scene->makeScreens();
-        int offset = 0xC0;
-        foreach (QByteArray scr, QList<QByteArray>() << screens.first << screens.second)
-        {
-            unsigned short sz = scr.count();
-
-            QByteArray h;
-            h += (char)0x13;
-            h += (char)0x00;
-            h += (char)0x00;
-            h += (char)0x03;
-            h += "SCREEN    ";
-            h += ((char *)& sz)[0];
-            h += ((char *)& sz)[1];
-            h += (char)0x00;
-            h += (char)offset;
-            h += (char)0x00;
-            h += (char)0x00;
-
-            char checksum = h[2];
-            for (int i = 3; i < h.count(); i++)
-            {
-                checksum ^= h[i];
-            }
-            h += (char)checksum;
-            offset += 0x1B;
-
-            f.write(h);
-
-            sz += 2;
-
-            QByteArray d;
-            d += ((char *)& sz)[0];
-            d += ((char *)& sz)[1];
-            d += (char)0xFF;
-            d += scr;
-            checksum = d[2];
-            for (int i = 3; i < d.count(); i++)
-            {
-                checksum ^= d[i];
-            }
-            d += (char)checksum;
-
-            f.write(d);
-        }
-
-        f.close();
-        return;
+        exportTape(current_scene->image(), filename);
     }
     else
     if (filters.indexOf(filter) == 0)
     {
-        if (QFileInfo(filename).suffix().compare("scr0", Qt::CaseInsensitive) != 0)
-        {
-            filename = filename.replace("." + QFileInfo(filename).suffix(), ".scr0");
-        }
-
-        auto screens = current_scene->makeScreens();
-
-        QFile f0(filename), f1(filename.replace(".scr0", ".scr1", Qt::CaseInsensitive));
-        f0.open(QFile::WriteOnly);
-        f1.open(QFile::WriteOnly);
-        if (f0.isOpen() && f1.isOpen())
-        {
-            f0.write(screens.first);
-            f1.write(screens.second);
-        }
-        f0.close();
-        f1.close();
+        exportScreens(current_scene->image(), filename);
     }
 }
 

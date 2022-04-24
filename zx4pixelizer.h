@@ -14,48 +14,25 @@ struct Zx4Image
     typedef QMap<int, QMap<int, Bit>> Layer; // x, y, bit
     Layer color_layer0, color_layer1, alpha_layer;
     virtual ~Zx4Image() {}
+    virtual void resize(int _w, int _h);
     bool isNull() const { return h <= 0 || w <= 0; }
-    virtual void resize(int _w, int _h)
-    {
-        w = _w;
-        h = _h;
-        Layer _color_layer0, _color_layer1, _alpha_layer;
-        for (int x = 0; x < w; x++)
-        {
-            for (int y = 0; y < h; y++)
-            {
-                _color_layer0[x][y] = color_layer0[x][y];
-                _color_layer1[x][y] = color_layer1[x][y];
-                _alpha_layer[x][y] = alpha_layer[x][y];
-            }
-        }
-        color_layer0 = _color_layer0;
-        color_layer1 = _color_layer1;
-        alpha_layer = _alpha_layer;
-    }
     int width() const { return w; }
     int height() const { return h; }
 protected:
     int w = 0, h = 0;
 };
 
+struct Zx4Palette;
 struct Zx4ImageWithAttributes: public Zx4Image
 {
+    Zx4ImageWithAttributes(int _w = 0, int _h = 0);
+    Zx4ImageWithAttributes(const Zx4Image & o, int p_index);
     typedef QMap<int, QMap<int, int>> Attr; // x, y, palette index
     Attr attr; // 32x24
-    virtual void resize(int _w, int _h)
-    {
-        Zx4Image::resize(_w, _h);
-        Attr _attr;
-        for (int x = 0; x < (w + 7) / 8; x++)
-        {
-            for (int y = 0; y < (h + 7) / 8; y++)
-            {
-                _attr[x][y] = attr[x][y];
-            }
-        }
-        attr = _attr;
-    }
+    virtual void resize(int _w, int _h);
+    QPair<QByteArray, QByteArray> makeScreens(const Zx4Palette & palettes) const;
+    void makeAttr(int p_idx);
+    Zx4ImageWithAttributes & copy(const Zx4ImageWithAttributes & o, QPoint pt = QPoint(0, 0));
 };
 
 template <> inline bool qMapLessThanKey<QColor>(const QColor &key1, const QColor &key2)

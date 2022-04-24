@@ -3,6 +3,117 @@
 #include "zx4pixelizer.h"
 #include "color_conversions.h"
 
+void Zx4Image::resize(int _w, int _h)
+{
+    w = _w;
+    h = _h;
+    Layer _color_layer0, _color_layer1, _alpha_layer;
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            _color_layer0[x][y] = color_layer0[x][y];
+            _color_layer1[x][y] = color_layer1[x][y];
+            _alpha_layer[x][y] = alpha_layer[x][y];
+        }
+    }
+    color_layer0 = _color_layer0;
+    color_layer1 = _color_layer1;
+    alpha_layer = _alpha_layer;
+}
+
+
+Zx4ImageWithAttributes::Zx4ImageWithAttributes(int _w, int _h): Zx4Image()
+{
+    resize(_w, _h);
+}
+
+Zx4ImageWithAttributes::Zx4ImageWithAttributes(const Zx4Image & o, int p_index): Zx4Image(o)
+{
+    makeAttr(p_index);
+}
+
+void Zx4ImageWithAttributes::resize(int _w, int _h)
+{
+    Zx4Image::resize(_w, _h);
+    Attr _attr;
+    for (int x = 0; x < (w + 7) / 8; x++)
+    {
+        for (int y = 0; y < (h + 7) / 8; y++)
+        {
+            _attr[x][y] = attr[x][y];
+        }
+    }
+    attr = _attr;
+}
+
+#define GetY(y)         (((y & 0xc0) << 5) | ((y & 0x07) << 8) | ((y & 0x38) << 2))
+#define GetXY(x, y)     (GetY(y) | (x & 0x1F))
+
+QPair<QByteArray, QByteArray> Zx4ImageWithAttributes::makeScreens(const Zx4Palette & palettes) const
+{
+    const int scr_size = 192 * 32;
+    QByteArray scr0(scr_size + 32 * 24, 0);
+    QByteArray scr1 = scr0;
+    for (int y = 0; y < height(); y++)
+    {
+        for (int x = 0; x < width() / 8; x++)
+        {
+            int xy = GetXY(x, y);
+            for (int bit = 0; bit < 8; bit++)
+            {
+                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(color_layer0[(8 * x) + (7 - bit)][y]) << bit));
+                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(color_layer1[(8 * x) + (7 - bit)][y]) << bit));
+            }
+        }
+    }
+    for (int y = 0; y < (height() + 7) / 8; y++)
+    {
+        for (int x = 0; x < width() / 8; x++)
+        {
+            int p_idx = attr[x][y];
+            QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
+            scr0[scr_size + y * 32 + x] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
+            scr1[scr_size + y * 32 + x] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
+        }
+    }
+    return QPair<QByteArray, QByteArray>(scr0, scr1);
+}
+
+void Zx4ImageWithAttributes::makeAttr(int p_idx)
+{
+    for (int x = 0; x < (w + 7) / 8; x++)
+    {
+        for (int y = 0; y < (h + 7) / 8; y++)
+        {
+            attr[x][y] = p_idx;
+        }
+    }
+}
+
+Zx4ImageWithAttributes & Zx4ImageWithAttributes::copy(const Zx4ImageWithAttributes & o, QPoint pt)
+{
+    for (int x = pt.x(), ox = 0; x < qMin(w, pt.x() + o.w); x++, ox++)
+    {
+        for (int y = pt.y(), oy = 0; y < qMin(h, pt.y() + o.h); y++, oy++)
+        {
+            color_layer0[x][y] = o.color_layer0[ox][oy];
+            color_layer1[x][y] = o.color_layer1[ox][oy];
+            alpha_layer[x][y] = qMax(alpha_layer[x][y], o.alpha_layer[ox][oy]);
+        }
+    }
+    for (int x = pt.x() / 8, ox = 0; x < (qMin(w, pt.x() + o.w) + 7) / 8; x++, ox++)
+    {
+        for (int y = pt.y() / 8, oy = 0; y < (qMin(h, pt.y() + o.h) + 7) / 8; y++, oy++)
+        {
+            attr[x][y] = o.attr[ox][oy];
+        }
+    }
+    return * this;
+}
+
+
+
 template <class T>
 inline T & deconst_cast(const T & m)
 {

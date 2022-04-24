@@ -478,39 +478,6 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
     }
 }
 
-#define GetY(y)         (((y & 0xc0) << 5) | ((y & 0x07) << 8) | ((y & 0x38) << 2))
-#define GetXY(x, y)     (GetY(y) | (x & 0x1F))
-
-QPair<QByteArray, QByteArray> SceneWindow::makeScreens() const
-{
-    QByteArray scr0(32 * 192 + 32 * 24, 0);
-    QByteArray scr1 = scr0;
-    for (int y = 0; y < scene.height(); y++)
-    {
-        for (int x = 0; x < scene.width() / 8; x++)
-        {
-            int xy = GetXY(x, y);
-            for (int bit = 0; bit < 8; bit++)
-            {
-                scr0[xy] = static_cast<char>(scr0[xy] | (static_cast<int>(scene.color_layer0[(8 * x) + (7 - bit)][y]) << bit));
-                scr1[xy] = static_cast<char>(scr1[xy] | (static_cast<int>(scene.color_layer1[(8 * x) + (7 - bit)][y]) << bit));
-            }
-        }
-    }
-    int attr_offs = 192 * 32;
-    for (int y = 0; y < (scene.height() + 7) / 8; y++)
-    {
-        for (int x = 0; x < scene.width() / 8; x++)
-        {
-            int p_idx = scene.attr[x][y];
-            QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
-            scr0[attr_offs + y * 32 + x] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
-            scr1[attr_offs + y * 32 + x] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
-        }
-    }
-    return QPair<QByteArray, QByteArray>(scr0, scr1);
-}
-
 void SceneWindow::invertColors()
 {
     if (selected_char == QPoint(-1, -1))
