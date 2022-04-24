@@ -10,7 +10,7 @@ namespace Ui {
 class SceneWindow;
 }
 
-class SceneWindow : public QWidget
+class SceneWindow : public QWidget, public Zx4BaseObject
 {
     Q_OBJECT
 
@@ -18,19 +18,11 @@ public:
     explicit SceneWindow(const Zx4Palette & palettes, QWidget *parent = nullptr);
     ~SceneWindow();
 
-    void setFileName(QString);
-    QString fileName() const;
-
-    void setSourceImage(const QImage &);
-    const QImage & sourceImage() const;
-    QImage & transformedImage();
+    virtual void setFileName(QString);
     const QImage & renderedImage() const;
 
+    virtual void setImage(const Zx4Image &);
     virtual QSize sizeHint() const;
-    QLabel * canvas() const;
-
-    void setImage(const Zx4ImageWithAttributes &);
-    const Zx4ImageWithAttributes & image() const;
 
     void setAttr(Zx4ImageWithAttributes::Attr);
     Zx4ImageWithAttributes::Attr attr() const;
@@ -42,10 +34,7 @@ public:
     int selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMethod method = Zx4Palette::DefaultSelectPaletteMethod) const;
     void importChar(QPoint, int p_idx, QImage small_quad);
 
-    void setCurrentColorIndex(int);
-    int currentColorIndex() const;
     void setPixel(QPoint, int color_index);
-
     void invertColors();
 signals:
     void previewUpdateIsNeeded();
@@ -54,18 +43,12 @@ private slots:
     void drawGrid();
 private:
     Ui::SceneWindow *ui;
-    const Zx4Palette & palettes;
+    Zx4ImageWithAttributes & scene;
 
     bool eventFilter(QObject *, QEvent *);
 
-    QString file_name;
-
-    Zx4ImageWithAttributes scene;
-
-    QImage src_imp_img, transformed_img, rdr_img;
-    int grid_x = 1, grid_y = 1;
+    QImage rdr_img;
     QPoint selected_char, update_char;
-    int current_color_index = 0;
     bool checkPalette(QImage small_quad, int p_idx) const;
 };
 

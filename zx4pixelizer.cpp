@@ -1,5 +1,6 @@
 #include <QSet>
 #include <QApplication>
+#include <QWidget>
 #include "zx4pixelizer.h"
 #include "color_conversions.h"
 
@@ -730,4 +731,101 @@ QByteArray Zx4Processing::inflateRle8(QByteArray ba)
         }
     }
     return out;
+}
+
+
+
+
+Zx4BaseObject::Zx4BaseObject(const Zx4Palette & _palettes): palettes(_palettes)
+{
+
+}
+
+Zx4BaseObject::~Zx4BaseObject()
+{
+    if (zx4_img)
+    {
+        delete zx4_img;
+    }
+}
+
+void Zx4BaseObject::setFileName(QString _f)
+{
+    file_name = _f;
+}
+
+QString Zx4BaseObject::fileName() const
+{
+    return file_name;
+}
+
+void Zx4BaseObject::setSourceImage(const QImage & i)
+{
+    src_imp_img = transformed_img = i;
+    if (!zx4_img)
+    {
+        return;
+    }
+    zx4_img->resize(i.width(), i.height());
+    if (widget)
+    {
+        widget->update();
+    }
+}
+
+const QImage & Zx4BaseObject::sourceImage() const
+{
+    return src_imp_img;
+}
+
+QImage & Zx4BaseObject::transformedImage()
+{
+    return transformed_img;
+}
+
+void Zx4BaseObject::setImage(const Zx4Image & i)
+{
+    if (zx4_img)
+    {
+        delete zx4_img;
+    }
+    zx4_img = i.clone();
+    if (widget)
+    {
+        widget->update();
+    }
+}
+
+const Zx4Image & Zx4BaseObject::image() const
+{
+    if (!zx4_img)
+    {
+        zx4_img = new Zx4Image();
+    }
+    return * zx4_img;
+}
+
+void Zx4BaseObject::setCurrentColorIndex(int i)
+{
+    current_color_index = i;
+    if (widget)
+    {
+        widget->update();
+    }
+}
+
+int Zx4BaseObject::currentColorIndex() const
+{
+    return current_color_index;
+}
+
+void Zx4BaseObject::setCanvas(QWidget * w)
+{
+    widget = w;
+    widget->installEventFilter(dynamic_cast<QWidget *>(this));
+}
+
+QWidget * Zx4BaseObject::canvas() const
+{
+    return widget;
 }

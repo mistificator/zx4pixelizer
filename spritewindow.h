@@ -10,7 +10,7 @@ namespace Ui {
 class SpriteWindow;
 }
 
-class SpriteWindow : public QWidget
+class SpriteWindow : public QWidget, public Zx4BaseObject
 {
     Q_OBJECT
 
@@ -18,25 +18,15 @@ public:
     explicit SpriteWindow(const Zx4Palette & palettes, QWidget *parent = nullptr);
     ~SpriteWindow();
 
-    void setFileName(QString);
-    QString fileName() const;
+    virtual void setFileName(QString);
 
     virtual QSize sizeHint() const;
-    QLabel * canvas() const;
-    const Zx4Image & image() const;
-
-    void setSourceImage(QImage);
-    const QImage & sourceImage() const;
-    QImage & transformedImage();
 
     enum ActionEnum {ActionPencil = 0, ActionBrush, ActionMove, ActionEraser};
     void setAction(ActionEnum, QAction *);
 
     void setColors(QList<QColor>);
     QList<QColor> colors() const;
-
-    void setCurrentColorIndex(int);
-    int currentColorIndex() const;
 
     void setPaletteIndex(int);
     int paletteIndex() const;
@@ -63,20 +53,13 @@ private slots:
 
 private:
     Ui::SpriteWindow *ui;
-    const Zx4Palette & palettes;
-
-    bool eventFilter(QObject *, QEvent *);
-
-    int grid_x = 64, grid_y = 64;
-    Zx4Image sprite, stored_sprite;
+    Zx4Image & sprite, stored_sprite;
     QPoint old_grid_pos;
-    QString file_name;
-    QImage src_imp_img, transformed_img;
-
     QMap<ActionEnum, QAction *> acts;
     QList<QColor> clrs;
-    int current_color_index = 0;
     int p_idx = 0;
+
+    bool eventFilter(QObject *, QEvent *);
 };
 
 #endif // SPRITEWINDOW_H

@@ -435,12 +435,12 @@ void MainWindow::on_actionExport_scene_triggered()
     else
     if (filters.indexOf(filter) == 1)
     {
-        exportTape(current_scene->image(), filename);
+        exportTape(* dynamic_cast<const Zx4ImageWithAttributes *>(& current_scene->image()), filename);
     }
     else
     if (filters.indexOf(filter) == 0)
     {
-        exportScreens(current_scene->image(), filename);
+        exportScreens(* dynamic_cast<const Zx4ImageWithAttributes *>(& current_scene->image()), filename);
     }
 }
 

@@ -7,12 +7,10 @@
 #include "ui_scenewindow.h"
 
 SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::SceneWindow),
-    palettes(palettes)
+    QWidget(parent), Zx4BaseObject(palettes), ui(new Ui::SceneWindow), scene(* new Zx4ImageWithAttributes())
 {
     ui->setupUi(this);
-    ui->canvas->installEventFilter(this);
+    setCanvas(ui->canvas);
 
     setFileName(QString());
     selected_char = update_char = QPoint(-1, -1);
@@ -20,35 +18,14 @@ SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
 
 SceneWindow::~SceneWindow()
 {
+    delete & scene;
     delete ui;
 }
 
 void SceneWindow::setFileName(QString s)
 {
-    file_name = s;
+    Zx4BaseObject::setFileName(s);
     setWindowTitle((!file_name.isEmpty() ? QFileInfo(file_name).fileName() : "untitled") + " - Scene");
-}
-
-QString SceneWindow::fileName() const
-{
-    return file_name;
-}
-
-void SceneWindow::setSourceImage(const QImage & i)
-{
-    scene.resize(i.width(), i.height());
-    src_imp_img = transformed_img = i;
-    ui->canvas->update();
-}
-
-const QImage & SceneWindow::sourceImage() const
-{
-    return src_imp_img;
-}
-
-QImage & SceneWindow::transformedImage()
-{
-    return transformed_img;
 }
 
 const QImage & SceneWindow::renderedImage() const
@@ -61,20 +38,21 @@ QSize SceneWindow::sizeHint() const
     return QSize(640, 640);
 }
 
-QLabel * SceneWindow::canvas() const
+void SceneWindow::setImage(const Zx4Image & i)
 {
-    return ui->canvas;
-}
-
-void SceneWindow::setImage(const Zx4ImageWithAttributes & i)
-{
-    scene = i;
-    ui->canvas->update();
-}
-
-const Zx4ImageWithAttributes & SceneWindow::image() const
-{
-    return scene;
+    if (!dynamic_cast<const Zx4ImageWithAttributes *>(& i))
+    {
+        return;
+    }
+    if (zx4_img)
+    {
+        delete zx4_img;
+    }
+    scene = * dynamic_cast<const Zx4ImageWithAttributes *>(zx4_img = i.clone());
+    if (widget)
+    {
+        widget->update();
+    }
 }
 
 void SceneWindow::setAttr(Zx4ImageWithAttributes::Attr a)
@@ -101,16 +79,6 @@ void SceneWindow::setAttr(QPoint p, int p_idx)
 void SceneWindow::setAttr(int p_idx)
 {
     setAttr(selected_char, p_idx);
-}
-
-void SceneWindow::setCurrentColorIndex(int i)
-{
-    current_color_index = i;
-}
-
-int SceneWindow::currentColorIndex() const
-{
-    return current_color_index;
 }
 
 void SceneWindow::setPixel(QPoint p, int color_index)

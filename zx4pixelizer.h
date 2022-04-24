@@ -18,6 +18,7 @@ struct Zx4Image
     bool isNull() const { return h <= 0 || w <= 0; }
     int width() const { return w; }
     int height() const { return h; }
+    virtual Zx4Image * clone() const { return new Zx4Image(* this); }
 protected:
     int w = 0, h = 0;
 };
@@ -33,6 +34,7 @@ struct Zx4ImageWithAttributes: public Zx4Image
     QPair<QByteArray, QByteArray> makeScreens(const Zx4Palette & palettes) const;
     void makeAttr(int p_idx);
     Zx4ImageWithAttributes & copy(const Zx4ImageWithAttributes & o, QPoint pt = QPoint(0, 0));
+    virtual Zx4Image * clone() const { return new Zx4ImageWithAttributes(* this); }
 };
 
 template <> inline bool qMapLessThanKey<QColor>(const QColor &key1, const QColor &key2)
@@ -95,6 +97,37 @@ struct Zx4Processing
     static QImage importImage(QImage small_quad, QVector<QRgb> color_table);
     static QByteArray deflateRle8(QByteArray ba);
     static QByteArray inflateRle8(QByteArray ba);
+};
+
+class Zx4BaseObject
+{
+public:
+    Zx4BaseObject(const Zx4Palette & _palettes);
+    virtual ~Zx4BaseObject();
+
+    virtual void setFileName(QString);
+    QString fileName() const;
+
+    virtual void setSourceImage(const QImage &);
+    const QImage & sourceImage() const;
+    QImage & transformedImage();
+
+    virtual void setImage(const Zx4Image &);
+    const Zx4Image & image() const;
+
+    virtual void setCurrentColorIndex(int);
+    int currentColorIndex() const;
+
+    QWidget * canvas() const;
+protected:
+    void setCanvas(QWidget *);
+    const Zx4Palette & palettes;
+    QString file_name;
+    mutable Zx4Image * zx4_img = nullptr;
+    QImage src_imp_img, transformed_img;
+    int grid_x = 64, grid_y = 64;
+    int current_color_index = 0;
+    QWidget * widget = nullptr;
 };
 
 #endif // ZX4PIXELIZER_H

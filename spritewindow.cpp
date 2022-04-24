@@ -7,12 +7,11 @@
 #include "ui_spritewindow.h"
 
 SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::SpriteWindow),
-    palettes(palettes)
+    QWidget(parent), Zx4BaseObject(palettes),
+    ui(new Ui::SpriteWindow), sprite(* new Zx4Image())
 {
     ui->setupUi(this);
-    ui->canvas->installEventFilter(this);
+    setCanvas(ui->canvas);
 
     clrs << Qt::black << Qt::black << Qt::black << Qt::black;
     setFileName(QString());
@@ -20,48 +19,19 @@ SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
 
 SpriteWindow::~SpriteWindow()
 {
+    delete & sprite;
     delete ui;
 }
 
 void SpriteWindow::setFileName(QString s)
 {
-    file_name = s;
+    Zx4BaseObject::setFileName(s);
     setWindowTitle((!file_name.isEmpty() ? QFileInfo(file_name).fileName() : "untitled") + " - Sprite");
-}
-
-QString SpriteWindow::fileName() const
-{
-    return file_name;
 }
 
 QSize SpriteWindow::sizeHint() const
 {
     return QSize(640, 640);
-}
-
-QLabel * SpriteWindow::canvas() const
-{
-    return ui->canvas;
-}
-
-const Zx4Image & SpriteWindow::image() const
-{
-    return sprite;
-}
-
-void SpriteWindow::setSourceImage(QImage i)
-{
-    src_imp_img = transformed_img = i;
-}
-
-const QImage & SpriteWindow::sourceImage() const
-{
-    return src_imp_img;
-}
-
-QImage & SpriteWindow::transformedImage()
-{
-    return transformed_img;
 }
 
 void SpriteWindow::setAction(ActionEnum e, QAction * a)
@@ -82,17 +52,6 @@ void SpriteWindow::setColors(QList<QColor> _colors)
 QList<QColor> SpriteWindow::colors() const
 {
     return clrs;
-}
-
-void SpriteWindow::setCurrentColorIndex(int _c)
-{
-    current_color_index = _c;
-    ui->canvas->update();
-}
-
-int SpriteWindow::currentColorIndex() const
-{
-    return current_color_index;
 }
 
 void SpriteWindow::setPaletteIndex(int i)
