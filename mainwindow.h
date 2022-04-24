@@ -72,5 +72,8 @@ private:
     QImage applyTransforms(const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
 
     void importScene(QImage img, QString filename = QString());
+    void openSprite(QImage img, QString filename = QString());
+    void importSprite(QImage img, QString filename = QString());
+    void importSpriteZx4Format(QString filename);
 };
 #endif // MAINWINDOW_H
