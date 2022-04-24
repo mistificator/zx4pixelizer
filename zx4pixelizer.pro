@@ -14,6 +14,8 @@ SOURCES += \
     lz4.c \
     lz4hc.c \
     main.cpp \
+    mainwindow_events.cpp \
+    mainwindow_private.cpp \
     zx4pixelizer.cpp \
     mainwindow.cpp \
     scenewindow.cpp \

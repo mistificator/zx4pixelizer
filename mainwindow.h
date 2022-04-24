@@ -54,19 +54,18 @@ private slots:
     void on_mdiArea_subWindowActivated(QMdiSubWindow *msw);
     void on_paletteIndex_currentIndexChanged(int index);
 
+protected:
+    bool eventFilter(QObject *, QEvent *);
+    void showEvent(QShowEvent *);
+    void resizeEvent(QResizeEvent *);
 private:
     Ui::MainWindow *ui;
     SpriteWindow * current_sprite = 0;
     SceneWindow * current_scene = 0;
     Zx4Palette palettes;
 
-    bool eventFilter(QObject *, QEvent *);
-
     void createPalettes();
     QImage importImage(QImage img, int palette_number, bool use_alpha);
-
-    void showEvent(QShowEvent *);
-    void resizeEvent(QResizeEvent *);
 
     Zx4Palette::SelectPaletteMethod selectPaletteMethod() const;
     QImage applyTransforms(const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
@@ -79,5 +78,8 @@ private:
 
     void exportScreens(const Zx4ImageWithAttributes & image, QString filename_scr0, QString filename_scr1 = QString());
     void exportTape(const Zx4ImageWithAttributes & image, QString filename);
+
+    void reimport(SpriteWindow *);
+    void reimport(SceneWindow *);
 };
 #endif // MAINWINDOW_H
