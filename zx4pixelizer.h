@@ -99,6 +99,24 @@ struct Zx4Processing
     static QByteArray inflateRle8(QByteArray ba);
 };
 
+struct Zx4ImportPars
+{
+    bool alpha = true;
+    bool autopalette = true;
+    int palette_index = -1;
+    int palette_index_max = -1;
+
+    bool multipass = false;
+    Zx4Palette::SelectPaletteMethod color_pick = Zx4Palette::SelectPaletteHSL;
+
+    bool horizontal_mirror = false;
+    bool vertical_mirror = false;
+
+    double x_shift = 0, y_shift = 0;
+    double x_scale = 1, y_scale = 1;
+    double rotate = 0;
+};
+
 class Zx4BaseObject
 {
 public:
@@ -118,6 +136,9 @@ public:
     virtual void setCurrentColorIndex(int);
     int currentColorIndex() const;
 
+    virtual void setImportPars(const Zx4ImportPars &);
+    const Zx4ImportPars & importPars() const;
+
     QWidget * canvas() const;
 protected:
     void setCanvas(QWidget *);
@@ -127,6 +148,7 @@ protected:
     QImage src_imp_img, transformed_img;
     int grid_x = 64, grid_y = 64;
     int current_color_index = 0;
+    Zx4ImportPars imp_pars;
     QWidget * widget = nullptr;
 };
 

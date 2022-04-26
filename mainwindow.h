@@ -68,7 +68,7 @@ private:
     QImage importImage(QImage img, int palette_number, bool use_alpha);
 
     Zx4Palette::SelectPaletteMethod selectPaletteMethod() const;
-    QImage applyTransforms(const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
+    QImage applyTransforms(const Zx4ImportPars & p, const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
 
     void importScene(QImage img, QString filename = QString());
     void openSprite(QImage img, QString filename = QString());
@@ -79,6 +79,8 @@ private:
     void exportScreens(const Zx4ImageWithAttributes & image, QString filename_scr0, QString filename_scr1 = QString());
     void exportTape(const Zx4ImageWithAttributes & image, QString filename);
 
+    void importParsFromWidgetToObject(Zx4BaseObject &);
+    void importParsFromObjectToWidget(const Zx4BaseObject &);
     void reimport(SpriteWindow *, int p_idx = -1);
     void reimport(SceneWindow *);
 };

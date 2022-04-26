@@ -819,6 +819,16 @@ int Zx4BaseObject::currentColorIndex() const
     return current_color_index;
 }
 
+void Zx4BaseObject::setImportPars(const Zx4ImportPars & i)
+{
+    imp_pars = i;
+}
+
+const Zx4ImportPars & Zx4BaseObject::importPars() const
+{
+    return imp_pars;
+}
+
 void Zx4BaseObject::setCanvas(QWidget * w)
 {
     widget = w;

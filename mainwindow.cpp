@@ -168,6 +168,7 @@ void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
 void MainWindow::on_actionNew_triggered()
 {
     current_sprite = new SpriteWindow(palettes);
+    importParsFromObjectToWidget(* current_sprite);
     current_sprite->setAction(SpriteWindow::ActionPencil, ui->actionPencil);
     current_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
     current_sprite->setAction(SpriteWindow::ActionMove, ui->actionMove);
@@ -186,11 +187,13 @@ void MainWindow::on_actionImportWizardApply_triggered()
 
     if (current_sprite)
     {
+        importParsFromWidgetToObject(* current_sprite);
         reimport(current_sprite);
     }
     else
     if (current_scene)
     {
+        importParsFromWidgetToObject(* current_scene);
         reimport(current_scene);
     }
 }
@@ -466,6 +469,15 @@ void MainWindow::on_actionAbout_ZX4_Pixelizer_triggered()
 
 void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
 {
+    if (current_sprite)
+    {
+        importParsFromWidgetToObject(* current_sprite);
+    }
+    if (current_scene)
+    {
+        importParsFromWidgetToObject(* current_scene);
+    }
+
     current_sprite = 0;
     current_scene = 0;
     if (msw == 0)
@@ -491,11 +503,13 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
             ui->actionColor_11->setChecked(true);
             break;
         }
+        importParsFromObjectToWidget(* current_sprite);
     }
     else
     if (SceneWindow * sw = dynamic_cast<SceneWindow *>(msw->widget()))
     {
         current_scene = sw;
+        importParsFromObjectToWidget(* current_scene);
     }
 }
 
