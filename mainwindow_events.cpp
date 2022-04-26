@@ -31,7 +31,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
         switch (ev->type())
         {
             case QEvent::Paint:
-            if (current_sprite && !current_sprite->image().isNull() && current_sprite->image().height() == current_sprite->canvasSize().height())
+            if (current_sprite && !current_sprite->image().isNull())
             {
                 int step = qMin(ui->preview->width() / current_sprite->canvasSize().width(), ui->preview->height() / current_sprite->canvasSize().height());
                 int side_x = step * current_sprite->canvasSize().width();

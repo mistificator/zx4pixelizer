@@ -121,7 +121,7 @@ void MainWindow::importScene(QImage img, QString filename)
     p.drawImage((dst_img.width() - img.width()) / 2, (dst_img.height() - img.height()) / 2, img);
     current_scene->setSourceImage(dst_img);
 
-    ui->actionImportWizardApply->trigger();
+    reimport(current_scene);
 }
 
 void MainWindow::openSprite(QImage src_imp_image, QString filename)
@@ -167,7 +167,7 @@ void MainWindow::openSprite(QImage src_imp_image, QString filename)
 
 //#define USE_RLE8
 
-void MainWindow::importSprite(QImage src_imp_image, QString filename)
+void MainWindow::importSprite(QImage src_imp_image, QString filename, QSize sz, int p_idx)
 {
     if (src_imp_image.isNull())
     {
@@ -175,9 +175,18 @@ void MainWindow::importSprite(QImage src_imp_image, QString filename)
         return;
     }
     ui->actionNew->trigger();
-    ui->actionResize_canvas->trigger();
+    if (!sz.isValid())
+    {
+        ui->actionResize_canvas->trigger();
+    }
+    else
+    {
+        current_sprite->setCanvasSize(sz);
+    }
+    current_sprite->setFileName(filename);
     current_sprite->setSourceImage(src_imp_image);
-    ui->actionImportWizardApply->trigger();
+
+    reimport(current_sprite, p_idx);
 }
 
 void MainWindow::importSpriteZx4Format(QString filename)
@@ -434,23 +443,26 @@ void MainWindow::exportTape(const Zx4ImageWithAttributes & image, QString filena
     f.close();
 }
 
-void MainWindow::reimport(SpriteWindow * _current_sprite)
+void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
 {
     if (!_current_sprite)
     {
         return;
     }
-    auto sel_method = selectPaletteMethod();
-    int p_idx = ui->palettes->currentRow();
-    if (ui->wizardPaletteBox->currentIndex() == 0)
+    if (p_idx < 0)
     {
-        p_idx = palettes.exactPalette(_current_sprite->sourceImage());
-        if (p_idx < 0)
+        auto sel_method = selectPaletteMethod();
+        p_idx = ui->palettes->currentRow();
+        if (ui->wizardPaletteBox->currentIndex() == 0)
         {
-            QMultiMap<double, int> dist = palettes.selectPalette(_current_sprite->sourceImage(), sel_method);
-            ui->paletteNumberBox->setRange(1, dist.count());
-            ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
-            p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
+            p_idx = palettes.exactPalette(_current_sprite->sourceImage());
+            if (p_idx < 0)
+            {
+                QMultiMap<double, int> dist = palettes.selectPalette(_current_sprite->sourceImage(), sel_method);
+                ui->paletteNumberBox->setRange(1, dist.count());
+                ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
+                p_idx = * (dist.begin() + (ui->paletteNumberBox->value() - 1));
+            }
         }
     }
     _current_sprite->setPaletteIndex(p_idx);

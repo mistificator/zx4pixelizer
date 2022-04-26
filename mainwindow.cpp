@@ -12,6 +12,7 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QMimeData>
+#include <QImageReader>
 
 #include <omp.h>
 
@@ -225,8 +226,20 @@ void MainWindow::on_actionImport_triggered()
 
     if (filters.indexOf(filter) == 0)
     {
-        QImage src_imp_image = QImage(filename);
-        importSprite(src_imp_image, filename);
+        QImageReader img_rdr(filename);
+
+        QImage src_imp_image;
+        QSize sz;
+        int p_idx = -1;
+        while (!(src_imp_image = img_rdr.read()).isNull())
+        {
+            importSprite(src_imp_image, filename, sz, p_idx);
+            if (current_sprite)
+            {
+                sz = current_sprite->canvasSize();
+                p_idx = current_sprite->paletteIndex();
+            }
+        }
     }
     else
     if (filters.indexOf(filter) == 1)

@@ -72,14 +72,14 @@ private:
 
     void importScene(QImage img, QString filename = QString());
     void openSprite(QImage img, QString filename = QString());
-    void importSprite(QImage img, QString filename = QString());
+    void importSprite(QImage img, QString filename = QString(), QSize sz = QSize(), int p_idx = -1);
     void importSpriteZx4Format(QString filename);
     void exportSpriteZx4Format(QString filename);
 
     void exportScreens(const Zx4ImageWithAttributes & image, QString filename_scr0, QString filename_scr1 = QString());
     void exportTape(const Zx4ImageWithAttributes & image, QString filename);
 
-    void reimport(SpriteWindow *);
+    void reimport(SpriteWindow *, int p_idx = -1);
     void reimport(SceneWindow *);
 };
 #endif // MAINWINDOW_H
