@@ -234,15 +234,17 @@ void MainWindow::on_actionImport_triggered()
         QImage src_imp_image;
         QSize sz;
         int p_idx = -1;
+        QList<QImage> list;
         while (!(src_imp_image = img_rdr.read()).isNull())
         {
-            importSprite(src_imp_image, filename, sz, p_idx);
-            if (current_sprite)
-            {
-                sz = current_sprite->canvasSize();
-                p_idx = current_sprite->paletteIndex();
-            }
+            list << src_imp_image;
         }
+        if (current_sprite)
+        {
+            sz = current_sprite->canvasSize();
+            p_idx = current_sprite->paletteIndex();
+        }
+        importSprite(list, filename, sz, p_idx);
     }
     else
     if (filters.indexOf(filter) == 1)
@@ -310,8 +312,7 @@ void MainWindow::on_actionOpen_triggered()
         return;
     }
 
-    QImage src_imp_image = QImage(filename);
-    openSprite(src_imp_image, filename);
+    openSprite(QList<QImage>() << QImage(filename), filename);
 }
 
 void MainWindow::on_actionSave_as_triggered()

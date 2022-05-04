@@ -19,6 +19,8 @@ public:
     ~SpriteWindow();
 
     virtual void setFileName(QString);
+    virtual void setSourceImage(const QList<QImage> &);
+    virtual void setImage(const QList<const Zx4Image *> &);
 
     virtual QSize sizeHint() const;
 
@@ -50,10 +52,13 @@ signals:
     void previewUpdateIsNeeded();
 private slots:
     void drawGrid();
-
+    void on_actionAnimate_toggled(bool);
+    void on_actionStop_triggered();
+    void on_frameBox_valueChanged(int);
+    void animationFrame();
 private:
     Ui::SpriteWindow *ui;
-    Zx4Image & sprite, stored_sprite;
+    Zx4Image stored_sprite;
     QPoint old_grid_pos;
     QMap<ActionEnum, QAction *> acts;
     QList<QColor> clrs;

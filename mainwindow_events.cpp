@@ -133,7 +133,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                                 QFileInfo fi(filename);
                                 if (fi.completeSuffix().compare("zx4.png", Qt::CaseInsensitive) == 0)
                                 {
-                                    openSprite(QImage(filename), filename);
+                                    openSprite(QList<QImage>() << QImage(filename), filename);
                                 }
                                 else
                                 if (fi.completeSuffix().compare("zx4", Qt::CaseInsensitive) == 0)

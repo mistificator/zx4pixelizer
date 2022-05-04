@@ -48,19 +48,13 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    QProgressDialog pd(0, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
-    pd.setWindowIcon(QPixmap(":/sonic.zx4.png"));
-    pd.setWindowTitle("ZX4 Pixelizer");
-    pd.setLabelText("Preparing palette indexes");
-    pd.setRange(0, 0);
-    pd.setCancelButton(0);
-    pd.show();
-    a.processEvents();
+    QProgressDialog * pd = MainWindow::createProgress(nullptr, "Preparing palette indexes");
 
     MainWindow w;
     w.show();
 
-    pd.hide();
+    pd->hide();
+    pd->deleteLater();
 
     return a.exec();
 }

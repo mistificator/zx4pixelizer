@@ -743,10 +743,7 @@ Zx4BaseObject::Zx4BaseObject(const Zx4Palette & _palettes): palettes(_palettes)
 
 Zx4BaseObject::~Zx4BaseObject()
 {
-    if (zx4_img)
-    {
-        delete zx4_img;
-    }
+    qDeleteAll(zx4_img);
 }
 
 void Zx4BaseObject::setFileName(QString _f)
@@ -759,50 +756,82 @@ QString Zx4BaseObject::fileName() const
     return file_name;
 }
 
-void Zx4BaseObject::setSourceImage(const QImage & i)
+void Zx4BaseObject::setSourceImage(const QList<QImage> & i)
 {
     src_imp_img = transformed_img = i;
-    if (!zx4_img)
+    while (zx4_img.count() < i.count())
     {
-        return;
+        zx4_img << new Zx4Image();
     }
-    zx4_img->resize(i.width(), i.height());
+    current_frame = 0;
+    for (int k = 0; k < i.count(); k++)
+    {
+        zx4_img[k]->resize(i[k].width(), i[k].height());
+    }
     if (widget)
     {
         widget->update();
     }
 }
 
-const QImage & Zx4BaseObject::sourceImage() const
+void Zx4BaseObject::setSourceImage(const QImage & i)
 {
-    return src_imp_img;
+    setSourceImage(QList<QImage>() << i);
 }
 
-QImage & Zx4BaseObject::transformedImage()
+void Zx4BaseObject::setSourceImage(QImageReader & i)
 {
-    return transformed_img;
+    QList<QImage> list;
+    QImage img;
+    if (i.jumpToImage(0))
+    while (!(img = i.read()).isNull())
+    {
+        list << img;
+    }
+    setSourceImage(list);
+}
+
+const QImage & Zx4BaseObject::sourceImage(int frame) const
+{
+    return src_imp_img[frame];
+}
+
+QImage & Zx4BaseObject::transformedImage(int frame)
+{
+    return transformed_img[frame];
+}
+
+void Zx4BaseObject::setImage(const QList<const Zx4Image *> & list)
+{
+    qDeleteAll(zx4_img);
+    zx4_img.clear();
+    current_frame = 0;
+    for (int k = 0; k < list.count(); k++)
+    {
+        zx4_img << list[k]->clone();
+    }
+    if (widget)
+    {
+        widget->update();
+    }
 }
 
 void Zx4BaseObject::setImage(const Zx4Image & i)
 {
-    if (zx4_img)
-    {
-        delete zx4_img;
-    }
-    zx4_img = i.clone();
-    if (widget)
-    {
-        widget->update();
-    }
+    setImage(QList<const Zx4Image *>() << & i);
 }
 
-const Zx4Image & Zx4BaseObject::image() const
+const Zx4Image & Zx4BaseObject::image(int frame) const
 {
-    if (!zx4_img)
+    if (zx4_img.isEmpty())
     {
-        zx4_img = new Zx4Image();
+        zx4_img << new Zx4Image();
     }
-    return * zx4_img;
+    if (frame >= zx4_img.count())
+    {
+        frame = 0;
+    }
+    return * zx4_img[frame];
 }
 
 void Zx4BaseObject::setCurrentColorIndex(int i)
@@ -838,4 +867,23 @@ void Zx4BaseObject::setCanvas(QWidget * w)
 QWidget * Zx4BaseObject::canvas() const
 {
     return widget;
+}
+
+void Zx4BaseObject::setCurrentFrame(int frame)
+{
+    if (frame < 0 || frame >= zx4_img.count())
+    {
+        frame = 0;
+    }
+    current_frame = frame;
+}
+
+int Zx4BaseObject::currentFrame() const
+{
+    return current_frame;
+}
+
+int Zx4BaseObject::framesCount() const
+{
+    return qMin(src_imp_img.count(), zx4_img.count());
 }

@@ -38,17 +38,21 @@ QSize SceneWindow::sizeHint() const
     return QSize(640, 640);
 }
 
-void SceneWindow::setImage(const Zx4Image & i)
+void SceneWindow::setImage(const QList<const Zx4Image *> & list)
 {
-    if (!dynamic_cast<const Zx4ImageWithAttributes *>(& i))
+    qDeleteAll(zx4_img);
+    zx4_img.clear();
+    if (list.isEmpty())
     {
         return;
     }
-    if (zx4_img)
+    if (!dynamic_cast<const Zx4ImageWithAttributes *>(list[0]))
     {
-        delete zx4_img;
+        return;
     }
-    scene = * dynamic_cast<const Zx4ImageWithAttributes *>(zx4_img = i.clone());
+
+    scene = * dynamic_cast<const Zx4ImageWithAttributes *>(list[0]->clone());
+    zx4_img << & scene;
     if (widget)
     {
         widget->update();
@@ -109,11 +113,11 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             case QEvent::MouseButtonDblClick:
             {
                 QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
-                double step = qMin(1.0 * grid_x / transformed_img.width(), 1.0 * grid_y / transformed_img.height());
+                double step = qMin(1.0 * grid_x / transformed_img[current_frame].width(), 1.0 * grid_y / transformed_img[current_frame].height());
 
                 QPoint pt = me->pos();
-                int x = qMin<int>(qMax<int>(pt.x() / step, 0), transformed_img.width() - 1);
-                int y = qMin<int>(qMax<int>(pt.y() / step, 0), transformed_img.height() - 1);
+                int x = qMin<int>(qMax<int>(pt.x() / step, 0), transformed_img[current_frame].width() - 1);
+                int y = qMin<int>(qMax<int>(pt.y() / step, 0), transformed_img[current_frame].height() - 1);
 
                 if (me->buttons().testFlag(Qt::LeftButton))
                 {
@@ -125,7 +129,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                             importChar(
                                 update_char,
                                 scene.attr[update_char.x()][update_char.y()] = scene.attr[selected_char.x()][selected_char.y()],
-                                transformed_img.convertToFormat(QImage::Format_Indexed8).copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
+                                transformed_img[current_frame].convertToFormat(QImage::Format_Indexed8).copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
                         }
                     }
                     else
@@ -155,7 +159,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             break;
             case QEvent::MouseButtonRelease:
             {
-                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
+//                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
                 update_char = QPoint(-1, -1);
                 QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
             }
@@ -169,8 +173,8 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
 
 void SceneWindow::drawGrid()
 {
-    scene.resize(transformed_img.width(), transformed_img.height());
-    rdr_img = QImage(transformed_img.width(), transformed_img.height(), QImage::Format_RGB32);
+    scene.resize(transformed_img[current_frame].width(), transformed_img[current_frame].height());
+    rdr_img = QImage(transformed_img[current_frame].width(), transformed_img[current_frame].height(), QImage::Format_RGB32);
     for (int y = 0; y < rdr_img.height(); y++)
     {
         for (int x = 0; x < rdr_img.width(); x++)
@@ -191,8 +195,8 @@ void SceneWindow::drawGrid()
     p.fillRect(ui->canvas->rect(), Qt::black);
     p.drawImage(0, 0, out);
 
-    double kx = 8.0 * grid_x / transformed_img.width();
-    double ky = 8.0 * grid_y / transformed_img.height();
+    double kx = 8.0 * grid_x / transformed_img[current_frame].width();
+    double ky = 8.0 * grid_y / transformed_img[current_frame].height();
     const auto list = QList<QPair<QPoint, QColor> >() << QPair<QPoint, QColor>(selected_char, QColor(0, 255, 0, 128)) << QPair<QPoint, QColor>(update_char, QColor(255, 0, 0, 128));
     const int pen_width = 3;
     for (auto i = list.begin(); i != list.end(); ++i)
@@ -423,11 +427,11 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
     for (int iy = 0; iy < 8; iy++)
     {
         int y = iy + char_pos.y() * 8;
-        if (y < transformed_img.height())
+        if (y < transformed_img[current_frame].height())
         for (int ix = 0; ix < 8; ix++)
         {
             int x = ix + char_pos.x() * 8;
-            if (x < transformed_img.width())
+            if (x < transformed_img[current_frame].width())
             {
                 int idx = small_quad.pixelIndex(ix, iy);
                 if (idx >= 0 && idx < 4)

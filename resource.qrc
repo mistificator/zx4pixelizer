@@ -11,5 +11,7 @@
         <file>resize_image.png</file>
         <file>about.png</file>
         <file>GIGAVIEW.TAP</file>
+        <file>animate.png</file>
+        <file>stop.png</file>
     </qresource>
 </RCC>

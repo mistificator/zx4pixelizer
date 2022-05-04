@@ -5,6 +5,7 @@
 #include <QColor>
 #include <QMap>
 #include <QImage>
+#include <QImageReader>
 
 enum ZxColorEnum {ZxBlack = 0, ZxBlue, ZxRed, ZxMagenta, ZxGreen, ZxCyan, ZxYellow, ZxWhite, ZxBrightBlack, ZxBrightBlue, ZxBrightRed, ZxBrightMagenta, ZxBrightGreen, ZxBrightCyan, ZxBrightYellow, ZxBrightWhite};
 
@@ -126,12 +127,15 @@ public:
     virtual void setFileName(QString);
     QString fileName() const;
 
-    virtual void setSourceImage(const QImage &);
-    const QImage & sourceImage() const;
-    QImage & transformedImage();
+    virtual void setSourceImage(const QList<QImage> &);
+    void setSourceImage(const QImage &);
+    void setSourceImage(QImageReader &);
+    const QImage & sourceImage(int frame = 0) const;
+    QImage & transformedImage(int frame = 0);
 
-    virtual void setImage(const Zx4Image &);
-    const Zx4Image & image() const;
+    virtual void setImage(const QList<const Zx4Image *> &);
+    void setImage(const Zx4Image &);
+    const Zx4Image & image(int frame = 0) const;
 
     virtual void setCurrentColorIndex(int);
     int currentColorIndex() const;
@@ -140,14 +144,19 @@ public:
     const Zx4ImportPars & importPars() const;
 
     QWidget * canvas() const;
+
+    void setCurrentFrame(int frame);
+    int currentFrame() const;
+    int framesCount() const;
 protected:
     void setCanvas(QWidget *);
     const Zx4Palette & palettes;
     QString file_name;
-    mutable Zx4Image * zx4_img = nullptr;
-    QImage src_imp_img, transformed_img;
+    mutable QList<Zx4Image *> zx4_img;
+    QList<QImage> src_imp_img, transformed_img;
     int grid_x = 64, grid_y = 64;
     int current_color_index = 0;
+    int current_frame = 0;
     Zx4ImportPars imp_pars;
     QWidget * widget = nullptr;
 };

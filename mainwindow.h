@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QLabel>
 #include <QMdiSubWindow>
+#include <QProgressDialog>
 #include "zx4pixelizer.h"
 #include "spritewindow.h"
 #include "scenewindow.h"
@@ -22,6 +23,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    static QProgressDialog * createProgress(QWidget * parent, QString text);
 private slots:
     void selectPalette(int p_idx);
 
@@ -71,8 +73,8 @@ private:
     QImage applyTransforms(const Zx4ImportPars & p, const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
 
     void importScene(QImage img, QString filename = QString());
-    void openSprite(QImage img, QString filename = QString());
-    void importSprite(QImage img, QString filename = QString(), QSize sz = QSize(), int p_idx = -1);
+    void openSprite(QList<QImage> img, QString filename = QString());
+    void importSprite(QList<QImage> img, QString filename = QString(), QSize sz = QSize(), int p_idx = -1);
     void importSpriteZx4Format(QString filename);
     void exportSpriteZx4Format(QString filename);
 
