@@ -84,7 +84,9 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     side_y = current_sprite->sourceImage().height() * side_y / current_sprite->sourceImage().width();
                 }
                 QPainter p(ui->sourceImage);
-                p.drawImage((step * current_sprite->canvasSize().width() - side_x) / 2, (step * current_sprite->canvasSize().height() - side_y) / 2, current_sprite->sourceImage().scaled(side_x, side_y));
+                p.drawImage((step * current_sprite->canvasSize().width() - side_x) / 2,
+                            (step * current_sprite->canvasSize().height() - side_y) / 2,
+                            current_sprite->sourceImage(current_sprite->currentFrame()).scaled(side_x, side_y));
             }
             else
             if (current_scene && !current_scene->sourceImage().isNull())
