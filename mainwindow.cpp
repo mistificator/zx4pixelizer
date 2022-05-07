@@ -13,6 +13,7 @@
 #include <QProgressDialog>
 #include <QMimeData>
 #include <QImageReader>
+#include <QImageWriter>
 
 #include <omp.h>
 
@@ -220,7 +221,7 @@ void MainWindow::on_actionImport_triggered()
     }
 
     QString filter;
-    QStringList filters = QStringList() << "Images (*.png *.jpg *.jpeg *.jfif *.gif *.bmp)" << "ZX4 Pixelizer sprites (*.zx4)";
+    QStringList filters = QStringList() << "Images (*.png *.apng *.jpg *.jpeg *.jfif *.gif *.bmp)" << "ZX4 Pixelizer sprites (*.zx4)";
     QString filename = QFileDialog::getOpenFileName(this, "Import file", path, filters.join(";;"), & filter);
     if (filename.isEmpty())
     {
@@ -306,13 +307,22 @@ void MainWindow::on_actionOpen_triggered()
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString filename = QFileDialog::getOpenFileName(this, "Open file", path, "ZX4 Pixelizer images (*.zx4.png)");
+    QString filename = QFileDialog::getOpenFileName(this, "Open file", path, "ZX4 Pixelizer images (*.zx4.png *.zx4.apng)");
     if (filename.isEmpty())
     {
         return;
     }
 
-    openSprite(QList<QImage>() << QImage(filename), filename);
+    QImageReader img_rdr(filename);
+
+    QImage src_imp_image;
+    QList<QImage> list;
+    while (!(src_imp_image = img_rdr.read()).isNull())
+    {
+        list << src_imp_image;
+    }
+
+    openSprite(list, filename);
 }
 
 void MainWindow::on_actionSave_as_triggered()
@@ -332,14 +342,18 @@ void MainWindow::on_actionSave_as_triggered()
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, "ZX4 Pixelizer images (*.zx4.png)");
+    QString ext = (current_sprite->framesCount() <= 1 ? ".zx4.png" : ".zx4.apng");
+    QString filter;
+    QStringList filters = QStringList() << "ZX4 Pixelizer images (*" + ext + ")";
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), & filter);
+
     if (filename.isEmpty())
     {
         return;
     }
     if (QFileInfo(filename).suffix().isEmpty())
     {
-        filename += ".zx4.png";
+        filename += ext;
     }
 
     current_sprite->setFileName(filename);
@@ -359,31 +373,38 @@ void MainWindow::on_actionSave_triggered()
         return;
     }
 
-    QImage img(current_sprite->canvasSize().width(), current_sprite->canvasSize().height(), QImage::Format_Indexed8);
     QVector<QRgb> color_table;
     foreach(QColor color, palettes.palettes[ui->palettes->currentRow()])
     {
         color_table << color.rgb();
     }
     color_table << 0; // alpha
-    img.setColorTable(color_table);
-    for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+
+    QImageWriter iw(current_sprite->fileName(), current_sprite->framesCount() <= 1 ? "png" : "apng");
+
+    for (int k = 0; k < current_sprite->framesCount(); k++)
     {
-        for (int x = 0; x < current_sprite->canvasSize().width(); x++)
+        QImage img(current_sprite->canvasSize().width(), current_sprite->canvasSize().height(), QImage::Format_Indexed8);
+        img.setColorTable(color_table);
+        for (int y = 0; y < current_sprite->canvasSize().height(); y++)
         {
-            if (!current_sprite->image().alpha_layer[x][y])
+            for (int x = 0; x < current_sprite->canvasSize().width(); x++)
             {
-                img.setPixel(x, y, 4);
-            }
-            else
-            {
-                img.setPixel(x, y, current_sprite->colorIndex(current_sprite->image(), x, y));
+                if (!current_sprite->image(k).alpha_layer[x][y])
+                {
+                    img.setPixel(x, y, 4);
+                }
+                else
+                {
+                    img.setPixel(x, y, current_sprite->colorIndex(current_sprite->image(k), x, y));
+                }
             }
         }
-    }
-    if (!img.save(current_sprite->fileName(), "png"))
-    {
-        QMessageBox::critical(this, "Error", "Error occured while file saving");
+        if (!iw.write(img))
+        {
+            QMessageBox::critical(this, "Error", "Error occured while file saving:\n" + iw.errorString());
+            break;
+        }
     }
 }
 
