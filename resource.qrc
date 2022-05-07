@@ -1,17 +1,17 @@
 <RCC>
     <qresource prefix="/">
-        <file>brush.png</file>
-        <file>eraser.png</file>
-        <file>pencil.png</file>
-        <file>color_placeholder.png</file>
-        <file>resize_canvas.png</file>
-        <file>move.png</file>
-        <file>sonic.zx4.png</file>
-        <file>invert.png</file>
-        <file>resize_image.png</file>
-        <file>about.png</file>
-        <file>GIGAVIEW.TAP</file>
-        <file>animate.png</file>
-        <file>stop.png</file>
+        <file alias="GIGAVIEW.TAP">tap/GIGAVIEW.TAP</file>
+        <file alias="brush.png">resources/brush.png</file>
+        <file alias="eraser.png">resources/eraser.png</file>
+        <file alias="pencil.png">resources/pencil.png</file>
+        <file alias="color_placeholder.png">resources/color_placeholder.png</file>
+        <file alias="resize_canvas.png">resources/resize_canvas.png</file>
+        <file alias="move.png">resources/move.png</file>
+        <file alias="sonic.zx4.png">resources/sonic.zx4.png</file>
+        <file alias="invert.png">resources/invert.png</file>
+        <file alias="resize_image.png">resources/resize_image.png</file>
+        <file alias="about.png">resources/about.png</file>
+        <file alias="animate.png">resources/animate.png</file>
+        <file alias="stop.png">resources/stop.png</file>
     </qresource>
 </RCC>

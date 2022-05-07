@@ -1,0 +1,3 @@
+[submodule "apng"]
+	path = apng
+	url = https://github.com/mistificator/qapng.git
