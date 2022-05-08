@@ -298,9 +298,10 @@ void MainWindow::on_actionExport_triggered()
 void MainWindow::on_actionOpen_triggered()
 {
     QString path;
-    if (current_sprite)
+    SpriteWindow * _current_sprite = current_sprite;
+    if (_current_sprite)
     {
-        path = QFileInfo(current_sprite->fileName()).absolutePath();
+        path = QFileInfo(_current_sprite->fileName()).absolutePath();
     }
     if (path.isEmpty())
     {
@@ -327,47 +328,51 @@ void MainWindow::on_actionOpen_triggered()
 
 void MainWindow::on_actionSave_as_triggered()
 {
-    if (!current_sprite)
+    SpriteWindow * _current_sprite = current_sprite;
+    if (!_current_sprite)
     {
         return;
     }
 
-    QString path = QFileInfo(current_sprite->fileName()).absolutePath();
+    QString path = QFileInfo(_current_sprite->fileName()).absolutePath();
     if (!path.isEmpty())
     {
-        path += "/" + QFileInfo(current_sprite->fileName()).baseName();
+        path += "/" + QFileInfo(_current_sprite->fileName()).baseName();
     }
     else
     {
         path = QDir::homePath() + "/Pictures/";
     }
 
-    QString ext = (current_sprite->framesCount() <= 1 ? ".zx4.png" : ".zx4.apng");
+    QString ext = (_current_sprite->framesCount() <= 1 ? "zx4.png" : "zx4.apng");
     QString filter;
-    QStringList filters = QStringList() << "ZX4 Pixelizer images (*" + ext + ")";
+    QStringList filters = QStringList() << "ZX4 Pixelizer images (*." + ext + ")";
     QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), & filter);
 
     if (filename.isEmpty())
     {
         return;
     }
-    if (QFileInfo(filename).suffix().isEmpty())
-    {
-        filename += ext;
-    }
 
-    current_sprite->setFileName(filename);
+    while (filename.endsWith(ext, Qt::CaseInsensitive))
+    {
+        filename = filename.remove(filename.count() - ext.length() - 1, ext.length() + 1);
+    }
+    filename += "." + ext;
+
+    _current_sprite->setFileName(filename);
     ui->actionSave->trigger();
 }
 
 void MainWindow::on_actionSave_triggered()
 {
-    if (!current_sprite)
+    SpriteWindow * _current_sprite = current_sprite;
+    if (!_current_sprite)
     {
         return;
     }
 
-    if (current_sprite->fileName().isEmpty())
+    if (_current_sprite->fileName().isEmpty())
     {
         ui->actionSave_as->trigger();
         return;
@@ -380,30 +385,30 @@ void MainWindow::on_actionSave_triggered()
     }
     color_table << 0; // alpha
 
-    QImageWriter iw(current_sprite->fileName(), current_sprite->framesCount() <= 1 ? "png" : "apng");
+    QImageWriter iw(_current_sprite->fileName(), _current_sprite->framesCount() <= 1 ? "png" : "apng");
 
-    for (int k = 0; k < current_sprite->framesCount(); k++)
+    for (int k = 0; k < _current_sprite->framesCount(); k++)
     {
-        QImage img(current_sprite->canvasSize().width(), current_sprite->canvasSize().height(), QImage::Format_Indexed8);
+        QImage img(_current_sprite->canvasSize().width(), _current_sprite->canvasSize().height(), QImage::Format_Indexed8);
         img.setColorTable(color_table);
-        for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+        for (int y = 0; y < _current_sprite->canvasSize().height(); y++)
         {
-            for (int x = 0; x < current_sprite->canvasSize().width(); x++)
+            for (int x = 0; x < _current_sprite->canvasSize().width(); x++)
             {
-                if (!current_sprite->image(k).alpha_layer[x][y])
+                if (!_current_sprite->image(k).alpha_layer[x][y])
                 {
                     img.setPixel(x, y, 4);
                 }
                 else
                 {
-                    img.setPixel(x, y, current_sprite->colorIndex(current_sprite->image(k), x, y));
+                    img.setPixel(x, y, _current_sprite->colorIndex(_current_sprite->image(k), x, y));
                 }
             }
         }
         if (!iw.write(img))
         {
             QMessageBox::critical(this, "Error", "Error occured while file saving:\n" + iw.errorString());
-            break;
+            return;
         }
     }
 }

@@ -154,13 +154,30 @@ void MainWindow::openSprite(QList<QImage> src_imp_image, QString filename)
         ui->actionNew->trigger();
     }
 
+    SpriteWindow * _current_sprite = current_sprite;
+
     selectPalette(p_idx);
 
-    current_sprite->setPaletteIndex(p_idx);
-    current_sprite->clearCanvas(QSize(qMin(src_imp_image[0].width(), 255), qMin(src_imp_image[0].height(), 192)));
-    current_sprite->setFileName(filename);
-    current_sprite->setSourceImage(src_imp_image);
-    current_sprite->drawImage(current_sprite->sourceImage());
+    QProgressDialog * pd = createProgress(this, "Opening sprite");
+    pd->setRange(0, src_imp_image.count() - 1);
+
+    _current_sprite->setPaletteIndex(p_idx);
+    _current_sprite->clearCanvas(QSize(qMin(src_imp_image[0].width(), 255), qMin(src_imp_image[0].height(), 192)));
+    _current_sprite->setFileName(filename);
+    _current_sprite->setSourceImage(src_imp_image);
+
+    for (int k = 0; k < _current_sprite->framesCount(); k++)
+    {
+        _current_sprite->setCurrentFrame(k);
+        _current_sprite->drawImage(_current_sprite->sourceImage(k));
+
+        pd->setValue(k);
+        qApp->processEvents();
+    }
+    _current_sprite->setCurrentFrame(0);
+
+    pd->hide();
+    pd->deleteLater();
 }
 
 //#define USE_RLE8
