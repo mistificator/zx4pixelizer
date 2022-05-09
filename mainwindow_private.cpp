@@ -175,6 +175,7 @@ void MainWindow::openSprite(QList<QImage> src_imp_image, QString filename)
         qApp->processEvents();
     }
     _current_sprite->setCurrentFrame(0);
+    _current_sprite->drawImage(_current_sprite->sourceImage(0));
 
     pd->hide();
     pd->deleteLater();

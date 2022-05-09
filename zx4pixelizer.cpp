@@ -98,9 +98,12 @@ Zx4ImageWithAttributes & Zx4ImageWithAttributes::copy(const Zx4ImageWithAttribut
     {
         for (int y = pt.y(), oy = 0; y < qMin(h, pt.y() + o.h); y++, oy++)
         {
-            color_layer0[x][y] = o.color_layer0[ox][oy];
-            color_layer1[x][y] = o.color_layer1[ox][oy];
-            alpha_layer[x][y] = qMax(alpha_layer[x][y], o.alpha_layer[ox][oy]);
+            if (o.alpha_layer[ox][oy])
+            {
+                color_layer0[x][y] = o.color_layer0[ox][oy];
+                color_layer1[x][y] = o.color_layer1[ox][oy];
+                alpha_layer[x][y] = o.alpha_layer[ox][oy];
+            }
         }
     }
     for (int x = pt.x() / 8, ox = 0; x < (qMin(w, pt.x() + o.w) + 7) / 8; x++, ox++)

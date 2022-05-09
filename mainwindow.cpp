@@ -283,13 +283,24 @@ void MainWindow::on_actionExport_triggered()
     else
     if (filters.indexOf(filter) == 1)
     {
-        Zx4ImageWithAttributes image(current_sprite->image(current_sprite->currentFrame()), current_sprite->paletteIndex());
         Zx4ImageWithAttributes scene(255, 192);
-        for (int x = 0; x < scene.width(); x += image.width())
+        for (int y = 0; y < scene.height(); y++)
         {
-            for (int y = 0; y < scene.height(); y += image.height())
+            for (int x = 0; x < scene.width(); x++)
             {
+                scene.alpha_layer[x][y] = Zx4Image::BitOn;
+                scene.color_layer0[x][y] = static_cast<Zx4Image::Bit>((y + x / 2) % 2);
+                scene.color_layer1[x][y] = static_cast<Zx4Image::Bit>((y + x) % 2);
+            }
+        }
+        int k = 0;
+        for (int y = 0; y < scene.height(); y += current_sprite->canvasSize().height())
+        {
+            for (int x = 0; x < scene.width(); x += current_sprite->canvasSize().width())
+            {
+                Zx4ImageWithAttributes image(current_sprite->image(k % current_sprite->framesCount()), current_sprite->paletteIndex());
                 scene.copy(image, QPoint(x, y));
+                k++;
             }
         }
         exportTape(scene, filename);
