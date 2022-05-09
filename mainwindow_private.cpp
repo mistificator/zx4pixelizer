@@ -237,12 +237,14 @@ void MainWindow::importSpriteZx4Format(QString filename)
 
     selectPalette(p_idx);
     current_sprite->setPaletteIndex(p_idx);
-    current_sprite->setCanvasSize(QSize(zx4[2], zx4[3]));
+    const int width = zx4[2], height = zx4[3];
+    current_sprite->setCanvasSize(QSize(width, height));
+    const int frames_count = zx4[4];
 
-    QByteArray zx4_data = zx4.mid(4);
+    QByteArray zx4_data = zx4.mid(5);
 #ifndef USE_RLE8
     QByteArray zx4_lz4 = zx4_data;
-    zx4.resize(3 * current_sprite->canvasSize().width() * current_sprite->canvasSize().height());
+    zx4.resize(3 * width * height);
 
     int isize = zx4_lz4.count();
     int osize = ::LZ4_uncompress_unknownOutputSize(zx4_lz4.constData(), zx4.data(), & isize, zx4.count());
@@ -255,37 +257,57 @@ void MainWindow::importSpriteZx4Format(QString filename)
 #else
     zx4 = Zx4Processing::inflateRle8(zx4_data);
 #endif
-    int alpha_bit = 0;
-    for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
+
+    QList<const Zx4Image *> list;
+    for (int k = 0; k < frames_count; k++)
     {
-        for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+        auto zx4_image = new Zx4Image();
+        zx4_image->resize(width, height);
+        list << zx4_image;
+    }
+    current_sprite->setImage(list);
+    qDeleteAll(list);
+    list.clear();
+
+    int alpha_bit = 0;
+    for (int k = 0; k < frames_count; k++)
+    {
+        Zx4Image & zx4_image = const_cast<Zx4Image &>(current_sprite->image(k));
+        for (int x = 0; x < (width + 7) / 8; x++)
         {
-            auto & alpha = const_cast<Zx4Image &>(current_sprite->image()).alpha_layer;
-            for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
+            for (int y = 0; y < height; y++)
             {
-                alpha[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4[alpha_bit / 8] >> (alpha_bit % 8)) & 0x01);
-                ++alpha_bit;
+                auto & alpha = zx4_image.alpha_layer;
+                for (int bit = 0; bit < 8 && (8 * x) + bit < width; bit++)
+                {
+                    alpha[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4[alpha_bit / 8] >> (alpha_bit % 8)) & 0x01);
+                    ++alpha_bit;
+                }
             }
         }
     }
     zx4 = zx4.mid((alpha_bit + 7) / 8);
     int color_bit = 0;
     QByteArray zx4_color0 = zx4.left(zx4.count() / 2), zx4_color1 = zx4.mid(zx4.count() / 2);
-    for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
+    for (int k = 0; k < frames_count; k++)
     {
-        for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+        Zx4Image & zx4_image = const_cast<Zx4Image &>(current_sprite->image(k));
+        for (int x = 0; x < (width + 7) / 8; x++)
         {
-            auto & alpha = const_cast<Zx4Image &>(current_sprite->image()).alpha_layer;
-            auto & layer0 = const_cast<Zx4Image &>(current_sprite->image()).color_layer0;
-            auto & layer1 = const_cast<Zx4Image &>(current_sprite->image()).color_layer1;
-            for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
+            for (int y = 0; y < height; y++)
             {
-                char alpha_value = alpha[(8 * x) + (7 - bit)][y];
-                if (alpha_value)
+                auto & alpha = zx4_image.alpha_layer;
+                auto & layer0 = zx4_image.color_layer0;
+                auto & layer1 = zx4_image.color_layer1;
+                for (int bit = 0; bit < 8 && (8 * x) + bit < width; bit++)
                 {
-                    layer0[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4_color0[color_bit / 8] >> (color_bit % 8)) & 0x01);
-                    layer1[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4_color1[color_bit / 8] >> (color_bit % 8)) & 0x01);
-                    ++color_bit;
+                    char alpha_value = alpha[(8 * x) + (7 - bit)][y];
+                    if (alpha_value)
+                    {
+                        layer0[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4_color0[color_bit / 8] >> (color_bit % 8)) & 0x01);
+                        layer1[(8 * x) + (7 - bit)][y] = static_cast<Zx4Image::Bit>((zx4_color1[color_bit / 8] >> (color_bit % 8)) & 0x01);
+                        ++color_bit;
+                    }
                 }
             }
         }
@@ -307,35 +329,45 @@ void MainWindow::exportSpriteZx4Format(QString filename)
     int p_idx = ui->palettes->currentRow();
     QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
 
-    const int layer_sz = ((current_sprite->canvasSize().width() * current_sprite->canvasSize().height() + 7) / 8);
+    const int width = current_sprite->canvasSize().width();
+    const int height = current_sprite->canvasSize().height();
+    const int layer_sz = ((width * height + 7) / 8) * current_sprite->framesCount();
     QByteArray zx4;
+    // 4-color palette
     zx4 += static_cast<char>(z[1] & 0x07) | ((z[0] & 0x0F) << 3);
     zx4 += static_cast<char>(z[3] & 0x07) | ((z[2] & 0x0F) << 3);
-    zx4 += static_cast<char>(current_sprite->canvasSize().width());
-    zx4 += static_cast<char>(current_sprite->canvasSize().height());
+    // width & height
+    zx4 += static_cast<char>(width);
+    zx4 += static_cast<char>(height);
+    // frames count
+    zx4 += static_cast<char>(current_sprite->framesCount());
 
     int alpha_bit = 0, color_bit = 0;
     QByteArray zx4_alpha(layer_sz, 0), zx4_color0(layer_sz, 0), zx4_color1(layer_sz, 0);
     QVector<Zx4Image::Bit> alpha_t;
-    for (int x = 0; x < (current_sprite->canvasSize().width() + 7) / 8; x++)
+    for (int k = 0; k < current_sprite->framesCount(); k++)
     {
-        for (int y = 0; y < current_sprite->canvasSize().height(); y++)
+        const auto & zx4_image = current_sprite->image(k);
+        for (int x = 0; x < (width + 7) / 8; x++)
         {
-            const auto & alpha = current_sprite->image().alpha_layer;
-            const auto & layer0 = current_sprite->image().color_layer0;
-            const auto & layer1 = current_sprite->image().color_layer1;
-            for (int bit = 0; bit < 8 && (8 * x) + bit < current_sprite->canvasSize().width(); bit++)
+            for (int y = 0; y < height; y++)
             {
-                auto alpha_value = alpha[(8 * x) + (7 - bit)][y];
-                alpha_t << alpha_value;
-                zx4_alpha[alpha_bit / 8] =         static_cast<char>(zx4_alpha[alpha_bit / 8] | (static_cast<int>(alpha_value) << (alpha_bit % 8)));
-                if (alpha_value)
+                const auto & alpha = zx4_image.alpha_layer;
+                const auto & layer0 = zx4_image.color_layer0;
+                const auto & layer1 = zx4_image.color_layer1;
+                for (int bit = 0; bit < 8 && (8 * x) + bit < width; bit++)
                 {
-                    zx4_color0[color_bit / 8] =    static_cast<char>(zx4_color0[color_bit / 8] | (static_cast<int>(layer0[(8 * x) + (7 - bit)][y]) << (color_bit % 8)));
-                    zx4_color1[color_bit / 8] =    static_cast<char>(zx4_color1[color_bit / 8] | (static_cast<int>(layer1[(8 * x) + (7 - bit)][y]) << (color_bit % 8)));
-                    ++color_bit;
+                    auto alpha_value = alpha[(8 * x) + (7 - bit)][y];
+                    alpha_t << alpha_value;
+                    zx4_alpha[alpha_bit / 8] =         static_cast<char>(zx4_alpha[alpha_bit / 8] | (static_cast<int>(alpha_value) << (alpha_bit % 8)));
+                    if (alpha_value)
+                    {
+                        zx4_color0[color_bit / 8] =    static_cast<char>(zx4_color0[color_bit / 8] | (static_cast<int>(layer0[(8 * x) + (7 - bit)][y]) << (color_bit % 8)));
+                        zx4_color1[color_bit / 8] =    static_cast<char>(zx4_color1[color_bit / 8] | (static_cast<int>(layer1[(8 * x) + (7 - bit)][y]) << (color_bit % 8)));
+                        ++color_bit;
+                    }
+                    ++alpha_bit;
                 }
-                ++alpha_bit;
             }
         }
     }
@@ -356,7 +388,8 @@ void MainWindow::exportSpriteZx4Format(QString filename)
 #endif
     zx4 += zx4_data;
 
-    qDebug() << "sprite deflated from" << 4 + 3 * layer_sz << "to" << zx4.count() << ", total ratio" << 100.0 * zx4.count() / (3 * layer_sz + 4) << "%";
+    const int src_size = 5 + 3 * layer_sz;
+    qDebug() << "sprite deflated from" << src_size << "to" << zx4.count() << ", total ratio" << 100.0 * zx4.count() / src_size << "%";
     QFile f(filename);
     f.open(QFile::WriteOnly);
     if (f.isOpen())

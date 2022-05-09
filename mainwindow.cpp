@@ -177,6 +177,7 @@ void MainWindow::on_actionNew_triggered()
     QMdiSubWindow * msw = ui->mdiArea->addSubWindow(current_sprite);
     msw->show();
 
+    current_sprite->image(0); // init 1 frame
     current_sprite->clearCanvas(QSize(64, 64));
     connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->preview, SLOT(update()));
     connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->sourceImage, SLOT(update()));
@@ -282,7 +283,7 @@ void MainWindow::on_actionExport_triggered()
     else
     if (filters.indexOf(filter) == 1)
     {
-        Zx4ImageWithAttributes image(current_sprite->image(), current_sprite->paletteIndex());
+        Zx4ImageWithAttributes image(current_sprite->image(current_sprite->currentFrame()), current_sprite->paletteIndex());
         Zx4ImageWithAttributes scene(255, 192);
         for (int x = 0; x < scene.width(); x += image.width())
         {
