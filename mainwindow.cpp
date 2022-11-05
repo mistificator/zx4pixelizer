@@ -479,6 +479,11 @@ void MainWindow::on_actionExport_scene_triggered()
         return;
     }
 
+    const Zx4ImageWithAttributes * scene_with_attr = dynamic_cast<const Zx4ImageWithAttributes *>(& current_scene->image());
+    if (!scene_with_attr)
+    {
+        QMessageBox::critical(this, "Error", "Error occured while exporting scene \"" + QFileInfo(filename).fileName() + "\"");
+    }
     if (filters.indexOf(filter) == 2)
     {        
         if (QFileInfo(filename).suffix().compare("png", Qt::CaseInsensitive) != 0)
@@ -490,12 +495,12 @@ void MainWindow::on_actionExport_scene_triggered()
     else
     if (filters.indexOf(filter) == 1)
     {
-        exportTape(* dynamic_cast<const Zx4ImageWithAttributes *>(& current_scene->image()), filename);
+        exportTape(* scene_with_attr, filename);
     }
     else
     if (filters.indexOf(filter) == 0)
     {
-        exportScreens(* dynamic_cast<const Zx4ImageWithAttributes *>(& current_scene->image()), filename);
+        exportScreens(* scene_with_attr, filename);
     }
 }
 

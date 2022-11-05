@@ -120,7 +120,7 @@ void MainWindow::importScene(QImage img, QString filename)
     dst_img.fill(0);
     QPainter p(& dst_img);
     p.drawImage((dst_img.width() - img.width()) / 2, (dst_img.height() - img.height()) / 2, img);
-    current_scene->setSourceImage(dst_img);
+    current_scene->Zx4BaseObject::setSourceImage(dst_img);
 
     reimport(current_scene);
 }

@@ -9,6 +9,8 @@
 SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
     QWidget(parent), Zx4BaseObject(palettes), ui(new Ui::SceneWindow), scene(* new Zx4ImageWithAttributes())
 {
+    zx4_img << & scene;
+
     ui->setupUi(this);
     setCanvas(ui->canvas);
 
@@ -18,7 +20,6 @@ SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
 
 SceneWindow::~SceneWindow()
 {
-    delete & scene;
     delete ui;
 }
 
@@ -38,21 +39,36 @@ QSize SceneWindow::sizeHint() const
     return QSize(640, 640);
 }
 
-void SceneWindow::setImage(const QList<const Zx4Image *> & list)
+void SceneWindow::setSourceImage(const QList<QImage> & i)
 {
-    qDeleteAll(zx4_img);
-    zx4_img.clear();
-    if (list.isEmpty())
+    src_imp_img = transformed_img = QList<QImage>();
+    current_frame = 0;
+
+    scene = Zx4ImageWithAttributes(); // reset scene
+    if (!i.isEmpty())
     {
-        return;
-    }
-    if (!dynamic_cast<const Zx4ImageWithAttributes *>(list[0]))
-    {
-        return;
+        scene.resize(i[0].width(), i[0].height());
+        src_imp_img = transformed_img = (QList<QImage>() << i[0]);
     }
 
-    scene = * dynamic_cast<const Zx4ImageWithAttributes *>(list[0]->clone());
-    zx4_img << & scene;
+    if (widget)
+    {
+        widget->update();
+    }
+}
+
+void SceneWindow::setImage(const QList<const Zx4Image *> & list)
+{
+    scene = Zx4ImageWithAttributes(); // reset scene
+
+    if (!list.isEmpty())
+    {
+        if (dynamic_cast<const Zx4ImageWithAttributes *>(list[0]))
+        {
+            scene = * dynamic_cast<const Zx4ImageWithAttributes *>(list[0]);
+        }
+    }
+
     if (widget)
     {
         widget->update();

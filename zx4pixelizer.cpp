@@ -766,6 +766,10 @@ void Zx4BaseObject::setSourceImage(const QList<QImage> & i)
     {
         zx4_img << new Zx4Image();
     }
+    while (zx4_img.count() > i.count())
+    {
+        delete zx4_img.takeLast();
+    }
     current_frame = 0;
     for (int k = 0; k < i.count(); k++)
     {

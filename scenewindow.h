@@ -21,6 +21,8 @@ public:
     virtual void setFileName(QString);
     const QImage & renderedImage() const;
 
+    virtual void setSourceImage(const QList<QImage> &);
+
     virtual void setImage(const QList<const Zx4Image *> &);
     virtual QSize sizeHint() const;
 
