@@ -87,7 +87,28 @@ QImage MainWindow::applyTransforms(const Zx4ImportPars & p, const QImage & src, 
     mx.scale(p.x_scale * mirror, p.y_scale);
 
     pmx.setTransform(mx);
-    pmx.drawImage(QPoint(mirror > 0 ? 0 : -img.width(), 0), src);
+
+    QImage color_shifted = src;
+    if (p.hue_shift != 0 || p.saturation_shift != 0 || p.lightness_shift != 0)
+    {
+        for (int y = 0; y < color_shifted.height(); ++y)
+        {
+            for (int x = 0; x < color_shifted.width(); ++x)
+            {
+                QColor c = color_shifted.pixelColor(x, y).toHsl();
+                qreal h, s, l;
+                c.getHslF(& h, & s, & l);
+                h += p.hue_shift;
+                while (h < 0) h += 1.0;
+                while (h > 1.0) h -= 1.0;
+                s = qMax(0.0, qMin(1.0, s + p.saturation_shift));
+                l = qMax(0.0, qMin(1.0, l + p.lightness_shift));
+                c.setHslF(h, s, l);
+                color_shifted.setPixelColor(x, y, c);
+            }
+        }
+    }
+    pmx.drawImage(QPoint(mirror > 0 ? 0 : -img.width(), 0), color_shifted);
 
     return img;
 }
@@ -508,6 +529,9 @@ void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
     p.x_shift = ui->xShift->value();
     p.y_scale = ui->yScale->value();
     p.y_shift = ui->yShift->value();
+    p.hue_shift = ui->hueShift->value();
+    p.saturation_shift = ui->saturationShift->value();
+    p.lightness_shift = ui->lightnessShift->value();
     b.setImportPars(p);
 }
 
@@ -527,6 +551,9 @@ void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
     ui->xShift->setValue(p.x_shift);
     ui->yScale->setValue(p.y_scale);
     ui->yShift->setValue(p.y_shift);
+    ui->hueShift->setValue(p.hue_shift);
+    ui->saturationShift->setValue(p.saturation_shift);
+    ui->lightnessShift->setValue(p.lightness_shift);
 }
 
 void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
