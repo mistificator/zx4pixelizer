@@ -483,13 +483,6 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="3" colspan="2">
-      <widget class="QCheckBox" name="multipass">
-       <property name="text">
-        <string>Multipass</string>
-       </property>
-      </widget>
-     </item>
      <item row="3" column="0" colspan="2">
       <widget class="QLabel" name="label_4">
        <property name="text">
@@ -623,6 +616,40 @@
        <property name="singleStep">
         <double>0.100000000000000</double>
        </property>
+      </widget>
+     </item>
+     <item row="2" column="3" colspan="2">
+      <widget class="QComboBox" name="multipass">
+       <item>
+        <property name="text">
+         <string>Single pass</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Multipass (scan 5x5 step 2)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Multipass (scan 7x7 step 3)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Multipass (scan 3x3 step 1)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Multipass (scan 5x5 step 1)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Multipass (scan 7x7 step 1)</string>
+        </property>
+       </item>
       </widget>
      </item>
     </layout>

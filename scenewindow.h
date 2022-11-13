@@ -51,7 +51,7 @@ private:
 
     QImage rdr_img;
     QPoint selected_char, update_char;
-    bool checkPalette(QImage small_quad, int p_idx) const;
+    bool checkPalette(QImage small_quad, int p_idx, int dist_colors_criteria = 1) const;
 };
 
 #endif // SCENEWINDOW_H

@@ -520,7 +520,7 @@ void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
     p.autopalette = ui->wizardPaletteBox->currentIndex() == 0;
     p.color_pick = static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
     p.horizontal_mirror = ui->mirrored->isChecked();
-    p.multipass = ui->multipass->isChecked();
+    p.multipass = static_cast<Zx4ImportPars::PassMethod>(ui->multipass->currentIndex());
     p.palette_index_max = ui->paletteNumberBox->maximum();
     p.palette_index = ui->paletteNumberBox->value();
     p.rotate = ui->rotate->value();
@@ -542,7 +542,7 @@ void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
     ui->wizardPaletteBox->setCurrentIndex(p.autopalette ? 0 : 1);
     ui->colorPickBox->setCurrentIndex(p.color_pick);
     ui->mirrored->setChecked(p.horizontal_mirror);
-    ui->multipass->setChecked(p.multipass);
+    ui->multipass->setCurrentIndex(p.multipass);
     ui->paletteNumberBox->setMaximum(p.palette_index_max);
     ui->paletteNumberBox->setValue(p.palette_index);
     ui->rotate->setValue(p.rotate);
@@ -633,9 +633,35 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     QPainter p(& out);
     int createProgress = 0;
     const auto sel_method = selectPaletteMethod();
-    const bool multipass = ui->multipass->isChecked();
-    const int multipass_offset = 2;
-    const int multipass_step = 2;
+    int multipass_offset = 2;
+    int multipass_step = 2;
+    const Zx4ImportPars::PassMethod multipass = static_cast<Zx4ImportPars::PassMethod>(ui->multipass->currentIndex());
+    switch (multipass)
+    {
+    case Zx4ImportPars::Multipass3x3x1:
+        multipass_offset = 1;
+        multipass_step = 1;
+        break;
+    case Zx4ImportPars::Multipass5x5x1:
+        multipass_offset = 2;
+        multipass_step = 1;
+        break;
+    case Zx4ImportPars::Multipass5x5x2:
+        multipass_offset = 2;
+        multipass_step = 2;
+        break;
+    case Zx4ImportPars::Multipass7x7x1:
+        multipass_offset = 3;
+        multipass_step = 1;
+        break;
+    case Zx4ImportPars::Multipass7x7x3:
+        multipass_offset = 3;
+        multipass_step = 3;
+        break;
+    default:
+        break;
+    }
+
     const int width = img8.width();
     const int height = img8.height();
 
@@ -650,7 +676,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
             int p_idx = -1;
 
             QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-            if (!multipass)
+            if (multipass == Zx4ImportPars::SinglePass)
             {
                 p_idx = _current_scene->selectPalette(small_quad, sel_method);
             }
@@ -683,7 +709,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
 
             _current_scene->importChar(QPoint(x / 8, y / 8), p_idx, small_quad);
 
-            if (multipass)
+            if (multipass != Zx4ImportPars::SinglePass)
             {
                 QMetaObject::invokeMethod(pd, "setValue", Qt::QueuedConnection, Q_ARG(int, createProgress));
                 QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);
@@ -691,7 +717,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
                     qApp->processEvents();
             }
         }
-        if (!multipass)
+        if (multipass == Zx4ImportPars::SinglePass)
         {
             QMetaObject::invokeMethod(pd, "setValue", Qt::QueuedConnection, Q_ARG(int, createProgress));
             QMetaObject::invokeMethod(_current_scene->canvas(), "update", Qt::QueuedConnection);

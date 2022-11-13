@@ -253,12 +253,15 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
         }
     }
 
+    int dist_colors_criteria = 1;
+
     switch (method)
     {
     case Zx4Palette::SelectPaletteCIE76:
     case Zx4Palette::SelectPaletteCIE94:
     case Zx4Palette::SelectPaletteCIEDE2000:
     {
+//        dist_colors_criteria = qMax(small_dist.count() - 1, 1);
         QMap<double, int> sorted_p_idx;
         do
         {
@@ -308,6 +311,22 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
         {
             p_idx = * sorted_p_idx.begin();
         }
+#if 1
+        int new_p_idx = p_idx;
+        while (!sorted_p_idx.isEmpty())
+        {
+            if (!checkPalette(small_quad, new_p_idx, dist_colors_criteria))
+            {
+                new_p_idx = * sorted_p_idx.begin();
+                sorted_p_idx.erase(sorted_p_idx.begin());
+            }
+            else
+            {
+                p_idx = new_p_idx;
+                break;
+            }
+        }
+#endif
         break;
     }
     default:
@@ -344,7 +363,7 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
                             if (Zx4Processing::alikeColors(i.key().first, colors.first(), hue_precision, light_satur_precision, ls * light_satur_precision) && Zx4Processing::alikeColors(i.key().second, colors.last(), hue_precision, light_satur_precision, ls * light_satur_precision))
                             {
                                 int _p_idx = i.value().at(i.value().count() * t);
-                                if (checkPalette(small_quad, _p_idx))
+                                if (checkPalette(small_quad, _p_idx, dist_colors_criteria))
                                 {
                                     p_idx = _p_idx;
                                     break;
@@ -364,7 +383,7 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
                                     if (Zx4Processing::alikeColors(k.key(), colors.at(2)))
                                     {
                                         int _p_idx = k.value().at(k.value().count() * t);
-                                        if (checkPalette(small_quad, _p_idx))
+                                        if (checkPalette(small_quad, _p_idx, dist_colors_criteria))
                                         {
                                             p_idx = _p_idx;
                                             break;
@@ -386,7 +405,7 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
                                     if (Zx4Processing::alikeColors(k.key().first, colors.at(2), hue_precision) && Zx4Processing::alikeColors(k.key().second, colors.at(3), hue_precision))
                                     {
                                         int _p_idx = k.value().at(k.value().count() * t);
-                                        if (checkPalette(small_quad, _p_idx))
+                                        if (checkPalette(small_quad, _p_idx, dist_colors_criteria))
                                         {
                                             p_idx = _p_idx;
                                             break;
@@ -413,7 +432,7 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
     return p_idx;
 }
 
-bool SceneWindow::checkPalette(QImage small_quad, int p_idx) const
+bool SceneWindow::checkPalette(QImage small_quad, int p_idx, int dist_colors_criteria) const
 {
     if (p_idx == -1)
     {
@@ -425,7 +444,7 @@ bool SceneWindow::checkPalette(QImage small_quad, int p_idx) const
         v << c.rgb();
     }
     auto check_dist = Zx4Processing::colorDistribution(small_quad.convertToFormat(QImage::Format_RGB32).convertToFormat(QImage::Format_Indexed8, v).convertToFormat(QImage::Format_RGB32), false);
-    return check_dist.count() > 1;
+    return check_dist.count() > dist_colors_criteria;
 }
 
 void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)

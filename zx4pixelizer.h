@@ -107,7 +107,8 @@ struct Zx4ImportPars
     int palette_index = -1;
     int palette_index_max = -1;
 
-    bool multipass = false;
+    enum PassMethod {SinglePass = 0, Multipass5x5x2, Multipass7x7x3, Multipass3x3x1, Multipass5x5x1, Multipass7x7x1};
+    PassMethod multipass = SinglePass;
     Zx4Palette::SelectPaletteMethod color_pick = Zx4Palette::SelectPaletteHSL;
 
     bool horizontal_mirror = false;
