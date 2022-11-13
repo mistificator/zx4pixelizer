@@ -118,6 +118,11 @@ struct Zx4ImportPars
     double x_scale = 1, y_scale = 1;
     double rotate = 0;
     double hue_shift = 0, saturation_shift = 0, lightness_shift = 0;
+
+    QByteArray serialize() const;
+    bool deserialize(const QByteArray & ba);
+
+    static QString defaultPresetPath();
 };
 
 class Zx4BaseObject

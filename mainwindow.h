@@ -56,6 +56,10 @@ private slots:
     void on_mdiArea_subWindowActivated(QMdiSubWindow *msw);
     void on_paletteIndex_currentIndexChanged(int index);
 
+    void on_presetBox_currentIndexChanged(int);
+    void on_addPreset_clicked();
+    void on_removePreset_clicked();
+
 protected:
     bool eventFilter(QObject *, QEvent *);
     void showEvent(QShowEvent *);
@@ -81,6 +85,8 @@ private:
     void exportScreens(const Zx4ImageWithAttributes & image, QString filename_scr0, QString filename_scr1 = QString());
     void exportTape(const Zx4ImageWithAttributes & image, QString filename);
 
+    void importParsFromWidget(Zx4ImportPars &);
+    void importParsToWidget(const Zx4ImportPars &);
     void importParsFromWidgetToObject(Zx4BaseObject &);
     void importParsFromObjectToWidget(const Zx4BaseObject &);
     void reimport(SpriteWindow *, int p_idx = -1);

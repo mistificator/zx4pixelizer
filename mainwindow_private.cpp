@@ -513,9 +513,8 @@ void MainWindow::exportTape(const Zx4ImageWithAttributes & image, QString filena
     f.close();
 }
 
-void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
+void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 {
-    Zx4ImportPars p = b.importPars();
     p.alpha = ui->alphaBox->isChecked();
     p.autopalette = ui->wizardPaletteBox->currentIndex() == 0;
     p.color_pick = static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
@@ -532,12 +531,10 @@ void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
     p.hue_shift = ui->hueShift->value();
     p.saturation_shift = ui->saturationShift->value();
     p.lightness_shift = ui->lightnessShift->value();
-    b.setImportPars(p);
 }
 
-void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
+void MainWindow::importParsToWidget(const Zx4ImportPars & p)
 {
-    Zx4ImportPars p = b.importPars();
     ui->alphaBox->setChecked(p.alpha);
     ui->wizardPaletteBox->setCurrentIndex(p.autopalette ? 0 : 1);
     ui->colorPickBox->setCurrentIndex(p.color_pick);
@@ -554,6 +551,19 @@ void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
     ui->hueShift->setValue(p.hue_shift);
     ui->saturationShift->setValue(p.saturation_shift);
     ui->lightnessShift->setValue(p.lightness_shift);
+}
+
+void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
+{
+    Zx4ImportPars p = b.importPars();
+    importParsFromWidget(p);
+    b.setImportPars(p);
+}
+
+void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
+{
+    Zx4ImportPars p = b.importPars();
+    importParsToWidget(p);
 }
 
 void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)

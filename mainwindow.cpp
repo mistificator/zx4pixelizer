@@ -52,6 +52,13 @@ MainWindow::MainWindow(QWidget *parent)
     createPalettes();
 
     QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, palettes.grayscale_index));
+
+    foreach(QString preset_name, QDir(Zx4ImportPars::defaultPresetPath()).entryList(QDir::Files))
+    {
+        ui->presetBox->addItem(preset_name);
+    }
+    ui->presetBox->setCurrentIndex(-1);
+    ui->presetBox->setCurrentText(QString());
 }
 
 MainWindow::~MainWindow()
@@ -336,6 +343,8 @@ void MainWindow::on_actionOpen_triggered()
     }
 
     openSprite(list, filename);
+    ui->presetBox->setCurrentIndex(-1);
+    ui->presetBox->setCurrentText(QString());
 }
 
 void MainWindow::on_actionSave_as_triggered()
@@ -444,6 +453,8 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
     importScene(QImage(filename), filename);
+    ui->presetBox->setCurrentIndex(-1);
+    ui->presetBox->setCurrentText(QString());
 }
 
 void MainWindow::on_actionExport_scene_triggered()
@@ -599,3 +610,53 @@ void MainWindow::on_paletteIndex_currentIndexChanged(int index)
 {
     selectPalette(index);
 }
+
+void MainWindow::on_presetBox_currentIndexChanged(int)
+{
+    if (ui->presetBox->currentText().isEmpty())
+    {
+        return;
+    }
+    Zx4ImportPars p;
+    QFile file(Zx4ImportPars::defaultPresetPath() + "/" + ui->presetBox->currentText() + ".");
+    file.open(QFile::ReadOnly);
+    if (!p.deserialize(file.readAll()))
+    {
+        return;
+    }
+    file.close();
+    importParsToWidget(p);
+}
+
+void MainWindow::on_addPreset_clicked()
+{
+    if (ui->presetBox->currentText().isEmpty())
+    {
+        return;
+    }
+    Zx4ImportPars p;
+    importParsFromWidget(p);
+    QDir().mkpath(Zx4ImportPars::defaultPresetPath());
+    QFile file(Zx4ImportPars::defaultPresetPath() + "/" + ui->presetBox->currentText() + ".");
+    file.open(QFile::WriteOnly);
+    if (file.write(p.serialize()) > 0)
+    {
+        ui->presetBox->addItem(ui->presetBox->currentText());
+    }
+    file.close();
+}
+
+
+void MainWindow::on_removePreset_clicked()
+{
+    if (ui->presetBox->currentText().isEmpty())
+    {
+        return;
+    }
+    QFile::remove(Zx4ImportPars::defaultPresetPath() + "/" + ui->presetBox->currentText() + ".");
+    const int idx = ui->presetBox->currentIndex();
+    ui->presetBox->setCurrentText(QString());
+    ui->presetBox->setCurrentIndex(-1);
+    ui->presetBox->removeItem(idx);
+}
+

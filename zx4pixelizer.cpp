@@ -1,6 +1,7 @@
 #include <QSet>
 #include <QApplication>
 #include <QWidget>
+#include <QDir>
 #include "zx4pixelizer.h"
 #include "color_conversions.h"
 
@@ -115,6 +116,31 @@ Zx4ImageWithAttributes & Zx4ImageWithAttributes::copy(const Zx4ImageWithAttribut
     }
     return * this;
 }
+
+
+
+QByteArray Zx4ImportPars::serialize() const
+{
+    QByteArray ba(sizeof(Zx4ImportPars), '\0');
+    ::memcpy(ba.data(), this, ba.count());
+    return ba;
+}
+
+bool Zx4ImportPars::deserialize(const QByteArray & ba)
+{
+    if (ba.count() != sizeof(Zx4ImportPars))
+    {
+        return false;
+    }
+    ::memcpy(this, ba.constData(), ba.count());
+    return true;
+}
+
+QString Zx4ImportPars::defaultPresetPath()
+{
+    return QDir().toNativeSeparators(QDir::homePath() + "/." + qApp->applicationName() + "/presets/");
+}
+
 
 
 
