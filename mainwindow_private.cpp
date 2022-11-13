@@ -664,6 +664,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
 
     const int width = img8.width();
     const int height = img8.height();
+    const int color_variations = 1; // optional 2
 
     #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, height / 8))
     for (int y = 0; y < height; y += 8)
@@ -678,7 +679,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
             QImage small_quad = img8.copy(QRect(x, y, 8, 8));
             if (multipass == Zx4ImportPars::SinglePass)
             {
-                p_idx = _current_scene->selectPalette(small_quad, sel_method);
+                p_idx = _current_scene->selectPalette(small_quad, sel_method, color_variations);
             }
             else
             {
@@ -687,9 +688,13 @@ void MainWindow::reimport(SceneWindow * _current_scene)
                 {
                     for (int x1 = -multipass_offset; x1 <= multipass_offset; x1 += multipass_step)
                     {
-                        map[_current_scene->selectPalette(
-                            img8.copy(QRect(qMax(x + x1, 0), qMax(y + y1, 0), qMin(8, width - (x + x1)), qMin(8, height - (y + y1)))),
-                            sel_method)]++;
+                        int new_p_idx = _current_scene->selectPalette(
+                                    img8.copy(QRect(qMax(x + x1, 0), qMax(y + y1, 0), qMin(8, width - (x + x1)), qMin(8, height - (y + y1)))),
+                                    sel_method, color_variations);
+                        if (new_p_idx != -1)
+                        {
+                            map[new_p_idx]++;
+                        }
                     }
                 }
                 int map_max = 0;

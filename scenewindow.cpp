@@ -227,7 +227,7 @@ void SceneWindow::drawGrid()
     QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
 }
 
-int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMethod method) const
+int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMethod method, int dist_colors_criteria) const
 {
     auto small_dist = Zx4Processing::colorDistribution(small_quad, false);
 
@@ -253,15 +253,12 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
         }
     }
 
-    int dist_colors_criteria = 1;
-
     switch (method)
     {
     case Zx4Palette::SelectPaletteCIE76:
     case Zx4Palette::SelectPaletteCIE94:
     case Zx4Palette::SelectPaletteCIEDE2000:
     {
-//        dist_colors_criteria = qMax(small_dist.count() - 1, 1);
         QMap<double, int> sorted_p_idx;
         do
         {

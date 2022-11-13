@@ -33,7 +33,7 @@ public:
     void setAttr(QPoint, int p_idx);
     void setAttr(int p_idx);
 
-    int selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMethod method = Zx4Palette::DefaultSelectPaletteMethod) const;
+    int selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMethod method = Zx4Palette::DefaultSelectPaletteMethod, int dist_colors_criteria = 1) const;
     void importChar(QPoint, int p_idx, QImage small_quad);
 
     void setPixel(QPoint, int color_index);

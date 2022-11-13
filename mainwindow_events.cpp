@@ -92,7 +92,8 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
             if (current_scene && !current_scene->sourceImage().isNull())
             {
                 QPainter p(ui->sourceImage);
-                p.drawImage(0, 0, current_scene->sourceImage().scaled(ui->sourceImage->size(), Qt::KeepAspectRatio));
+//                p.drawImage(0, 0, current_scene->sourceImage().scaled(ui->sourceImage->size(), Qt::KeepAspectRatio));
+                p.drawImage(0, 0, applyTransforms(current_scene->importPars(), current_scene->sourceImage()).scaled(ui->sourceImage->size(), Qt::KeepAspectRatio));
             }
             break;
             default:
