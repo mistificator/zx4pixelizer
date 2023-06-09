@@ -53,12 +53,13 @@ MainWindow::MainWindow(QWidget *parent)
 
     QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, palettes.grayscale_index));
 
+    QFile::copy(":/Default", Zx4ImportPars::defaultPresetPath() + "Default");
+    QFile::copy(":/Dark Sharp HQ", Zx4ImportPars::defaultPresetPath() + "Dark Sharp HQ");
     foreach(QString preset_name, QDir(Zx4ImportPars::defaultPresetPath()).entryList(QDir::Files))
     {
         ui->presetBox->addItem(preset_name);
     }
-    ui->presetBox->setCurrentIndex(-1);
-    ui->presetBox->setCurrentText(QString());
+    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
 }
 
 MainWindow::~MainWindow()
@@ -343,8 +344,7 @@ void MainWindow::on_actionOpen_triggered()
     }
 
     openSprite(list, filename);
-    ui->presetBox->setCurrentIndex(-1);
-    ui->presetBox->setCurrentText(QString());
+    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
 }
 
 void MainWindow::on_actionSave_as_triggered()
@@ -453,8 +453,7 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
     importScene(QImage(filename), filename);
-    ui->presetBox->setCurrentIndex(-1);
-    ui->presetBox->setCurrentText(QString());
+    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
 }
 
 void MainWindow::on_actionExport_scene_triggered()
@@ -655,8 +654,7 @@ void MainWindow::on_removePreset_clicked()
     }
     QFile::remove(Zx4ImportPars::defaultPresetPath() + "/" + ui->presetBox->currentText() + ".");
     const int idx = ui->presetBox->currentIndex();
-    ui->presetBox->setCurrentText(QString());
-    ui->presetBox->setCurrentIndex(-1);
+    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
     ui->presetBox->removeItem(idx);
 }
 
