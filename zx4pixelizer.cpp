@@ -767,12 +767,12 @@ QByteArray Zx4Processing::inflateRle8(QByteArray ba)
 
 Zx4BaseObject::Zx4BaseObject(const Zx4Palette & _palettes): palettes(_palettes)
 {
-
+    clearHistory();
 }
 
 Zx4BaseObject::~Zx4BaseObject()
 {
-    qDeleteAll(zx4_img);
+    zx4_img.clear();
 }
 
 void Zx4BaseObject::setFileName(QString _f)
@@ -790,11 +790,11 @@ void Zx4BaseObject::setSourceImage(const QList<QImage> & i)
     src_imp_img = transformed_img = i;
     while (zx4_img.count() < i.count())
     {
-        zx4_img << new Zx4Image();
+        zx4_img << QSharedPointer<Zx4Image>(new Zx4Image());
     }
     while (zx4_img.count() > i.count())
     {
-        delete zx4_img.takeLast();
+        zx4_img.removeLast();
     }
     current_frame = 0;
     for (int k = 0; k < i.count(); k++)
@@ -826,7 +826,8 @@ void Zx4BaseObject::setSourceImage(QImageReader & i)
 
 const QImage & Zx4BaseObject::sourceImage(int frame) const
 {
-    return src_imp_img[frame];
+    static QImage placeholder_img;
+    return frame >= 0 && frame < src_imp_img.count() ? src_imp_img[frame] : placeholder_img;
 }
 
 QImage & Zx4BaseObject::transformedImage(int frame)
@@ -836,12 +837,11 @@ QImage & Zx4BaseObject::transformedImage(int frame)
 
 void Zx4BaseObject::setImage(const QList<const Zx4Image *> & list)
 {
-    qDeleteAll(zx4_img);
     zx4_img.clear();
     current_frame = 0;
     for (int k = 0; k < list.count(); k++)
     {
-        zx4_img << list[k]->clone();
+        zx4_img << QSharedPointer<Zx4Image>(list[k]->clone());
     }
     if (widget)
     {
@@ -858,7 +858,7 @@ const Zx4Image & Zx4BaseObject::image(int frame) const
 {
     if (zx4_img.isEmpty())
     {
-        zx4_img << new Zx4Image();
+        zx4_img << QSharedPointer<Zx4Image>(new Zx4Image());
     }
     if (frame >= zx4_img.count())
     {
@@ -919,4 +919,74 @@ int Zx4BaseObject::currentFrame() const
 int Zx4BaseObject::framesCount() const
 {
     return qMin(src_imp_img.count(), zx4_img.count());
+}
+
+void Zx4BaseObject::storeToHistory(QString desc)
+{
+    history.second = history.second.mid(0, history.first + 1);
+    QList<QSharedPointer<Zx4Image>> list;
+    foreach (auto entry, zx4_img) // do deep copy
+    {
+        list << QSharedPointer<Zx4Image>(entry->clone());
+    }
+    history.second << qMakePair(desc, list);
+    history.first++;
+}
+
+void Zx4BaseObject::clearHistory()
+{
+    history = qMakePair(-1, QList<QPair<QString, QList<QSharedPointer<Zx4Image>>>>());
+}
+
+void Zx4BaseObject::undo()
+{
+    if (canUndo())
+    {
+        zx4_img.clear();
+        foreach (auto entry, history.second.at(--history.first).second) // do deep copy
+        {
+            zx4_img << QSharedPointer<Zx4Image>(entry->clone());
+        }
+    }
+}
+
+void Zx4BaseObject::redo()
+{
+    if (canRedo())
+    {
+        zx4_img.clear();
+        foreach (auto entry, history.second.at(++history.first).second) // do deep copy
+        {
+            zx4_img << QSharedPointer<Zx4Image>(entry->clone());
+        }
+    }
+}
+
+bool Zx4BaseObject::canUndo(QString * desc)
+{
+    const bool rc = history.first > 0 && history.first < history.second.count();
+    if (rc && desc)
+    {
+        * desc = history.second.at(history.first).first;
+    }
+    return rc;
+}
+
+bool Zx4BaseObject::canRedo(QString * desc)
+{
+    const bool rc = history.first >= 0 && history.first < history.second.count() - 1;
+    if (rc && desc)
+    {
+        * desc = history.second.at(history.first + 1).first;
+    }
+    return rc;
+}
+
+QString Zx4BaseObject::historyCurrentDescription() const
+{
+    if (history.first >= 0 && history.first < history.second.count())
+    {
+        return history.second.at(history.first).first;
+    }
+    return QString();
 }

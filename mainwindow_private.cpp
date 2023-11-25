@@ -63,7 +63,12 @@ QImage MainWindow::importImage(QImage img, int palette_number, bool use_alpha)
         color_table << color.rgb();
     }
 
-    return Zx4Processing::importImage(img, color_table, use_alpha);
+    QImage _image = Zx4Processing::importImage(img, color_table, use_alpha);
+
+    current_sprite->clearHistory();
+    current_sprite->storeToHistory("Import sprite");
+
+    return _image;
 }
 
 Zx4Palette::SelectPaletteMethod MainWindow::selectPaletteMethod() const
@@ -131,6 +136,7 @@ void MainWindow::importScene(QImage img, QString filename)
         connect(current_scene, SIGNAL(charSelected(int)), this, SLOT(selectPalette(int)), Qt::QueuedConnection);
         connect(current_scene, SIGNAL(previewUpdateIsNeeded()), ui->preview, SLOT(update()));
         connect(current_scene, SIGNAL(previewUpdateIsNeeded()), ui->sourceImage, SLOT(update()));
+        connect(current_scene, SIGNAL(undoRedoMenuUpdateIsNeeded()), this, SLOT(undoRedoMenuUpdate()));
     }
 
     current_scene->setFileName(filename);
@@ -144,6 +150,9 @@ void MainWindow::importScene(QImage img, QString filename)
     current_scene->Zx4BaseObject::setSourceImage(dst_img);
 
     reimport(current_scene);
+
+    current_scene->clearHistory();
+    current_scene->storeToHistory("Import scene");
 }
 
 void MainWindow::openSprite(QList<QImage> src_imp_image, QString filename)
@@ -200,6 +209,9 @@ void MainWindow::openSprite(QList<QImage> src_imp_image, QString filename)
 
     pd->hide();
     pd->deleteLater();
+
+    _current_sprite->clearHistory();
+    _current_sprite->storeToHistory("Open sprite");
 }
 
 //#define USE_RLE8
@@ -224,6 +236,9 @@ void MainWindow::importSprite(QList<QImage> src_imp_image, QString filename, QSi
     current_sprite->setSourceImage(src_imp_image);
 
     reimport(current_sprite, p_idx);
+
+    current_sprite->clearHistory();
+    current_sprite->storeToHistory("Import sprite");
 }
 
 void MainWindow::importSpriteZx4Format(QString filename)
@@ -335,6 +350,9 @@ void MainWindow::importSpriteZx4Format(QString filename)
         }
     }
     current_sprite->update();
+
+    current_sprite->clearHistory();
+    current_sprite->storeToHistory("Import sprite");
 }
 
 void MainWindow::exportSpriteZx4Format(QString filename)
@@ -675,6 +693,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     const int width = img8.width();
     const int height = img8.height();
     const int color_variations = 1; // optional 2
+    const int current_palette = ui->palettes->currentRow();
 
     #pragma omp parallel for num_threads(std::min(omp_get_num_procs() - 1, height / 8))
     for (int y = 0; y < height; y += 8)
@@ -687,35 +706,43 @@ void MainWindow::reimport(SceneWindow * _current_scene)
             int p_idx = -1;
 
             QImage small_quad = img8.copy(QRect(x, y, 8, 8));
-            if (multipass == Zx4ImportPars::SinglePass)
+
+            if (_current_scene->importPars().autopalette)
             {
-                p_idx = _current_scene->selectPalette(small_quad, sel_method, color_variations);
-            }
-            else
-            {
-                QMap<int, int> map;
-                for (int y1 = -multipass_offset; y1 <= multipass_offset; y1 += multipass_step)
+                if (multipass == Zx4ImportPars::SinglePass)
                 {
-                    for (int x1 = -multipass_offset; x1 <= multipass_offset; x1 += multipass_step)
+                    p_idx = _current_scene->selectPalette(small_quad, sel_method, color_variations);
+                }
+                else
+                {
+                    QMap<int, int> map;
+                    for (int y1 = -multipass_offset; y1 <= multipass_offset; y1 += multipass_step)
                     {
-                        int new_p_idx = _current_scene->selectPalette(
-                                    img8.copy(QRect(qMax(x + x1, 0), qMax(y + y1, 0), qMin(8, width - (x + x1)), qMin(8, height - (y + y1)))),
-                                    sel_method, color_variations);
-                        if (new_p_idx != -1)
+                        for (int x1 = -multipass_offset; x1 <= multipass_offset; x1 += multipass_step)
                         {
-                            map[new_p_idx]++;
+                            int new_p_idx = _current_scene->selectPalette(
+                                        img8.copy(QRect(qMax(x + x1, 0), qMax(y + y1, 0), qMin(8, width - (x + x1)), qMin(8, height - (y + y1)))),
+                                        sel_method, color_variations);
+                            if (new_p_idx != -1)
+                            {
+                                map[new_p_idx]++;
+                            }
+                        }
+                    }
+                    int map_max = 0;
+                    for (auto i = map.begin(); i != map.end(); ++i)
+                    {
+                        if (i.value() > map_max)
+                        {
+                            map_max = i.value();
+                            p_idx = i.key();
                         }
                     }
                 }
-                int map_max = 0;
-                for (auto i = map.begin(); i != map.end(); ++i)
-                {
-                    if (i.value() > map_max)
-                    {
-                        map_max = i.value();
-                        p_idx = i.key();
-                    }
-                }
+            }
+            else
+            {
+                p_idx = current_palette;
             }
             if (p_idx < 0)
             {

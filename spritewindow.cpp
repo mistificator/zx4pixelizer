@@ -214,6 +214,7 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
             break;
             case QEvent::MouseButtonPress:
             case QEvent::MouseMove:
+            on_change = nullptr;
             if (!ui->actionAnimate->isChecked())
             {
                 QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
@@ -228,11 +229,21 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                     if (acts[ActionPencil] && acts[ActionPencil]->isChecked())
                     {
                         drawDot(x, y);
+                        on_change = [=]()
+                        {
+                            storeToHistory("Pixel draw");
+                            emit undoRedoMenuUpdateIsNeeded();
+                        };
                     }
                     else
                     if (acts[ActionBrush] && acts[ActionBrush]->isChecked())
                     {
                         drawBrush(x, y);
+                        on_change = [=]()
+                        {
+                            storeToHistory("Brush draw");
+                            emit undoRedoMenuUpdateIsNeeded();
+                        };
                     }
                     else
                     if (acts[ActionMove] && acts[ActionMove]->isChecked())
@@ -249,16 +260,33 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                                 int dx = old_grid_pos.x() - x;
                                 int dy = old_grid_pos.y() - y;
                                 moveImage(dx, dy);
+                                on_change = [=]()
+                                {
+                                    storeToHistory("Sprite move");
+                                    emit undoRedoMenuUpdateIsNeeded();
+                                };
                             }
                         }
-                    }
+                    }                    
                     QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
                 }
                 if (me->buttons().testFlag(Qt::RightButton) || (me->buttons().testFlag(Qt::LeftButton) && acts[ActionEraser] && acts[ActionEraser]->isChecked()))
                 {
                     eraseDot(x, y);
                     QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
+                    on_change = [=]()
+                    {
+                        storeToHistory("Pixel erase");
+                        emit undoRedoMenuUpdateIsNeeded();
+                    };
                 }
+            }
+            break;
+            case QEvent::MouseButtonRelease:
+            if (on_change)
+            {
+                on_change();
+                on_change = nullptr;
             }
             break;
             default:
@@ -475,6 +503,8 @@ void SpriteWindow::invertColors()
         }
     }
     ui->canvas->update();
+    storeToHistory("Colors inversion");
+    emit undoRedoMenuUpdateIsNeeded();
 }
 
 void SpriteWindow::on_actionAnimate_toggled(bool state)

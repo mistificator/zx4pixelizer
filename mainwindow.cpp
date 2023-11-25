@@ -189,6 +189,10 @@ void MainWindow::on_actionNew_triggered()
     current_sprite->clearCanvas(QSize(64, 64));
     connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->preview, SLOT(update()));
     connect(current_sprite, SIGNAL(previewUpdateIsNeeded()), ui->sourceImage, SLOT(update()));
+    connect(current_sprite, SIGNAL(undoRedoMenuUpdateIsNeeded()), this, SLOT(undoRedoMenuUpdate()));
+
+    current_sprite->storeToHistory("New sprite");
+    updateUndoRedoMenu(current_sprite);
 }
 
 void MainWindow::on_actionImportWizardApply_triggered()
@@ -199,12 +203,16 @@ void MainWindow::on_actionImportWizardApply_triggered()
     {
         importParsFromWidgetToObject(* current_sprite);
         reimport(current_sprite);
+        current_sprite->storeToHistory("Import sprite");
+        updateUndoRedoMenu(current_sprite);
     }
     else
     if (current_scene)
     {
         importParsFromWidgetToObject(* current_scene);
         reimport(current_scene);
+        current_scene->storeToHistory("Import scene");
+        updateUndoRedoMenu(current_scene);
     }
 }
 
@@ -214,10 +222,14 @@ void MainWindow::on_actionInvert_colors_triggered()
     if (current_sprite)
     {
         current_sprite->invertColors();
+        current_sprite->storeToHistory("Colors inversion");
+        updateUndoRedoMenu(current_sprite);
     }
     if (current_scene)
     {
         current_scene->invertColors();
+        current_scene->storeToHistory("Colors inversion");
+        updateUndoRedoMenu(current_scene);
     }
 }
 
@@ -517,7 +529,7 @@ void MainWindow::on_actionExport_scene_triggered()
 
 void MainWindow::on_actionAbout_ZX4_Pixelizer_triggered()
 {
-    QMessageBox::about(this, "ZX4 Pixelizer", QString("ZX4 Pixelizer\nImages & sprites manipulation tool\nfor ZX Spectrum 128K\n\nVersion %1\n\n© 2022\nZXLDR - ZX Lab of Dreams Reinvention").arg(APP_VERSION));
+    QMessageBox::about(this, "ZX4 Pixelizer", QString("ZX4 Pixelizer\nImages & sprites manipulation tool\nfor ZX Spectrum 128K\n\nVersion %1\n\n© 2022-2023\nZXLDR - ZX Lab of Dreams Reinvention").arg(APP_VERSION));
 }
 
 
@@ -564,6 +576,31 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
     {
         current_scene = sw;
         importParsFromObjectToWidget(* current_scene);
+    }
+
+    updateUndoRedoMenu(dynamic_cast<Zx4BaseObject *>(msw->widget()));
+}
+
+void MainWindow::updateUndoRedoMenu(Zx4BaseObject * zbo)
+{
+    if (!zbo)
+    {
+        return;
+    }
+    ui->actionUndo->setEnabled(false);
+    ui->actionRedo->setEnabled(false);
+    ui->actionUndo->setText(QString("Undo"));
+    ui->actionRedo->setText(QString("Redo"));
+    QString desc;
+    if (zbo->canUndo(& desc))
+    {
+        ui->actionUndo->setEnabled(true);
+        ui->actionUndo->setText(QString("Undo \"%1\"").arg(desc));
+    }
+    if (zbo->canRedo(& desc))
+    {
+        ui->actionRedo->setEnabled(true);
+        ui->actionRedo->setText(QString("Redo \"%1\"").arg(desc));
     }
 }
 
@@ -656,5 +693,40 @@ void MainWindow::on_removePreset_clicked()
     const int idx = ui->presetBox->currentIndex();
     ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
     ui->presetBox->removeItem(idx);
+}
+
+
+void MainWindow::on_actionUndo_triggered()
+{
+    if (ui->mdiArea->activeSubWindow())
+    {
+        if (auto zbo = dynamic_cast<Zx4BaseObject *>(ui->mdiArea->activeSubWindow()->widget()))
+        {
+            zbo->undo();
+            undoRedoMenuUpdate();
+        }
+    }
+}
+
+
+void MainWindow::on_actionRedo_triggered()
+{
+    if (ui->mdiArea->activeSubWindow())
+    {
+        if (auto zbo = dynamic_cast<Zx4BaseObject *>(ui->mdiArea->activeSubWindow()->widget()))
+        {
+            zbo->redo();
+            undoRedoMenuUpdate();
+        }
+    }
+}
+
+void MainWindow::undoRedoMenuUpdate()
+{
+    if (auto zbo = dynamic_cast<Zx4BaseObject *>(ui->mdiArea->activeSubWindow()->widget()))
+    {
+        updateUndoRedoMenu(zbo);
+        zbo->canvas()->update();
+    }
 }
 

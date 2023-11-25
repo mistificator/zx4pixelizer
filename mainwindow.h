@@ -26,6 +26,7 @@ public:
     static QProgressDialog * createProgress(QWidget * parent, QString text);
 private slots:
     void selectPalette(int p_idx);
+    void undoRedoMenuUpdate();
 
     void on_actionQuit_triggered();
     void on_actionResize_canvas_triggered();
@@ -60,6 +61,9 @@ private slots:
     void on_addPreset_clicked();
     void on_removePreset_clicked();
 
+    void on_actionUndo_triggered();
+    void on_actionRedo_triggered();
+
 protected:
     bool eventFilter(QObject *, QEvent *);
     void showEvent(QShowEvent *);
@@ -91,5 +95,7 @@ private:
     void importParsFromObjectToWidget(const Zx4BaseObject &);
     void reimport(SpriteWindow *, int p_idx = -1);
     void reimport(SceneWindow *);
+
+    void updateUndoRedoMenu(Zx4BaseObject * zbo);
 };
 #endif // MAINWINDOW_H

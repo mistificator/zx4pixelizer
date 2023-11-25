@@ -41,11 +41,12 @@ public:
 signals:
     void previewUpdateIsNeeded();
     void charSelected(int p_idx);
+    void undoRedoMenuUpdateIsNeeded();
 private slots:
     void drawGrid();
 private:
     Ui::SceneWindow *ui;
-    Zx4ImageWithAttributes & scene;
+    Zx4ImageWithAttributes & scene() const;
 
     bool eventFilter(QObject *, QEvent *);
 

@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QImage>
 #include <QImageReader>
+#include <QSharedPointer>
 
 enum ZxColorEnum {ZxBlack = 0, ZxBlue, ZxRed, ZxMagenta, ZxGreen, ZxCyan, ZxYellow, ZxWhite, ZxBrightBlack, ZxBrightBlue, ZxBrightRed, ZxBrightMagenta, ZxBrightGreen, ZxBrightCyan, ZxBrightYellow, ZxBrightWhite};
 
@@ -155,11 +156,22 @@ public:
     void setCurrentFrame(int frame);
     int currentFrame() const;
     int framesCount() const;
+
+    void storeToHistory(QString desc);
+    void clearHistory();
+    void undo();
+    void redo();
+    bool canUndo(QString * desc = nullptr);
+    bool canRedo(QString * desc = nullptr);
+    QString historyCurrentDescription() const;
+
+    std::function<void()> on_change = nullptr;
 protected:
     void setCanvas(QWidget *);
     const Zx4Palette & palettes;
     QString file_name;
-    mutable QList<Zx4Image *> zx4_img;
+    mutable QList<QSharedPointer<Zx4Image>> zx4_img;
+    QPair<int, QList<QPair<QString, QList<QSharedPointer<Zx4Image>>>>> history;
     QList<QImage> src_imp_img, transformed_img;
     int grid_x = 64, grid_y = 64;
     int current_color_index = 0;

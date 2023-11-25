@@ -7,9 +7,9 @@
 #include "ui_scenewindow.h"
 
 SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
-    QWidget(parent), Zx4BaseObject(palettes), ui(new Ui::SceneWindow), scene(* new Zx4ImageWithAttributes())
+    QWidget(parent), Zx4BaseObject(palettes), ui(new Ui::SceneWindow)
 {
-    zx4_img << & scene;
+    zx4_img << QSharedPointer<Zx4Image>(new Zx4ImageWithAttributes());
 
     ui->setupUi(this);
     setCanvas(ui->canvas);
@@ -44,10 +44,10 @@ void SceneWindow::setSourceImage(const QList<QImage> & i)
     src_imp_img = transformed_img = QList<QImage>();
     current_frame = 0;
 
-    scene = Zx4ImageWithAttributes(); // reset scene
+    scene() = Zx4ImageWithAttributes(); // reset scene
     if (!i.isEmpty())
     {
-        scene.resize(i[0].width(), i[0].height());
+        scene().resize(i[0].width(), i[0].height());
         src_imp_img = transformed_img = (QList<QImage>() << i[0]);
     }
 
@@ -59,13 +59,13 @@ void SceneWindow::setSourceImage(const QList<QImage> & i)
 
 void SceneWindow::setImage(const QList<const Zx4Image *> & list)
 {
-    scene = Zx4ImageWithAttributes(); // reset scene
+    scene() = Zx4ImageWithAttributes(); // reset scene
 
     if (!list.isEmpty())
     {
         if (dynamic_cast<const Zx4ImageWithAttributes *>(list[0]))
         {
-            scene = * dynamic_cast<const Zx4ImageWithAttributes *>(list[0]);
+            scene() = * dynamic_cast<const Zx4ImageWithAttributes *>(list[0]);
         }
     }
 
@@ -77,13 +77,13 @@ void SceneWindow::setImage(const QList<const Zx4Image *> & list)
 
 void SceneWindow::setAttr(Zx4ImageWithAttributes::Attr a)
 {
-    scene.attr = a;
+    scene().attr = a;
     ui->canvas->update();
 }
 
 Zx4ImageWithAttributes::Attr SceneWindow::attr() const
 {
-    return scene.attr;
+    return scene().attr;
 }
 
 QPoint SceneWindow::currentChar() const
@@ -93,7 +93,7 @@ QPoint SceneWindow::currentChar() const
 
 void SceneWindow::setAttr(QPoint p, int p_idx)
 {
-    scene.attr[p.x()][p.y()] = p_idx;
+    scene().attr[p.x()][p.y()] = p_idx;
 }
 
 void SceneWindow::setAttr(int p_idx)
@@ -103,16 +103,16 @@ void SceneWindow::setAttr(int p_idx)
 
 void SceneWindow::setPixel(QPoint p, int color_index)
 {
-    if (p.y() < 0 || p.y() >= scene.height())
+    if (p.y() < 0 || p.y() >= scene().height())
     {
         return;
     }
-    if (p.x() < 0 || p.x() >= scene.width())
+    if (p.x() < 0 || p.x() >= scene().width())
     {
         return;
     }
-    scene.color_layer0[p.x()][p.y()] = color_index == 0 || color_index == 1 ? Zx4Image::BitOff : Zx4Image::BitOn;
-    scene.color_layer1[p.x()][p.y()] = color_index == 0 || color_index == 2 ? Zx4Image::BitOff : Zx4Image::BitOn;
+    scene().color_layer0[p.x()][p.y()] = color_index == 0 || color_index == 1 ? Zx4Image::BitOff : Zx4Image::BitOn;
+    scene().color_layer1[p.x()][p.y()] = color_index == 0 || color_index == 2 ? Zx4Image::BitOff : Zx4Image::BitOn;
 }
 
 bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
@@ -124,16 +124,47 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             case QEvent::Paint:
                 drawGrid();
             break;
+            case QEvent::Wheel:
+            {
+                on_change = nullptr;
+
+                QWheelEvent * we = dynamic_cast<QWheelEvent *>(ev);
+                const QPoint pt = we->pos();
+
+                if (we->modifiers().testFlag(Qt::ShiftModifier) || we->modifiers().testFlag(Qt::ControlModifier))
+                {
+                    if (selected_char != QPoint(-1, -1))
+                    {
+                        int p_idx = scene().attr[selected_char.x()][selected_char.y()];
+                        p_idx = qMin(qMax(p_idx + we->delta() / 120, 0), palettes.palettes.count() - 1);
+                        scene().attr[selected_char.x()][selected_char.y()] = p_idx;
+                        importChar(
+                            selected_char,
+                            p_idx,
+                            transformed_img[current_frame].convertToFormat(QImage::Format_Indexed8).copy(selected_char.x() * 8, selected_char.y() * 8, 8, 8));
+
+                        emit charSelected(p_idx);
+                        QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
+                        we->accept();
+                        storeToHistory("Palette change at character position");
+                        emit undoRedoMenuUpdateIsNeeded();
+                        return true;
+                    }
+                }
+            }
+            break;
             case QEvent::MouseButtonPress:
             case QEvent::MouseMove:
             case QEvent::MouseButtonDblClick:
             {
-                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
-                double step = qMin(1.0 * grid_x / transformed_img[current_frame].width(), 1.0 * grid_y / transformed_img[current_frame].height());
+                on_change = nullptr;
 
-                QPoint pt = me->pos();
-                int x = qMin<int>(qMax<int>(pt.x() / step, 0), transformed_img[current_frame].width() - 1);
-                int y = qMin<int>(qMax<int>(pt.y() / step, 0), transformed_img[current_frame].height() - 1);
+                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
+                const double step = qMin(1.0 * grid_x / transformed_img[current_frame].width(), 1.0 * grid_y / transformed_img[current_frame].height());
+
+                const QPoint pt = me->pos();
+                const int x = qMin<int>(qMax<int>(pt.x() / step, 0), transformed_img[current_frame].width() - 1);
+                const int y = qMin<int>(qMax<int>(pt.y() / step, 0), transformed_img[current_frame].height() - 1);
 
                 if (me->buttons().testFlag(Qt::LeftButton))
                 {
@@ -144,9 +175,14 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                             update_char = QPoint(x / 8, y / 8);
                             importChar(
                                 update_char,
-                                scene.attr[update_char.x()][update_char.y()] = scene.attr[selected_char.x()][selected_char.y()],
+                                scene().attr[update_char.x()][update_char.y()] = scene().attr[selected_char.x()][selected_char.y()],
                                 transformed_img[current_frame].convertToFormat(QImage::Format_Indexed8).copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
                         }
+                        on_change = [=]()
+                        {
+                            storeToHistory("Palette change at character position");
+                            emit undoRedoMenuUpdateIsNeeded();
+                        };
                     }
                     else
                     if (me->modifiers().testFlag(Qt::ControlModifier))
@@ -158,7 +194,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                         else
                         {
                             selected_char = QPoint(x / 8, y / 8);
-                            emit charSelected(scene.attr[selected_char.x()][selected_char.y()]);
+                            emit charSelected(scene().attr[selected_char.x()][selected_char.y()]);
                         }
                     }
                     else
@@ -167,6 +203,11 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                         if (selected_char == QPoint(x / 8, y / 8))
                         {
                             setPixel(QPoint(x, y), currentColorIndex());
+                            on_change = [=]()
+                            {
+                                storeToHistory("Pixel draw");
+                                emit undoRedoMenuUpdateIsNeeded();
+                            };
                         }
                     }
                     QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
@@ -175,7 +216,12 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             break;
             case QEvent::MouseButtonRelease:
             {
-//                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
+                if (on_change)
+                {
+                    on_change();
+                    on_change = nullptr;
+                }
+
                 update_char = QPoint(-1, -1);
                 QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
             }
@@ -189,17 +235,17 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
 
 void SceneWindow::drawGrid()
 {
-    scene.resize(transformed_img[current_frame].width(), transformed_img[current_frame].height());
+    scene().resize(transformed_img[current_frame].width(), transformed_img[current_frame].height());
     rdr_img = QImage(transformed_img[current_frame].width(), transformed_img[current_frame].height(), QImage::Format_RGB32);
     for (int y = 0; y < rdr_img.height(); y++)
     {
         for (int x = 0; x < rdr_img.width(); x++)
         {
-            int p_idx = scene.attr[x / 8][y / 8];
+            int p_idx = scene().attr[x / 8][y / 8];
             auto c = palettes.palettes[p_idx];
 
-            char l0 = scene.color_layer0[x][y];
-            char l1 = scene.color_layer1[x][y];
+            char l0 = scene().color_layer0[x][y];
+            char l1 = scene().color_layer1[x][y];
             rdr_img.setPixelColor(x, y, !l0 && !l1 ? c[0] : l0 && !l1 ? c[2] : !l0 && l1 ? c[1] : c[3]);
         }
     }
@@ -444,9 +490,14 @@ bool SceneWindow::checkPalette(QImage small_quad, int p_idx, int dist_colors_cri
     return check_dist.count() > dist_colors_criteria;
 }
 
+Zx4ImageWithAttributes & SceneWindow::scene() const
+{
+    return * dynamic_cast<Zx4ImageWithAttributes *>(zx4_img.first().data());
+}
+
 void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
 {
-    if (p_idx < 0 || scene.isNull())
+    if (p_idx < 0 || scene().isNull())
     {
         return;
     }
@@ -454,7 +505,7 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
     small_quad = Zx4Processing::importImage(small_quad.convertToFormat(QImage::Format_RGB32), palettes.colorTable(p_idx));
 
     #pragma omp critical
-        scene.attr[char_pos.x()][char_pos.y()] = p_idx;
+        scene().attr[char_pos.x()][char_pos.y()] = p_idx;
 
     for (int iy = 0; iy < 8; iy++)
     {
@@ -469,9 +520,9 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
                 if (idx >= 0 && idx < 4)
                 #pragma omp critical
                 {
-                    scene.color_layer0[x][y] = idx == 0 || idx == 1 ? Zx4Image::BitOff : Zx4Image::BitOn;
-                    scene.color_layer1[x][y] = idx == 0 || idx == 2 ? Zx4Image::BitOff : Zx4Image::BitOn;
-                    scene.alpha_layer[x][y] = Zx4Image::BitOn;
+                    scene().color_layer0[x][y] = idx == 0 || idx == 1 ? Zx4Image::BitOff : Zx4Image::BitOn;
+                    scene().color_layer1[x][y] = idx == 0 || idx == 2 ? Zx4Image::BitOff : Zx4Image::BitOn;
+                    scene().alpha_layer[x][y] = Zx4Image::BitOn;
                 }
                 else
                 {
@@ -488,13 +539,15 @@ void SceneWindow::invertColors()
     {
         return;
     }
-    for (int y = selected_char.y() * 8; y < qMin((selected_char.y() + 1) * 8, scene.height()); y++)
+    for (int y = selected_char.y() * 8; y < qMin((selected_char.y() + 1) * 8, scene().height()); y++)
     {
-        for (int x = selected_char.x() * 8; x < qMin((selected_char.x() + 1) * 8, scene.width()); x++)
+        for (int x = selected_char.x() * 8; x < qMin((selected_char.x() + 1) * 8, scene().width()); x++)
         {
-            scene.color_layer0[x][y] = scene.color_layer0[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
-            scene.color_layer1[x][y] = scene.color_layer1[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
+            scene().color_layer0[x][y] = scene().color_layer0[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
+            scene().color_layer1[x][y] = scene().color_layer1[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
         }
     }
     ui->canvas->update();
+    storeToHistory("Colors inversion");
+    emit undoRedoMenuUpdateIsNeeded();
 }

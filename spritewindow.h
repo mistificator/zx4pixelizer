@@ -50,6 +50,7 @@ public:
     void invertColors();
 signals:
     void previewUpdateIsNeeded();
+    void undoRedoMenuUpdateIsNeeded();
 private slots:
     void drawGrid();
     void on_actionAnimate_toggled(bool);
