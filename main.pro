@@ -1,4 +1,4 @@
-QT       += core gui widgets
+QT       += core gui widgets network
 
 CONFIG += c++11
 
@@ -33,11 +33,6 @@ FORMS += \
     scenewindow.ui \
     spritewindow.ui
 
-# Default rules for deployment.
-qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
-!isEmpty(target.path): INSTALLS += target
-
 RESOURCES += \
     resource.qrc
 
@@ -48,3 +43,12 @@ DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 QMAKE_CXXFLAGS+= -openmp
 
 INCLUDEPATH += cie lz4
+
+win32 {
+    # https://slproweb.com/products/Win32OpenSSL.html
+    OPENSSL_PATH =  "$$(PROGRAMFILES)\OpenSSL-Win64"
+    exists($$OPENSSL_PATH) {
+        INCLUDEPATH += $$OPENSSL_PATH\include\openssl
+        LIBS += -L$$OPENSSL_PATH\lib -llibcrypto -llibssl
+    }
+}

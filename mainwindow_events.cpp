@@ -12,8 +12,11 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QMimeData>
-
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
 #include <omp.h>
+
 
 void MainWindow::showEvent(QShowEvent *)
 {
@@ -121,7 +124,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     /*
                     if (de->mimeData()->hasImage())
                     {
-                        importScene(qvariant_cast<QImage>(de->mimeData()->imageData()));
+                        importScene(de->mimeData()->imageData().value<QImage>());
                         de->acceptProposedAction();
                         return true;
                     }
@@ -147,6 +150,21 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                                 {
                                     importScene(QImage(filename), filename);
                                 }
+                            }
+                            else
+                            {
+                                auto net = new QNetworkAccessManager(this);
+                                auto reply = net->get(QNetworkRequest(url));
+                                connect(reply, & QNetworkReply::finished, this, [=]()
+                                {
+                                    importScene(QImageReader(reply).read(), url.fileName());
+                                    reply->deleteLater();
+                                    net->deleteLater();
+                                });
+                                connect(reply, & QNetworkReply::errorOccurred, this, [=](QNetworkReply::NetworkError err)
+                                {
+                                    qDebug() << err << reply->errorString();
+                                });
                             }
                         }
                         de->acceptProposedAction();
