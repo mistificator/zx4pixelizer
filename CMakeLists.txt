@@ -12,6 +12,17 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 find_package(OpenMP)
 
+# Директория установки бинарных файлов внутри пакета:
+# На Windows кладем в корень пакета для удобного portable-ZIP и NSIS, на Linux — в bin
+if(WIN32)
+    set(ZX4_INSTALL_BINDIR ".")
+    set(ZX4_INSTALL_PLUGINS_IMAGEFORMATS "imageformats")
+else()
+    include(GNUInstallDirs)
+    set(ZX4_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}")
+    set(ZX4_INSTALL_PLUGINS_IMAGEFORMATS "${CMAKE_INSTALL_BINDIR}/imageformats")
+endif()
+
 # ==============================================================================
 # 1. Сборка подпроекта apng (zlib + libpng-apng + плагин qapng) без правок в apng/
 # ==============================================================================
@@ -94,6 +105,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apng/src/plugins/imageformats/apng/apngim
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/imageformats"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/imageformats"
     )
+
+    install(TARGETS qapng
+        LIBRARY DESTINATION "${ZX4_INSTALL_PLUGINS_IMAGEFORMATS}"
+        RUNTIME DESTINATION "${ZX4_INSTALL_PLUGINS_IMAGEFORMATS}"
+    )
 endif()
 
 # ==============================================================================
@@ -131,7 +147,7 @@ if(WIN32)
     list(APPEND PROJECT_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc")
 endif()
 
-qt_add_executable(zx4pixelizer WIN32 ${PROJECT_SOURCES})
+qt_add_executable(zx4pixelizer WIN32 MACOSX_BUNDLE ${PROJECT_SOURCES})
 
 if(TARGET qapng)
     add_dependencies(zx4pixelizer qapng)
@@ -161,3 +177,88 @@ endif()
 set_target_properties(zx4pixelizer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+# ==============================================================================
+# 3. Правила установки (Install) и развёртывания зависимостей Qt6
+# ==============================================================================
+include(InstallRequiredSystemLibraries)
+
+install(TARGETS zx4pixelizer
+    BUNDLE  DESTINATION .
+    RUNTIME DESTINATION "${ZX4_INSTALL_BINDIR}"
+)
+
+if(WIN32)
+    # Находим windeployqt из состава используемого Qt6 для упаковки всех DLL и плагинов Qt
+    get_target_property(_qmake_executable Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(_qt_bin_dir "${_qmake_executable}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin_dir}")
+
+    if(WINDEPLOYQT_EXECUTABLE)
+        install(CODE "
+            message(STATUS \"Running windeployqt on \${CMAKE_INSTALL_PREFIX}/zx4pixelizer.exe...\")
+            execute_process(
+                COMMAND \"${WINDEPLOYQT_EXECUTABLE}\"
+                        --no-translations
+                        --no-system-d3d-compiler
+                        --no-opengl-sw
+                        --compiler-runtime
+                        \"\${CMAKE_INSTALL_PREFIX}/zx4pixelizer.exe\"
+            )
+        ")
+    endif()
+
+    # Если сборка через MinGW + OpenMP, захватываем libgomp-1.dll / libwinpthread-1.dll / libstdc++-6.dll
+    if(MINGW)
+        get_filename_component(_compiler_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        foreach(_mingw_dll libgomp-1.dll libwinpthread-1.dll libstdc++-6.dll libgcc_s_seh-1.dll)
+            if(EXISTS "${_compiler_dir}/${_mingw_dll}")
+                install(FILES "${_compiler_dir}/${_mingw_dll}" DESTINATION "${ZX4_INSTALL_BINDIR}")
+            endif()
+        endforeach()
+    endif()
+elseif(UNIX AND NOT APPLE)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/sonic.zx4.png"
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps"
+            RENAME "zx4pixelizer.png")
+endif()
+
+# ==============================================================================
+# 4. Конфигурация пакетирования CPack
+# ==============================================================================
+set(CPACK_PACKAGE_NAME "zx4pixelizer")
+set(CPACK_PACKAGE_VENDOR "ZXLDR")
+set(CPACK_PACKAGE_CONTACT "ZXLDR <zxldr@users.noreply.github.com>")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "ZX Spectrum 128K Gigascreen (25Hz) Scene Converter & Animated Sprite Studio")
+set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "ZX4 Pixelizer")
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+endif()
+
+# Имя создаваемого архива/инсталлятора с указанием ОС и архитектуры
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+
+if(WIN32)
+    # По умолчанию создаем автономный ZIP-архив; при наличии NSIS можно вызвать: cpack -G NSIS
+    set(CPACK_GENERATOR "ZIP")
+    set(CPACK_NSIS_DISPLAY_NAME "ZX4 Pixelizer")
+    set(CPACK_NSIS_PACKAGE_NAME "ZX4 Pixelizer")
+    set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/resources/sonic.zx4.ico")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "zx4pixelizer.exe")
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_PACKAGE_EXECUTABLES "zx4pixelizer" "ZX4 Pixelizer")
+    set(CPACK_CREATE_DESKTOP_LINKS "zx4pixelizer")
+elseif(APPLE)
+    set(CPACK_GENERATOR "DragNDrop;TGZ")
+else()
+    set(CPACK_GENERATOR "TGZ;DEB")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "graphics")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+endif()
+
+include(CPack)
