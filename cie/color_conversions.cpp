@@ -1,314 +1,180 @@
 // http://www.easyrgb.com/index.php?X=MATH&H=02#text2
-#include <stdio.h>
 #include <math.h>
 #include "color_conversions.h"
 #include "CIEDE2000.h"
 
-float ref_X = 95.047;
-float ref_Y = 100.0;
-float ref_Z = 108.883;
+float ref_X = 95.047f;
+float ref_Y = 100.0f;
+float ref_Z = 108.883f;
 
-/***************************************************
- *  Name:        convertRGBtoXYZ
- *
- *  Returns:     Nothing
- *
- *  Parameters:  RGB values and XYZ references
- *
- *  Description: Given a color in RGB values converts  
- *               to the corresponding XYZ values
- *
- ***************************************************/
-void convertRGBtoXYZ(int inR, int inG, int inB, float * outX, float * outY, float * outZ) {
+namespace {
+struct LabEntry {
+    float l, a, b;
+};
 
+// Таблица предвычисленных значений Lab для всех комбинаций RGB (64x64x64 = 262144 цвета, шаг 4)
+static LabEntry s_labLut[64][64][64];
+static bool s_lutInitialized = false;
 
-	float var_R = (inR / 255.0f); //R from 0 to 255
-	float var_G = (inG / 255.0f); //G from 0 to 255
-	float var_B = (inB / 255.0f); //B from 0 to 255
-
-	if (var_R > 0.04045f)
-		var_R = powf(( (var_R + 0.055f) / 1.055f), 2.4f);
-	else 
-		var_R = var_R / 12.92f;
-
-	if (var_G > 0.04045)
-		var_G = powf(( (var_G + 0.055f) / 1.055f), 2.4f);
-	else
-		var_G = var_G / 12.92f;
-
-	if (var_B > 0.04045f)
-		var_B = powf(( (var_B + 0.055f) / 1.055f), 2.4f);
-	else
-		var_B = var_B / 12.92f;
-
-	var_R = var_R * 100;
-	var_G = var_G * 100;
-	var_B = var_B * 100;
-
-	//Observer. = 2°, Illuminant = D65
-	*outX = var_R * 0.4124f + var_G * 0.3576f + var_B * 0.1805f;
-	*outY = var_R * 0.2126f + var_G * 0.7152f + var_B * 0.0722f;
-	*outZ = var_R * 0.0193f + var_G * 0.1192f + var_B * 0.9505f;
+void initLabLut()
+{
+    if (s_lutInitialized) return;
+    for (int r = 0; r < 64; ++r)
+    {
+        int inR = (r << 2) | (r >> 4);
+        for (int g = 0; g < 64; ++g)
+        {
+            int inG = (g << 2) | (g >> 4);
+            for (int b = 0; b < 64; ++b)
+            {
+                int inB = (b << 2) | (b >> 4);
+                float x, y, z;
+                convertRGBtoXYZ(inR, inG, inB, &x, &y, &z);
+                convertXYZtoLab(x, y, z, &s_labLut[r][g][b].l, &s_labLut[r][g][b].a, &s_labLut[r][g][b].b);
+            }
+        }
+    }
+    s_lutInitialized = true;
 }
 
+inline const LabEntry & fastRgbToLab(int r, int g, int b)
+{
+    if (!s_lutInitialized) initLabLut();
+    return s_labLut[(r >> 2) & 0x3F][(g >> 2) & 0x3F][(b >> 2) & 0x3F];
+}
+} // namespace
 
-/***************************************************
- *  Name:        convertXYZtoLab
- *
- *  Returns:     Nothing
- *
- *  Parameters:  XYZ values and Lab references
- *
- *  Description: Given a color in XYZ values converts  
- *               to the corresponding Lab values
- *
- ***************************************************/
-void convertXYZtoLab(float inX, float inY, float inZ, float * outL, float * outa, float * outb) {
+void convertRGBtoXYZ(int inR, int inG, int inB, float * outX, float * outY, float * outZ)
+{
+    float var_R = (inR / 255.0f);
+    float var_G = (inG / 255.0f);
+    float var_B = (inB / 255.0f);
 
-	float var_X = (inX / ref_X); //ref_X = 95.047
-	float var_Y = (inY / ref_Y); //ref_Y = 100.0
-	float var_Z = (inZ / ref_Z); //ref_Z = 108.883
+    var_R = (var_R > 0.04045f) ? powf((var_R + 0.055f) / 1.055f, 2.4f) : (var_R / 12.92f);
+    var_G = (var_G > 0.04045f) ? powf((var_G + 0.055f) / 1.055f, 2.4f) : (var_G / 12.92f);
+    var_B = (var_B > 0.04045f) ? powf((var_B + 0.055f) / 1.055f, 2.4f) : (var_B / 12.92f);
 
-	if ( var_X > 0.008856 ) 
-		var_X = powf(var_X , ( 1.0f/3 )); 
-	else 
-		var_X = ( 7.787 * var_X ) + ( 16.0f/116 );
+    var_R *= 100.0f;
+    var_G *= 100.0f;
+    var_B *= 100.0f;
 
-	if ( var_Y > 0.008856 )
-		var_Y = powf(var_Y , ( 1.0f/3 )); 
-	else
-	    var_Y = ( 7.787 * var_Y ) + ( 16.0f/116 );
-
-	if ( var_Z > 0.008856 )
-		var_Z = powf(var_Z , ( 1.0f/3 )); 
-	else 
-		var_Z = ( 7.787 * var_Z ) + ( 16.0f/116 );
-
-	*outL = ( 116 * var_Y ) - 16;
-	*outa = 500 * ( var_X - var_Y );
-	*outb = 200 * ( var_Y - var_Z );
+    *outX = var_R * 0.4124f + var_G * 0.3576f + var_B * 0.1805f;
+    *outY = var_R * 0.2126f + var_G * 0.7152f + var_B * 0.0722f;
+    *outZ = var_R * 0.0193f + var_G * 0.1192f + var_B * 0.9505f;
 }
 
+void convertXYZtoLab(float inX, float inY, float inZ, float * outL, float * outa, float * outb)
+{
+    float var_X = inX / ref_X;
+    float var_Y = inY / ref_Y;
+    float var_Z = inZ / ref_Z;
 
-/***************************************************
- *  Name:        convertLabtoXYZ
- *
- *  Returns:     Nothing
- *
- *  Parameters:  Lab values and XYZ references
- *
- *  Description: Given a color in Lab values converts  
- *               to the corresponding XYZ values
- *
- ***************************************************/
-void convertLabtoXYZ( float inL, float ina, float  inb, float * outX, float * outY, float * outZ) {
+    var_X = (var_X > 0.008856f) ? cbrtf(var_X) : (7.787f * var_X) + (16.0f / 116.0f);
+    var_Y = (var_Y > 0.008856f) ? cbrtf(var_Y) : (7.787f * var_Y) + (16.0f / 116.0f);
+    var_Z = (var_Z > 0.008856f) ? cbrtf(var_Z) : (7.787f * var_Z) + (16.0f / 116.0f);
 
-	float var_Y = ( inL + 16 ) / 116;
-	float var_X = (ina/500) + var_Y;
-	float var_Z = var_Y - (inb/200);
-
-	if ( powf(var_Y,3.f) > 0.008856 ) 
-		var_Y = powf(var_Y,3.f);
-	else
-		var_Y = ( var_Y - (16/116) ) / 7.787;
-
-	if ( powf(var_X,3.f) > 0.008856 ) 
-		var_X = powf(var_X,3.f);
-	else 
-		var_X = ( var_X - (16/116) ) / 7.787;
-	
-	if ( powf(var_Z,3.f) > 0.008856 )
-		var_Z = powf(var_Z,3.f);
-	else
-		var_Z = ( var_Z - (16/116) ) / 7.787;
-
-	*outX = ref_X * var_X;     //ref_X =  95.047     Observer= 2°, Illuminant= D65
-	*outY = ref_Y * var_Y;     //ref_Y = 100.000
-	*outZ = ref_Z * var_Z;     //ref_Z = 108.883
+    *outL = (116.0f * var_Y) - 16.0f;
+    *outa = 500.0f * (var_X - var_Y);
+    *outb = 200.0f * (var_Y - var_Z);
 }
 
-/***************************************************
- *  Name:        convertXYZtoRGB
- *
- *  Returns:     Nothing
- *
- *  Parameters:  XYZ values and RGB references
- *
- *  Description: Given a color in XYZ values converts  
- *               to the corresponding RGB values
- *
- ***************************************************/
-void convertXYZtoRGB(float inX, float inY, float inZ, int * outR, int * outG, int * outB) {
+void convertLabtoXYZ(float inL, float ina, float inb, float * outX, float * outY, float * outZ)
+{
+    float var_Y = (inL + 16.0f) / 116.0f;
+    float var_X = (ina / 500.0f) + var_Y;
+    float var_Z = var_Y - (inb / 200.0f);
 
+    float y3 = var_Y * var_Y * var_Y;
+    float x3 = var_X * var_X * var_X;
+    float z3 = var_Z * var_Z * var_Z;
 
-	float var_X = inX/100;
-	float var_Y = inY/100;
-	float var_Z = inZ/100;
+    var_Y = (y3 > 0.008856f) ? y3 : (var_Y - (16.0f / 116.0f)) / 7.787f;
+    var_X = (x3 > 0.008856f) ? x3 : (var_X - (16.0f / 116.0f)) / 7.787f;
+    var_Z = (z3 > 0.008856f) ? z3 : (var_Z - (16.0f / 116.0f)) / 7.787f;
 
-	float var_R = var_X *  3.2406 + (var_Y * -1.5372) + var_Z * (-0.4986);
-	float var_G = var_X * (-0.9689) + var_Y *  1.8758 + var_Z *  0.0415;
-	float var_B = var_X *  0.0557 + var_Y * (-0.2040) + var_Z *  1.0570;
-
-	if ( var_R > 0.0031308 )
-		var_R = 1.055 * powf(var_R, ( 1.0f / 2.4 ) )  - 0.055;
-	else 
-		var_R = 12.92 * var_R;
-
-	if ( var_G > 0.0031308 ) 
-		var_G = 1.055 * powf(var_G, ( 1.0f / 2.4 ) ) - 0.055;
-	else 
-		var_G = 12.92 * var_G;
-
-	if ( var_B > 0.0031308 )
-		var_B = 1.055 * powf(var_B, ( 1.0f / 2.4 ) ) - 0.055;
-	else
-		var_B = 12.92 * var_B;
-
-	*outR = (int)(var_R * 255);
-	*outG = (int)(var_G * 255);
-	*outB = (int)(var_B * 255);
-
-
+    *outX = ref_X * var_X;
+    *outY = ref_Y * var_Y;
+    *outZ = ref_Z * var_Z;
 }
 
-/***************************************************
- *  Name:        Lab_color_difference_CIE76
- *
- *  Returns:     float
- *
- *  Parameters:  2 Lab color values
- *
- *  Description: Calculates and returns the difference 
- *				 between 2 Lab colors based on the CIE76 formula
- *
- ***************************************************/
-float Lab_color_difference_CIE76( float inL1, float ina1, float  inb1, float inL2, float ina2, float inb2){
-	return( sqrt( powf(inL1 - inL2, 2.f) + powf(ina1 - ina2, 2.f) + powf(inb1 - inb2, 2.f) ) );//CIE76
+void convertXYZtoRGB(float inX, float inY, float inZ, int * outR, int * outG, int * outB)
+{
+    float var_X = inX / 100.0f;
+    float var_Y = inY / 100.0f;
+    float var_Z = inZ / 100.0f;
+
+    float var_R = var_X *  3.2406f + var_Y * (-1.5372f) + var_Z * (-0.4986f);
+    float var_G = var_X * (-0.9689f) + var_Y *  1.8758f + var_Z *  0.0415f;
+    float var_B = var_X *  0.0557f + var_Y * (-0.2040f) + var_Z *  1.0570f;
+
+    var_R = (var_R > 0.0031308f) ? (1.055f * powf(var_R, 1.0f / 2.4f) - 0.055f) : (12.92f * var_R);
+    var_G = (var_G > 0.0031308f) ? (1.055f * powf(var_G, 1.0f / 2.4f) - 0.055f) : (12.92f * var_G);
+    var_B = (var_B > 0.0031308f) ? (1.055f * powf(var_B, 1.0f / 2.4f) - 0.055f) : (12.92f * var_B);
+
+    *outR = static_cast<int>(var_R * 255.0f);
+    *outG = static_cast<int>(var_G * 255.0f);
+    *outB = static_cast<int>(var_B * 255.0f);
 }
 
-/***************************************************
- *  Name:        RGB_color_Lab_difference_CIE76
- *
- *  Returns:     float
- *
- *  Parameters:  2 RGB color values
- *
- *  Description: Converts RGB values to Lab values and returns  
- *				 the difference between 2 Lab colors based on 
- *				 the CIE76 formula
- *
- ***************************************************/
-float RGB_color_Lab_difference_CIE76( int R1, int G1, int B1, int R2, int G2, int B2){
-	float x1=0,y1=0,z1=0;
-	float x2=0,y2=0,z2=0;
-	float l1=0,a1=0,b1=0;
-	float l2=0,a2=0,b2=0;
-
-	convertRGBtoXYZ(R1, G1, B1, &x1, &y1, &z1);
-	convertRGBtoXYZ(R2, G2, B2, &x2, &y2, &z2);
-
-	convertXYZtoLab(x1, y1, z1, &l1, &a1, &b1);
-	convertXYZtoLab(x2, y2, z2, &l2, &a2, &b2); 
-
-	return( Lab_color_difference_CIE76(l1 ,a1 ,b1 ,l2 ,a2 ,b2) );
+float Lab_color_difference_CIE76(float inL1, float ina1, float inb1, float inL2, float ina2, float inb2)
+{
+    float dl = inL1 - inL2;
+    float da = ina1 - ina2;
+    float db = inb1 - inb2;
+    return sqrtf(dl * dl + da * da + db * db);
 }
 
-/***************************************************
- *  Name:        Lab_color_difference_CIE94
- *
- *  Returns:     float
- *
- *  Parameters:  2 Lab color values
- *
- *  Description: Calculates and returns the difference 
- *				 between 2 Lab colors based on the CIE94 formula
- *
- ***************************************************/
-float Lab_color_difference_CIE94( float inL1, float ina1, float  inb1, float inL2, float ina2, float inb2){
-	// case Application.GraphicArts:
-    //	float Kl = 1.0;
-    //	float K1 = 0.045;
-    //	float K2 = 0.015;
-	// 	break;
-	// case Application.Textiles:
-    //  float Kl = 2.0;
-    //  float K1 = 0.048;
-    //  float K2 = 0.014;
-	// break;
-
-    const float Kl = 2.0;
-    const float K1 = 0.048;
-    const float K2 = 0.014;
-
-	float deltaL = inL1 - inL2;
-	float deltaA = ina1 - ina2;
-	float deltaB = inb1 - inb2;
-
-	float c1 = sqrt(pow(ina1, 2) + pow(inb1, 2));
-	float c2 = sqrt(pow(ina2, 2) + pow(inb2, 2));
-	float deltaC = c1 - c2;
-
-	float deltaH = pow(deltaA,2) + pow(deltaB,2) - pow(deltaC,2);
-	deltaH = deltaH < 0 ? 0 : sqrt(deltaH);
-
-	const float sl = 1.f;
-	const float kc = 1.f;
-	const float kh = 1.f;
-
-	float sc = 1.f + K1*c1;
-	float sh = 1.f + K2*c1;
-
-	float i = pow(deltaL/(Kl*sl), 2) +
-	                pow(deltaC/(kc*sc), 2) +
-	                pow(deltaH/(kh*sh), 2);
-
-	float finalResult = i < 0 ? 0 : sqrt(i);
-	return (finalResult);
+float RGB_color_Lab_difference_CIE76(int R1, int G1, int B1, int R2, int G2, int B2)
+{
+    const auto & c1 = fastRgbToLab(R1, G1, B1);
+    const auto & c2 = fastRgbToLab(R2, G2, B2);
+    return Lab_color_difference_CIE76(c1.l, c1.a, c1.b, c2.l, c2.a, c2.b);
 }
 
-/***************************************************
- *  Name:        RGB_color_Lab_difference_CIE94
- *
- *  Returns:     float
- *
- *  Parameters:  2 RGB color values
- *
- *  Description: Converts RGB values to Lab values and returns  
- *				 the difference between 2 Lab colors based on 
- *				 the CIE94 formula
- *
- ***************************************************/
-float RGB_color_Lab_difference_CIE94( int R1, int G1, int B1, int R2, int G2, int B2){
-	float x1=0,y1=0,z1=0;
-	float x2=0,y2=0,z2=0;
-	float l1=0,a1=0,b1=0;
-	float l2=0,a2=0,b2=0;
+float Lab_color_difference_CIE94(float inL1, float ina1, float inb1, float inL2, float ina2, float inb2)
+{
+    // Коэффициенты Graphic Arts (вместо Textiles) для корректного учёта контраста яркости
+    const float Kl = 1.0f;
+    const float K1 = 0.045f;
+    const float K2 = 0.015f;
 
-	convertRGBtoXYZ(R1, G1, B1, &x1, &y1, &z1);
-	convertRGBtoXYZ(R2, G2, B2, &x2, &y2, &z2);
+    float deltaL = inL1 - inL2;
+    float deltaA = ina1 - ina2;
+    float deltaB = inb1 - inb2;
 
-	convertXYZtoLab(x1, y1, z1, &l1, &a1, &b1);
-	convertXYZtoLab(x2, y2, z2, &l2, &a2, &b2); 
+    float c1 = sqrtf(ina1 * ina1 + inb1 * inb1);
+    float c2 = sqrtf(ina2 * ina2 + inb2 * inb2);
+    float deltaC = c1 - c2;
 
-	return( Lab_color_difference_CIE94(l1 ,a1 ,b1 ,l2 ,a2 ,b2) );
+    float deltaH2 = deltaA * deltaA + deltaB * deltaB - deltaC * deltaC;
+    if (deltaH2 < 0.0f) deltaH2 = 0.0f;
+
+    float sc = 1.0f + K1 * c1;
+    float sh = 1.0f + K2 * c1;
+
+    float lTerm = deltaL / Kl;
+    float cTerm = deltaC / sc;
+    float hTerm2 = deltaH2 / (sh * sh);
+
+    float i = lTerm * lTerm + cTerm * cTerm + hTerm2;
+    return (i <= 0.0f) ? 0.0f : sqrtf(i);
 }
 
+float RGB_color_Lab_difference_CIE94(int R1, int G1, int B1, int R2, int G2, int B2)
+{
+    const auto & c1 = fastRgbToLab(R1, G1, B1);
+    const auto & c2 = fastRgbToLab(R2, G2, B2);
+    return Lab_color_difference_CIE94(c1.l, c1.a, c1.b, c2.l, c2.a, c2.b);
+}
 
-float Lab_color_difference_CIEDE2000( float inL1, float ina1, float  inb1, float inL2, float ina2, float inb2) {
+float Lab_color_difference_CIEDE2000(float inL1, float ina1, float inb1, float inL2, float ina2, float inb2)
+{
     return CIEDE2000::CIEDE2000(CIEDE2000::LAB(inL1, ina1, inb1), CIEDE2000::LAB(inL2, ina2, inb2));
 }
 
-float RGB_color_Lab_difference_CIEDE2000( int R1, int G1, int B1, int R2, int G2, int B2) {
-    float x1=0,y1=0,z1=0;
-    float x2=0,y2=0,z2=0;
-    float l1=0,a1=0,b1=0;
-    float l2=0,a2=0,b2=0;
-
-    convertRGBtoXYZ(R1, G1, B1, &x1, &y1, &z1);
-    convertRGBtoXYZ(R2, G2, B2, &x2, &y2, &z2);
-
-    convertXYZtoLab(x1, y1, z1, &l1, &a1, &b1);
-    convertXYZtoLab(x2, y2, z2, &l2, &a2, &b2);
-
-    return( Lab_color_difference_CIEDE2000(l1 ,a1 ,b1 ,l2 ,a2 ,b2) );
+float RGB_color_Lab_difference_CIEDE2000(int R1, int G1, int B1, int R2, int G2, int B2)
+{
+    const auto & c1 = fastRgbToLab(R1, G1, B1);
+    const auto & c2 = fastRgbToLab(R2, G2, B2);
+    return Lab_color_difference_CIEDE2000(c1.l, c1.a, c1.b, c2.l, c2.a, c2.b);
 }

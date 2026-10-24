@@ -8,19 +8,19 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    a.setApplicationName("zx4pixelizer");
 
 #ifdef Q_OS_WIN
-    // from https://forum.qt.io/topic/101391/windows-10-dark-theme/5
-    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",QSettings::NativeFormat);
+    QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", QSettings::NativeFormat);
     if (settings.value("AppsUseLightTheme") == 0)
     {
         qApp->setStyle(QStyleFactory::create("Fusion"));
         QPalette darkPalette;
-        QColor darkColor = QColor(45,45,45);
-        QColor disabledColor = QColor(127,127,127);
+        QColor darkColor = QColor(45, 45, 45);
+        QColor disabledColor = QColor(127, 127, 127);
         darkPalette.setColor(QPalette::Window, darkColor);
         darkPalette.setColor(QPalette::WindowText, Qt::white);
-        darkPalette.setColor(QPalette::Base, QColor(18,18,18));
+        darkPalette.setColor(QPalette::Base, QColor(18, 18, 18));
         darkPalette.setColor(QPalette::AlternateBase, darkColor);
         darkPalette.setColor(QPalette::ToolTipBase, Qt::white);
         darkPalette.setColor(QPalette::ToolTipText, Qt::white);
@@ -32,7 +32,6 @@ int main(int argc, char *argv[])
         darkPalette.setColor(QPalette::Disabled, QPalette::Base, darkColor);
         darkPalette.setColor(QPalette::BrightText, Qt::red);
         darkPalette.setColor(QPalette::Link, QColor(42, 130, 218));
-
         darkPalette.setColor(QPalette::Highlight, QColor(42, 130, 218));
         darkPalette.setColor(QPalette::HighlightedText, Qt::black);
         darkPalette.setColor(QPalette::Disabled, QPalette::HighlightedText, disabledColor);
@@ -40,21 +39,18 @@ int main(int argc, char *argv[])
         qApp->setPalette(darkPalette);
 
         QString stylesheet =
-                "QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }"
-                "QToolButton { border: 2px solid; border-radius: 6px; border-color: rgb(18, 18, 18); }"
-                "QToolButton:checked, QToolButton:pressed { border: 2px solid; border-radius: 6px; border-color: rgb(42, 130, 218); }"
-                "QListWidget::item:selected { background: rgb(42, 130, 218); }";
+            "QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }"
+            "QToolButton { border: 2px solid; border-radius: 6px; border-color: rgb(18, 18, 18); }"
+            "QToolButton:checked, QToolButton:pressed { border: 2px solid; border-radius: 6px; border-color: rgb(42, 130, 218); }"
+            "QListWidget::item:selected { background: rgb(42, 130, 218); }";
         qApp->setStyleSheet(stylesheet);
     }
 #endif
 
-    QProgressDialog * pd = MainWindow::createProgress(nullptr, "Preparing palette indexes");
-
+    QProgressDialog *pd = MainWindow::createProgress(nullptr, "Preparing palette indexes");
     MainWindow w;
     w.show();
-
     pd->hide();
     pd->deleteLater();
-
     return a.exec();
 }

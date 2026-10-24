@@ -2,6 +2,10 @@
 #include <QApplication>
 #include <QWidget>
 #include <QDir>
+#include <QDebug>
+#include <algorithm>
+#include <cstring>
+#include <cmath>
 #include "zx4pixelizer.h"
 #include "color_conversions.h"
 
@@ -24,13 +28,30 @@ void Zx4Image::resize(int _w, int _h)
     alpha_layer = _alpha_layer;
 }
 
+void Zx4Image::clear(int _w, int _h)
+{
+    w = _w;
+    h = _h;
+    color_layer0.clear();
+    color_layer1.clear();
+    alpha_layer.clear();
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            color_layer0[x][y] = BitOff;
+            color_layer1[x][y] = BitOff;
+            alpha_layer[x][y] = BitOff;
+        }
+    }
+}
 
-Zx4ImageWithAttributes::Zx4ImageWithAttributes(int _w, int _h): Zx4Image()
+Zx4ImageWithAttributes::Zx4ImageWithAttributes(int _w, int _h) : Zx4Image()
 {
     resize(_w, _h);
 }
 
-Zx4ImageWithAttributes::Zx4ImageWithAttributes(const Zx4Image & o, int p_index): Zx4Image(o)
+Zx4ImageWithAttributes::Zx4ImageWithAttributes(const Zx4Image & o, int p_index) : Zx4Image(o)
 {
     makeAttr(p_index);
 }
@@ -75,8 +96,8 @@ QPair<QByteArray, QByteArray> Zx4ImageWithAttributes::makeScreens(const Zx4Palet
         {
             int p_idx = attr[x][y];
             QList<ZxColorEnum> z = palettes.color_palette_table[p_idx];
-            scr0[scr_size + y * 32 + x] = (z[1] & 0x07) | ((z[0] & 0x0F) << 3);
-            scr1[scr_size + y * 32 + x] = (z[3] & 0x07) | ((z[2] & 0x0F) << 3);
+            scr0[scr_size + y * 32 + x] = static_cast<char>((z[1] & 0x07) | ((z[0] & 0x0F) << 3));
+            scr1[scr_size + y * 32 + x] = static_cast<char>((z[3] & 0x07) | ((z[2] & 0x0F) << 3));
         }
     }
     return QPair<QByteArray, QByteArray>(scr0, scr1);
@@ -114,116 +135,73 @@ Zx4ImageWithAttributes & Zx4ImageWithAttributes::copy(const Zx4ImageWithAttribut
             attr[x][y] = o.attr[ox][oy];
         }
     }
-    return * this;
+    return *this;
 }
-
-
 
 QByteArray Zx4ImportPars::serialize() const
 {
     QByteArray ba(sizeof(Zx4ImportPars), '\0');
-    ::memcpy(ba.data(), this, ba.count());
+    std::memcpy(ba.data(), this, ba.size());
     return ba;
 }
 
 bool Zx4ImportPars::deserialize(const QByteArray & ba)
 {
-    if (ba.count() != sizeof(Zx4ImportPars))
+    if (ba.size() != sizeof(Zx4ImportPars))
     {
         return false;
     }
-    ::memcpy(this, ba.constData(), ba.count());
+    std::memcpy(this, ba.constData(), ba.size());
     return true;
 }
 
 QString Zx4ImportPars::defaultPresetPath()
 {
-    return QDir().toNativeSeparators(QDir::homePath() + "/." + qApp->applicationName() + "/presets/");
-}
-
-
-
-
-template <class T>
-inline T & deconst_cast(const T & m)
-{
-    return * const_cast<T *>(& m);
-}
-
-Zx4Palette::Zx4Palette()
-{
-
+    return QDir::toNativeSeparators(QDir::homePath() + "/." + qApp->applicationName() + "/presets/");
 }
 
 void Zx4Palette::init()
 {
-    auto & _color_table = deconst_cast(color_table);
-#if 0
-    _color_table[ZxBlack] =          Qt::black;
-    _color_table[ZxBlue] =           Qt::darkBlue;
-    _color_table[ZxRed] =            Qt::darkRed;
-    _color_table[ZxMagenta] =        Qt::darkMagenta;
-    _color_table[ZxGreen] =          Qt::darkGreen;
-    _color_table[ZxCyan] =           Qt::darkCyan;
-    _color_table[ZxYellow] =         Qt::darkYellow;
-    _color_table[ZxWhite] =          Qt::lightGray;
-    _color_table[ZxBrightBlack] =    Qt::black;
-    _color_table[ZxBrightBlue] =     Qt::blue;
-    _color_table[ZxBrightRed] =      Qt::red;
-    _color_table[ZxBrightMagenta] =  Qt::magenta;
-    _color_table[ZxBrightGreen] =    Qt::green;
-    _color_table[ZxBrightCyan] =     Qt::cyan;
-    _color_table[ZxBrightYellow] =   Qt::yellow;
-    _color_table[ZxBrightWhite] =    Qt::white;
+    // Инициализируем LUT цветов при старте вместе с палитрами
+    RGB_color_Lab_difference_CIE76(0, 0, 0, 0, 0, 0);
 
-    deconst_cast(grayscale_index) = 492;
-#else
     const int level = 0xC0;
     const int high_level = 0xFF;
-    _color_table[ZxBlack] =          QColor(0x00, 0x00, 0x00);
-    _color_table[ZxBlue] =           QColor(0x00, 0x00, level);
-    _color_table[ZxRed] =            QColor(level, 0x00, 0x00);
-    _color_table[ZxMagenta] =        QColor(level, 0x00, level);
-    _color_table[ZxGreen] =          QColor(0x00, level, 0x00);
-    _color_table[ZxCyan] =           QColor(0x00, level, level);
-    _color_table[ZxYellow] =         QColor(level, level, 0x00);
-    _color_table[ZxWhite] =          QColor(level, level, level);
-    _color_table[ZxBrightBlack] =    QColor(0x00, 0x00, 0x00);
-    _color_table[ZxBrightBlue] =     QColor(0x00, 0x00, high_level);
-    _color_table[ZxBrightRed] =      QColor(high_level, 0x00, 0x00);
-    _color_table[ZxBrightMagenta] =  QColor(high_level, 0x00, high_level);
-    _color_table[ZxBrightGreen] =    QColor(0x00, high_level, 0x00);
-    _color_table[ZxBrightCyan] =     QColor(0x00, high_level, high_level);
-    _color_table[ZxBrightYellow] =   QColor(high_level, high_level, 0x00);
-    _color_table[ZxBrightWhite] =    QColor(high_level, high_level, high_level);
+    color_table[ZxBlack] =          QColor(0x00, 0x00, 0x00);
+    color_table[ZxBlue] =           QColor(0x00, 0x00, level);
+    color_table[ZxRed] =            QColor(level, 0x00, 0x00);
+    color_table[ZxMagenta] =        QColor(level, 0x00, level);
+    color_table[ZxGreen] =          QColor(0x00, level, 0x00);
+    color_table[ZxCyan] =           QColor(0x00, level, level);
+    color_table[ZxYellow] =         QColor(level, level, 0x00);
+    color_table[ZxWhite] =          QColor(level, level, level);
+    color_table[ZxBrightBlack] =    QColor(0x00, 0x00, 0x00);
+    color_table[ZxBrightBlue] =     QColor(0x00, 0x00, high_level);
+    color_table[ZxBrightRed] =      QColor(high_level, 0x00, 0x00);
+    color_table[ZxBrightMagenta] =  QColor(high_level, 0x00, high_level);
+    color_table[ZxBrightGreen] =    QColor(0x00, high_level, 0x00);
+    color_table[ZxBrightCyan] =     QColor(0x00, high_level, high_level);
+    color_table[ZxBrightYellow] =   QColor(high_level, high_level, 0x00);
+    color_table[ZxBrightWhite] =    QColor(high_level, high_level, high_level);
+    grayscale_index = 486;
 
-    deconst_cast(grayscale_index) = 486;
-#endif
+    color_name[ZxBlack] =          "Black";
+    color_name[ZxBlue] =           "Blue";
+    color_name[ZxRed] =            "Red";
+    color_name[ZxMagenta] =        "Magenta";
+    color_name[ZxGreen] =          "Green";
+    color_name[ZxCyan] =           "Cyan";
+    color_name[ZxYellow] =         "Yellow";
+    color_name[ZxWhite] =          "White";
+    color_name[ZxBrightBlack] =    "Bright black";
+    color_name[ZxBrightBlue] =     "Bright blue";
+    color_name[ZxBrightRed] =      "Bright red";
+    color_name[ZxBrightMagenta] =  "Bright magenta";
+    color_name[ZxBrightGreen] =    "Bright green";
+    color_name[ZxBrightCyan] =     "Bright cyan";
+    color_name[ZxBrightYellow] =   "Bright yellow";
+    color_name[ZxBrightWhite] =    "Bright white";
 
-    auto & _color_name = deconst_cast(color_name);
-    _color_name[ZxBlack] =          "Black";
-    _color_name[ZxBlue] =           "Blue";
-    _color_name[ZxRed] =            "Red";
-    _color_name[ZxMagenta] =        "Magenta";
-    _color_name[ZxGreen] =          "Green";
-    _color_name[ZxCyan] =           "Cyan";
-    _color_name[ZxYellow] =         "Yellow";
-    _color_name[ZxWhite] =          "White";
-    _color_name[ZxBrightBlack] =    "Bright black";
-    _color_name[ZxBrightBlue] =     "Bright blue";
-    _color_name[ZxBrightRed] =      "Bright red";
-    _color_name[ZxBrightMagenta] =  "Bright magenta";
-    _color_name[ZxBrightGreen] =    "Bright green";
-    _color_name[ZxBrightCyan] =     "Bright cyan";
-    _color_name[ZxBrightYellow] =   "Bright yellow";
-    _color_name[ZxBrightWhite] =    "Bright white";
-
-    auto & _palettes = deconst_cast(palettes);
-    auto & _palettes_by_color = deconst_cast(palettes_by_color);
-    auto & _palettes_by_2colors = deconst_cast(palettes_by_2colors);
-    auto & _palettes_by_3colors = deconst_cast(palettes_by_3colors);
-    auto & _palettes_by_4colors = deconst_cast(palettes_by_4colors);
-    auto & _color_palette_table = deconst_cast(color_palette_table);
     int color_num = 0;
     for (int c0i = 0; c0i < 8; c0i++)
     {
@@ -244,7 +222,6 @@ void Zx4Palette::init()
                             z[1] = static_cast<ZxColorEnum>(c1i + 8 * b0);
                             z[2] = static_cast<ZxColorEnum>(c2i + 8 * b1);
                             z[3] = static_cast<ZxColorEnum>(c3i + 8 * b1);
-
                             c[0] = color_table[z[0]];
                             c[1] = color_table[z[1]];
                             c[2] = color_table[z[2]];
@@ -256,28 +233,24 @@ void Zx4Palette::init()
                             m[2] = QColor::fromRgb((c[1].red() + c[2].red()) / 2, (c[1].green() + c[2].green()) / 2, (c[1].blue() + c[2].blue()) / 2);
                             m[3] = QColor::fromRgb((c[1].red() + c[3].red()) / 2, (c[1].green() + c[3].green()) / 2, (c[1].blue() + c[3].blue()) / 2);
 
-                            QList<QRgb> ml1;
-                            ml1 << m[0].rgb() << m[1].rgb() << m[2].rgb() << m[3].rgb();
-                            if (ml1.toSet().count() < 4) // if (ml1.toSet().count() != 4)
+                            QSet<QRgb> unique_colors = { m[0].rgb(), m[1].rgb(), m[2].rgb(), m[3].rgb() };
+                            if (unique_colors.size() < 4)
                             {
                                 continue;
                             }
 
-                            QList<QColor> list;
-                            list << m[0] << m[1] << m[2] << m[3];
+                            QList<QColor> list = { m[0], m[1], m[2], m[3] };
                             if (palettes.contains(list))
                             {
                                 continue;
                             }
-                            _palettes << list;
 
-                            _palettes_by_color[m[0]] << color_num;
-                            _palettes_by_color[m[1]] << color_num;
-                            _palettes_by_color[m[2]] << color_num;
-                            _palettes_by_color[m[3]] << color_num;
-
-                            _color_palette_table[color_num] << z[0] << z[1] << z[2] << z[3];
-
+                            palettes << list;
+                            palettes_by_color[m[0]] << color_num;
+                            palettes_by_color[m[1]] << color_num;
+                            palettes_by_color[m[2]] << color_num;
+                            palettes_by_color[m[3]] << color_num;
+                            color_palette_table[color_num] << z[0] << z[1] << z[2] << z[3];
                             color_num++;
                         }
                     }
@@ -285,51 +258,66 @@ void Zx4Palette::init()
             }
         }
     }
-    for (auto i = _palettes_by_color.begin(); i != _palettes_by_color.end(); ++i)
-    {
-        qSort(i.value() = i.value().toSet().toList());
-    }
+
     for (auto i = palettes_by_color.begin(); i != palettes_by_color.end(); ++i)
     {
+        QSet<int> s(i.value().begin(), i.value().end());
+        i.value() = s.values();
+        std::sort(i.value().begin(), i.value().end());
+    }
+
+    for (auto i = palettes_by_color.cbegin(); i != palettes_by_color.cend(); ++i)
+    {
         qApp->processEvents();
-        for (auto k = i + 1; k != palettes_by_color.end(); ++k)
+        QSet<int> set_i(i.value().begin(), i.value().end());
+        for (auto k = i + 1; k != palettes_by_color.cend(); ++k)
         {
-            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
+            QSet<int> set_k(k.value().begin(), k.value().end());
+            auto list = (set_i & set_k).values();
             if (!list.isEmpty())
             {
-                qSort(_palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = list);
+                std::sort(list.begin(), list.end());
+                palettes_by_2colors[QPair<QColor, QColor>(i.key(), k.key())] = list;
             }
         }
     }
-    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+
+    for (auto i = palettes_by_2colors.cbegin(); i != palettes_by_2colors.cend(); ++i)
     {
         qApp->processEvents();
-        for (auto k = palettes_by_color.begin(); k != palettes_by_color.end(); ++k)
+        QSet<int> set_i(i.value().begin(), i.value().end());
+        for (auto k = palettes_by_color.cbegin(); k != palettes_by_color.cend(); ++k)
         {
             if (k.key().rgba() <= i.key().second.rgba())
             {
                 continue;
             }
-            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
+            QSet<int> set_k(k.value().begin(), k.value().end());
+            auto list = (set_i & set_k).values();
             if (!list.isEmpty())
             {
-                qSort(_palettes_by_3colors[i.key()][k.key()] = list);
+                std::sort(list.begin(), list.end());
+                palettes_by_3colors[i.key()][k.key()] = list;
             }
         }
     }
-    for (auto i = palettes_by_2colors.begin(); i != palettes_by_2colors.end(); ++i)
+
+    for (auto i = palettes_by_2colors.cbegin(); i != palettes_by_2colors.cend(); ++i)
     {
         qApp->processEvents();
-        for (auto k = i + 1; k != palettes_by_2colors.end(); ++k)
+        QSet<int> set_i(i.value().begin(), i.value().end());
+        for (auto k = i + 1; k != palettes_by_2colors.cend(); ++k)
         {
             if (k.key().first.rgba() <= i.key().second.rgba())
             {
                 continue;
             }
-            auto list = i.value().toSet().intersect(k.value().toSet()).toList();
+            QSet<int> set_k(k.value().begin(), k.value().end());
+            auto list = (set_i & set_k).values();
             if (!list.isEmpty())
             {
-                qSort(_palettes_by_4colors[i.key()][k.key()] = list);
+                std::sort(list.begin(), list.end());
+                palettes_by_4colors[i.key()][k.key()] = list;
             }
         }
     }
@@ -338,73 +326,76 @@ void Zx4Palette::init()
 QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib4, SelectPaletteMethod method) const
 {
     QMultiMap<double, int> dist;
+    if (color_distrib4.isEmpty())
+    {
+        return dist;
+    }
+
+    double total_weight = 0;
+    for (auto c = color_distrib4.cbegin(); c != color_distrib4.cend(); ++c)
+    {
+        total_weight += c.value();
+    }
+    if (total_weight <= 0) total_weight = 1.0;
+
     for (int i = 0; i < palettes.count(); i++)
     {
-        QList<QColor> pal = palettes[i];
-        if (pal[0] == pal[1] || pal[2] == pal[3] || pal[0] == pal[2] || pal[1] == pal[3] || pal[1] == pal[2])
-        {
-            continue;
-        }
-        double d = 0;
+        const QList<QColor> & pal = palettes[i];
+        double total_error = 0.0;
 
-        foreach (QColor p, pal)
+        // Для каждого доминирующего цвета изображения ищем ближайший цвет в палитре с учётом его веса
+        for (auto c = color_distrib4.cbegin(); c != color_distrib4.cend(); ++c)
         {
-            QColor p_hsl = p.toHsl();
-            int p_h = p_hsl.hslHue();
-            int p_s = p_hsl.hslSaturation();
-            int p_l = p_hsl.lightness();
-            for(QMap<QColor, int>::iterator c = color_distrib4.begin(); c != color_distrib4.end(); ++c)
+            const QColor img_c = c.key().toRgb();
+            const QColor img_hsl = c.key().toHsl();
+            const int c_h = img_hsl.hslHue();
+            const int c_s = img_hsl.hslSaturation();
+            const int c_l = img_hsl.lightness();
+
+            double best_diff = 1e9;
+            for (const QColor & p : pal)
             {
+                double diff = 0.0;
                 switch (method)
                 {
                 case SelectPaletteCIE76:
-                    d += RGB_color_Lab_difference_CIE76(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue()) / c.value();
+                    diff = RGB_color_Lab_difference_CIE76(p.red(), p.green(), p.blue(), img_c.red(), img_c.green(), img_c.blue());
                     break;
                 case SelectPaletteCIE94:
-                    d += RGB_color_Lab_difference_CIE94(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue()) / c.value();
+                    diff = RGB_color_Lab_difference_CIE94(p.red(), p.green(), p.blue(), img_c.red(), img_c.green(), img_c.blue());
                     break;
                 case SelectPaletteCIEDE2000:
-                    d += RGB_color_Lab_difference_CIEDE2000(p.red(), p.green(), p.blue(), c.key().red(), c.key().green(), c.key().blue()) / c.value();
+                    diff = RGB_color_Lab_difference_CIEDE2000(p.red(), p.green(), p.blue(), img_c.red(), img_c.green(), img_c.blue());
                     break;
                 default:
-                    QColor c_hsl = c.key().toHsl();
-                    int c_h = c_hsl.hslHue();
-                    int c_s = c_hsl.hslSaturation();
-                    int c_l = c_hsl.lightness();
-
-                    double _d = 0;
+                {
+                    QColor p_hsl = p.toHsl();
+                    int p_h = p_hsl.hslHue();
+                    int p_s = p_hsl.hslSaturation();
+                    int p_l = p_hsl.lightness();
                     if (p_h != -1 && c_h != -1)
                     {
-                        if (p_h < c_h)
-                        {
-                            p_h += 360;
-                        }
-                        _d = p_h - c_h;
-                        if (_d > 180)
-                        {
-                            _d = 360 - _d;
-                        }
+                        int dh = qAbs(p_h - c_h);
+                        if (dh > 180) dh = 360 - dh;
+                        diff = dh;
                     }
-                    else
-                    if (p_h != c_h)
+                    else if (p_h != c_h)
                     {
-                        _d += 90;
+                        diff = 45.0;
                     }
-
-                    _d += 1.0 * (qAbs(p_s - c_s) + 0.1 * qAbs(p_l - c_l));
-                    d += _d / c.value();
+                    diff += 0.5 * qAbs(p_s - c_s) + 0.8 * qAbs(p_l - c_l);
                     break;
                 }
+                }
+                if (diff < best_diff)
+                {
+                    best_diff = diff;
+                }
             }
+            total_error += best_diff * c.value();
         }
-        if (d > 0)
-        {
-            dist.insert(d, i);
-        }
+        dist.insert(total_error / total_weight, i);
     }
-
-//    qDebug() << dist;
-
     return dist;
 }
 
@@ -413,16 +404,18 @@ int Zx4Palette::exactPalette(const QImage & img) const
     if (img.colorCount() >= 4)
     {
         QVector<QRgb> colors = img.colorTable().mid(0, 4);
-        qSort(colors);
-        if (palettes_by_4colors.contains(QPair<QColor, QColor>(colors[0], colors[1])))
+        std::sort(colors.begin(), colors.end());
+        QPair<QColor, QColor> firstPair(colors[0], colors[1]);
+        QPair<QColor, QColor> secondPair(colors[2], colors[3]);
+        if (palettes_by_4colors.contains(firstPair))
         {
-            if(palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])].contains(QPair<QColor, QColor>(colors[2], colors[3])))
+            const auto & inner = palettes_by_4colors[firstPair];
+            if (inner.contains(secondPair))
             {
-                QList<int> list = palettes_by_4colors[QPair<QColor, QColor>(colors[0], colors[1])][QPair<QColor, QColor>(colors[2], colors[3])];
+                const QList<int> & list = inner[secondPair];
                 if (!list.isEmpty())
                 {
-                    const int p_idx = list.first();
-                    return p_idx;
+                    return list.first();
                 }
             }
         }
@@ -449,19 +442,22 @@ QVector<QRgb> Zx4Palette::colorTable(int p_idx) const
     {
         return color_table;
     }
-    foreach(QColor c, palettes[p_idx])
+    for (const QColor & c : palettes[p_idx])
     {
         color_table << c.rgb();
     }
     return color_table;
 }
 
-
 QImage Zx4Processing::scaleImage(QImage img, int w, int h)
 {
     img = img.convertToFormat(QImage::Format_ARGB32);
     QImage out(img.scaled(w, h, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
     out.fill(QColor(0, 0, 0, 0));
+    if (img.isNull() || out.isNull())
+    {
+        return out;
+    }
     for (int y = 0; y < img.height(); y++)
     {
         for (int x = 0; x < img.width(); x++)
@@ -469,13 +465,10 @@ QImage Zx4Processing::scaleImage(QImage img, int w, int h)
             int ix = x * out.width() / img.width();
             int iy = y * out.height() / img.height();
             QColor px;
-
             QColor old_px_rgb = out.pixelColor(ix, iy);
             QColor new_px_rgb = img.pixelColor(x, y);
-
             QColor old_px_hsl = old_px_rgb.toHsl();
             QColor new_px_hsl = new_px_rgb.toHsl();
-
             if (new_px_hsl.hslHue() == -1 || old_px_hsl.hslHue() == -1)
             {
                 px = new_px_rgb;
@@ -483,14 +476,12 @@ QImage Zx4Processing::scaleImage(QImage img, int w, int h)
             else
             {
                 px = new_px_hsl.hslSaturation() > old_px_hsl.hslSaturation() ? new_px_hsl : old_px_hsl;
-
                 px.setHsl(
-                            px.hslHue(),
-                            px.hslSaturation(),
-                            px.lightness(),
-                            qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
+                    px.hslHue(),
+                    px.hslSaturation(),
+                    px.lightness(),
+                    qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
             }
-
             out.setPixelColor(ix, iy, px.toRgb());
         }
     }
@@ -499,44 +490,43 @@ QImage Zx4Processing::scaleImage(QImage img, int w, int h)
 
 QMultiMap<int, QColor> Zx4Processing::colorDistribution(QImage img, bool use_alpha)
 {
-    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
-
-    QMap<QColor, int> color_distrib;
-    QMultiMap<int, QColor> color_distrib2;
-    QImage detect_colors_img = img.convertToFormat(QImage::Format_Indexed8);
-    QByteArray ba = QByteArray::fromRawData(reinterpret_cast<const char *>(detect_colors_img.constBits()), detect_colors_img.width() * detect_colors_img.height());
-    QVector<QRgb> color_table = detect_colors_img.colorTable();
-    for (int i = 0; i < color_table.count(); i++)
+    if (img.isNull())
     {
-        int n = ba.count(i);
-        if (n > 0)
-        {
-            color_distrib[color_table[i]] += n;
-        }
+        return {};
     }
+    bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+    QRgb corner_rgb = img.pixel(0, 0) & 0x00FFFFFF;
 
-    if (use_alpha)
+    // Квантуем близкие шумовые оттенки до 5 бит на канал (шаг 8), чтобы подавить градиентный шум
+    QMap<QRgb, int> counts;
+    for (int y = 0; y < img.height(); y++)
     {
-        for (int y = 0; y < img.height(); y++)
+        for (int x = 0; x < img.width(); x++)
         {
-            for (int x = 0; x < img.width(); x++)
+            QRgb px = img.pixel(x, y);
+            if (use_alpha)
             {
-                if ((src_alpha_channel && qAlpha(img.pixel(x, y)) < 128) || (!src_alpha_channel && detect_colors_img.pixel(0, 0) == detect_colors_img.pixel(x, y)))
+                if ((src_alpha_channel && qAlpha(px) < 128) ||
+                    (!src_alpha_channel && (px & 0x00FFFFFF) == corner_rgb))
                 {
-                    color_distrib.remove(detect_colors_img.pixel(x, y));
+                    continue;
                 }
             }
+            int r = (qRed(px) & 0xF8) | (qRed(px) >> 5);
+            int g = (qGreen(px) & 0xF8) | (qGreen(px) >> 5);
+            int b = (qBlue(px) & 0xF8) | (qBlue(px) >> 5);
+            counts[qRgb(r, g, b)]++;
         }
     }
 
-    for (auto i = color_distrib.begin(); i != color_distrib.end(); ++i)
+    QMultiMap<int, QColor> color_distrib2;
+    for (auto i = counts.cbegin(); i != counts.cend(); ++i)
     {
         if (i.value() > 0)
         {
-            color_distrib2.insert(i.value(), i.key());
+            color_distrib2.insert(i.value(), QColor::fromRgb(i.key()));
         }
     }
-
     return color_distrib2;
 }
 
@@ -548,11 +538,7 @@ bool Zx4Processing::alikeColors(QColor c1, QColor c2, int hue_precision, int lig
     int c2_h = c2.hslHue();
     if (c1_h != -1 && c2_h != -1)
     {
-        if (c1_h < c2_h)
-        {
-            c1_h += 360;
-        }
-        int _d = c1_h - c2_h;
+        int _d = qAbs(c1_h - c2_h);
         if (_d > 180)
         {
             _d = 360 - _d;
@@ -576,123 +562,114 @@ bool Zx4Processing::alikeColors(QColor c1, QColor c2, int hue_precision, int lig
 QMap<QColor, int> Zx4Processing::colorDistribution4(QImage img)
 {
     QMultiMap<int, QColor> color_distrib2 = colorDistribution(img);
-
     QMap<QColor, int> color_distrib4;
-    QColor prev_c, val_c;
     for (auto i = color_distrib2.end(); i != color_distrib2.begin() && color_distrib4.count() < 4;)
     {
         --i;
-        QColor c = i.value().toHsl();
-        if (!prev_c.isValid() || !alikeColors(c, prev_c))
+        QColor c = i.value();
+        bool merged = false;
+        for (auto k = color_distrib4.begin(); k != color_distrib4.end(); ++k)
         {
-            color_distrib4[val_c = c] = i.key();
+            if (alikeColors(c, k.key()))
+            {
+                k.value() += i.key();
+                merged = true;
+                break;
+            }
         }
-        else
-        if (val_c.isValid())
+        if (!merged)
         {
-            color_distrib4[val_c] += i.key();
+            color_distrib4[c] = i.key();
         }
-        prev_c = c;
     }
-
     return color_distrib4;
 }
 
 QImage Zx4Processing::importImage(QImage img, QVector<QRgb> color_table, bool use_alpha)
 {
-    QRgb alpha_pixel;
+    if (img.isNull() || color_table.isEmpty())
+    {
+        return QImage();
+    }
     bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
+    QRgb corner_rgb = img.pixel(0, 0) & 0x00FFFFFF;
+
+    QImage converted = importImage(img, color_table);
     if (use_alpha)
     {
-        if (!src_alpha_channel)
+        color_table << qRgba(0, 0, 0, 0);
+        converted.setColorTable(color_table);
+        for (int y = 0; y < img.height(); y++)
         {
-            alpha_pixel = img.pixel(0, 0);
-        }
-        else
-        {
-            alpha_pixel = color_table.first() & 0x00FFFFFF; // duplicate color with full opacity
-            for (int y = 0; y < img.height(); y++)
+            for (int x = 0; x < img.width(); x++)
             {
-                for (int x = 0; x < img.width(); x++)
+                QRgb px = img.pixel(x, y);
+                if ((src_alpha_channel && qAlpha(px) < 128) ||
+                    (!src_alpha_channel && (px & 0x00FFFFFF) == corner_rgb))
                 {
-                    if (qAlpha(img.pixel(x, y)) < 128)
-                    {
-                        img.setPixel(x, y, alpha_pixel);
-                    }
+                    converted.setPixel(x, y, 4);
                 }
             }
         }
-
-        color_table << alpha_pixel;
     }
-
-    img = importImage(img, color_table);
-
-    if (use_alpha)
-    {
-        if (!src_alpha_channel)
-        {
-            alpha_pixel = img.pixel(0, 0);
-            for (int y = 0; y < img.height(); y++)
-            {
-                for (int x = 0; x < img.width(); x++)
-                {
-                    if (img.pixel(x, y) == alpha_pixel)
-                    {
-                        img.setPixel(x, y, 4); // alpha_pixel index
-                    }
-                }
-            }
-        }
-        color_table.last() = qRgba(0, 0, 0, 0);
-        img.setColorTable(color_table);
-    }
-
-    return img;
+    return converted;
 }
 
-#include <QDebug>
 QImage Zx4Processing::importImage(QImage small_quad, QVector<QRgb> color_table)
 {
-#if 0
-    small_quad = small_quad.convertToFormat(QImage::Format_Indexed8, color_table);
-#else
     QImage converted(small_quad.size(), QImage::Format_Indexed8);
     converted.setColorTable(color_table);
+    const int n_colors = qMin(4, int(color_table.count()));
+
     for (int iy = 0; iy < converted.height(); iy++)
     {
         for (int ix = 0; ix < converted.width(); ix++)
         {
-            int i_diff = 0;
-            double color_diff = -1, alpha_diff = -1;
-            QColor px = small_quad.pixelColor(ix, iy);
-            for (int i = 0; i < color_table.count(); i++)
+            int best_idx = 0;
+            double best_diff = 1e18;
+            QRgb px = small_quad.pixel(ix, iy);
+            int pr = qRed(px), pg = qGreen(px), pb = qBlue(px);
+            int p_max = qMax(pr, qMax(pg, pb));
+            int p_min = qMin(pr, qMin(pg, pb));
+            int p_chroma = p_max - p_min;
+
+            for (int i = 0; i < n_colors; i++)
             {
-                QColor ct(qRed(color_table[i]), qGreen(color_table[i]), qBlue(color_table[i]), qAlpha(color_table[i]));
-                double _color_diff = RGB_color_Lab_difference_CIEDE2000(px.red(), px.green(), px.blue(), ct.red(), ct.green(), ct.blue());
-                if (color_diff < 0 || _color_diff <= color_diff)
+                QRgb ct = color_table[i];
+                int cr = qRed(ct), cg = qGreen(ct), cb = qBlue(ct);
+                int c_max = qMax(cr, qMax(cg, cb));
+                int c_min = qMin(cr, qMin(cg, cb));
+                int c_chroma = c_max - c_min;
+
+                double d = RGB_color_Lab_difference_CIEDE2000(pr, pg, pb, cr, cg, cb);
+
+                // Компенсируем занижение разницы яркости в CIEDE2000 на тёмных тонах,
+                // чтобы тёмные пиксели (L < 36) не прыгали в средне-серый/яркий цвет (96..255)
+                double luma_diff = qAbs((pr * 77 + pg * 150 + pb * 29) - (cr * 77 + cg * 150 + cb * 29)) / 256.0;
+                d += luma_diff * 0.12;
+
+                // Запрещаем красить цветные пиксели ахроматическим серым цветом палитры (96,96,96)
+                if (p_chroma > 18 && c_chroma == 0 && c_max > 0)
                 {
-                    color_diff = _color_diff;
-                    double _alpha_diff = qAbs(px.alphaF() - ct.alphaF());
-                    if (alpha_diff < 0 || _alpha_diff <= alpha_diff)
-                    {
-                        alpha_diff = _alpha_diff;
-                        i_diff = i;
-                    }
+                    d += p_chroma * 0.25;
+                }
+
+                if (d < best_diff)
+                {
+                    best_diff = d;
+                    best_idx = i;
                 }
             }
-            converted.setPixel(ix, iy, i_diff);
+            converted.setPixel(ix, iy, best_idx);
         }
     }
-    small_quad = converted;
-#endif
-    return small_quad;
+    return converted;
 }
 
 QByteArray Zx4Processing::deflateRle8(QByteArray ba)
 {
     QByteArray out;
-    const char sep = (char)0x80;
+    const char sep = static_cast<char>(0x80);
     for (int i = 0; i < ba.count();)
     {
         char current_char = ba[i];
@@ -707,11 +684,10 @@ QByteArray Zx4Processing::deflateRle8(QByteArray ba)
             out += current_char;
             if (current_char == sep)
             {
-                out += (char)0x00;
+                out += static_cast<char>(0x00);
             }
         }
-        else
-        if (count == 2 && current_char != sep)
+        else if (count == 2 && current_char != sep)
         {
             out += current_char;
             out += current_char;
@@ -721,7 +697,7 @@ QByteArray Zx4Processing::deflateRle8(QByteArray ba)
             do
             {
                 out += sep;
-                out += (char)qMin(255, count);
+                out += static_cast<char>(qMin(255, count));
                 out += current_char;
             }
             while ((count -= 255) > 0);
@@ -733,7 +709,7 @@ QByteArray Zx4Processing::deflateRle8(QByteArray ba)
 QByteArray Zx4Processing::inflateRle8(QByteArray ba)
 {
     QByteArray out;
-    const char sep = (char)0x80;
+    const char sep = static_cast<char>(0x80);
     for (int i = 0; i < ba.count(); ++i)
     {
         if (ba[i] != sep)
@@ -744,17 +720,14 @@ QByteArray Zx4Processing::inflateRle8(QByteArray ba)
         {
             if (++i < ba.count())
             {
-                int count = ba[i];
+                int count = static_cast<quint8>(ba[i]);
                 if (count == 0)
                 {
                     out += sep;
                 }
-                else
+                else if (++i < ba.count())
                 {
-                    if (++i < ba.count())
-                    {
-                        out += QByteArray(count, ba[i]);
-                    }
+                    out += QByteArray(count, ba[i]);
                 }
             }
         }
@@ -762,10 +735,7 @@ QByteArray Zx4Processing::inflateRle8(QByteArray ba)
     return out;
 }
 
-
-
-
-Zx4BaseObject::Zx4BaseObject(const Zx4Palette & _palettes): palettes(_palettes)
+Zx4BaseObject::Zx4BaseObject(const Zx4Palette & _palettes) : palettes(_palettes)
 {
     clearHistory();
 }
@@ -817,9 +787,11 @@ void Zx4BaseObject::setSourceImage(QImageReader & i)
     QList<QImage> list;
     QImage img;
     if (i.jumpToImage(0))
-    while (!(img = i.read()).isNull())
     {
-        list << img;
+        while (!(img = i.read()).isNull())
+        {
+            list << img;
+        }
     }
     setSourceImage(list);
 }
@@ -851,7 +823,7 @@ void Zx4BaseObject::setImage(const QList<const Zx4Image *> & list)
 
 void Zx4BaseObject::setImage(const Zx4Image & i)
 {
-    setImage(QList<const Zx4Image *>() << & i);
+    setImage(QList<const Zx4Image *>() << &i);
 }
 
 const Zx4Image & Zx4BaseObject::image(int frame) const
@@ -860,11 +832,11 @@ const Zx4Image & Zx4BaseObject::image(int frame) const
     {
         zx4_img << QSharedPointer<Zx4Image>(new Zx4Image());
     }
-    if (frame >= zx4_img.count())
+    if (frame < 0 || frame >= zx4_img.count())
     {
         frame = 0;
     }
-    return * zx4_img[frame];
+    return *zx4_img[frame];
 }
 
 void Zx4BaseObject::setCurrentColorIndex(int i)
@@ -918,14 +890,14 @@ int Zx4BaseObject::currentFrame() const
 
 int Zx4BaseObject::framesCount() const
 {
-    return qMin(src_imp_img.count(), zx4_img.count());
+    return zx4_img.count();
 }
 
 void Zx4BaseObject::storeToHistory(QString desc)
 {
     history.second = history.second.mid(0, history.first + 1);
     QList<QSharedPointer<Zx4Image>> list;
-    foreach (auto entry, zx4_img) // do deep copy
+    for (const auto & entry : zx4_img)
     {
         list << QSharedPointer<Zx4Image>(entry->clone());
     }
@@ -943,7 +915,7 @@ void Zx4BaseObject::undo()
     if (canUndo())
     {
         zx4_img.clear();
-        foreach (auto entry, history.second.at(--history.first).second) // do deep copy
+        for (const auto & entry : history.second.at(--history.first).second)
         {
             zx4_img << QSharedPointer<Zx4Image>(entry->clone());
         }
@@ -955,7 +927,7 @@ void Zx4BaseObject::redo()
     if (canRedo())
     {
         zx4_img.clear();
-        foreach (auto entry, history.second.at(++history.first).second) // do deep copy
+        for (const auto & entry : history.second.at(++history.first).second)
         {
             zx4_img << QSharedPointer<Zx4Image>(entry->clone());
         }
@@ -967,7 +939,7 @@ bool Zx4BaseObject::canUndo(QString * desc)
     const bool rc = history.first > 0 && history.first < history.second.count();
     if (rc && desc)
     {
-        * desc = history.second.at(history.first).first;
+        *desc = history.second.at(history.first).first;
     }
     return rc;
 }
@@ -977,7 +949,7 @@ bool Zx4BaseObject::canRedo(QString * desc)
     const bool rc = history.first >= 0 && history.first < history.second.count() - 1;
     if (rc && desc)
     {
-        * desc = history.second.at(history.first + 1).first;
+        *desc = history.second.at(history.first + 1).first;
     }
     return rc;
 }
