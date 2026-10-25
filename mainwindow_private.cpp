@@ -653,9 +653,9 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     }
     const auto pars = _current_scene->importPars();
     QProgressDialog * pd = createProgress(this, "Importing scene\n" + ui->colorPickBox->currentText());
-    _current_scene->transformedImage() = applyTransforms(pars, _current_scene->sourceImage());
-    QImage img = _current_scene->transformedImage()
-        .convertToFormat(pars.dithering ? QImage::Format_Indexed8 : QImage::Format_ARGB32);
+    QImage img = applyTransforms(pars, _current_scene->sourceImage())
+        .convertToFormat(pars.dithering ? QImage::Format_Indexed8 : QImage::Format_RGB32);
+    _current_scene->transformedImage() = img;
     pd->setRange(0, (img.width() / 8) * (img.height() / 8));
 
     QImage out(img.width(), img.height(), QImage::Format_RGB32);

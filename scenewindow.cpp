@@ -168,14 +168,12 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                     if (selected_char != QPoint(-1, -1))
                     {
                         update_char = QPoint(x / 8, y / 8);
-                        int target_attr = scene().attr[selected_char.x()][selected_char.y()];
-                        scene().attr[update_char.x()][update_char.y()] = target_attr;
                         importChar(
                             update_char,
-                            target_attr,
+                            scene().attr[selected_char.x()][selected_char.y()],
                             transformed_img[current_frame].copy(update_char.x() * 8, update_char.y() * 8, 8, 8));
                     }
-                    on_change = [=]()
+                    on_change = [this]()
                     {
                         storeToHistory("Palette change at character position");
                         emit undoRedoMenuUpdateIsNeeded();
@@ -198,7 +196,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                     if (selected_char == QPoint(x / 8, y / 8))
                     {
                         setPixel(QPoint(x, y), currentColorIndex());
-                        on_change = [=]()
+                        on_change = [this]()
                         {
                             storeToHistory("Pixel draw");
                             emit undoRedoMenuUpdateIsNeeded();
