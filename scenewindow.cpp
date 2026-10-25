@@ -14,7 +14,7 @@ SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
     zx4_img << QSharedPointer<Zx4Image>(new Zx4ImageWithAttributes());
     ui->setupUi(this);
     setCanvas(ui->canvas);
-    setFileName(QString());
+    SceneWindow::setFileName(QString());
     selected_char = update_char = QPoint(-1, -1);
 }
 

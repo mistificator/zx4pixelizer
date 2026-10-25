@@ -13,7 +13,5 @@
         <file alias="about.png">resources/about.png</file>
         <file alias="animate.png">resources/animate.png</file>
         <file alias="stop.png">resources/stop.png</file>
-        <file alias="Dark Sharp HQ">presets/Dark Sharp HQ</file>
-        <file alias="Default">presets/Default</file>
     </qresource>
 </RCC>

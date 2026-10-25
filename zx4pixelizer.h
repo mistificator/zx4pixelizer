@@ -106,6 +106,7 @@ struct Zx4Processing
 struct Zx4ImportPars
 {
     bool alpha = true;
+    bool dithering = false;
     bool autopalette = true;
     int palette_index = 1;
     int palette_index_max = 1;

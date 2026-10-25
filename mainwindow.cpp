@@ -51,8 +51,6 @@ MainWindow::MainWindow(QWidget *parent)
     QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, palettes.grayscale_index));
 
     QDir().mkpath(Zx4ImportPars::defaultPresetPath());
-    QFile::copy(":/Default", Zx4ImportPars::defaultPresetPath() + "/Default");
-    QFile::copy(":/Dark Sharp HQ", Zx4ImportPars::defaultPresetPath() + "/Dark Sharp HQ");
 
     auto ensurePreset = [](const QString &name, Zx4ImportPars::PassMethod pass, Zx4Palette::SelectPaletteMethod pick,
                            double hue, double sat, double light)
@@ -75,10 +73,12 @@ MainWindow::MainWindow(QWidget *parent)
         }
     };
 
-    ensurePreset("Acid ZX Contrast",   Zx4ImportPars::Multipass5x5x2, Zx4Palette::SelectPaletteCIEDE2000,  0.00, 0.55, -0.25);
-    ensurePreset("Neon Gigascreen HQ", Zx4ImportPars::Multipass7x7x3, Zx4Palette::SelectPaletteCIEDE2000, -0.03, 0.45, -0.20);
-    ensurePreset("Clean Pixel Art",    Zx4ImportPars::Multipass3x3x1, Zx4Palette::SelectPaletteCIE94,      0.00, 0.35, -0.15);
-    ensurePreset("Ultra Sharp Poster", Zx4ImportPars::Multipass5x5x2, Zx4Palette::SelectPaletteCIEDE2000,  0.00, 0.60, -0.40);
+    ensurePreset("Default",             Zx4ImportPars::SinglePass,     Zx4Palette::SelectPaletteHSL,        0.00, 0.00,  0.00);
+    ensurePreset("Dark Sharp",          Zx4ImportPars::Multipass7x7x3, Zx4Palette::SelectPaletteCIEDE2000,  0.00, 0.30, -0.15);
+    ensurePreset("Acid ZX Contrast",    Zx4ImportPars::Multipass5x5x2, Zx4Palette::SelectPaletteCIEDE2000,  0.00, 0.55, -0.25);
+    ensurePreset("Neon Gigascreen",     Zx4ImportPars::Multipass7x7x3, Zx4Palette::SelectPaletteCIEDE2000, -0.03, 0.45, -0.20);
+    ensurePreset("Clean Pixel Art",     Zx4ImportPars::Multipass3x3x1, Zx4Palette::SelectPaletteCIE94,      0.00, 0.35, -0.15);
+    ensurePreset("Ultra Sharp Poster",  Zx4ImportPars::Multipass5x5x2, Zx4Palette::SelectPaletteCIEDE2000,  0.00, 0.60, -0.40);
 
     for (const QString & preset_name : QDir(Zx4ImportPars::defaultPresetPath()).entryList(QDir::Files))
     {

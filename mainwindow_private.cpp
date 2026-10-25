@@ -548,6 +548,7 @@ void MainWindow::exportTape(const Zx4ImageWithAttributes & image, QString filena
 void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 {
     p.alpha = ui->alphaBox->isChecked();
+    p.dithering = ui->ditherBox->isChecked();
     p.autopalette = ui->wizardPaletteBox->currentIndex() == 0;
     p.color_pick = static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
     p.horizontal_mirror = ui->mirrored->isChecked();
@@ -567,6 +568,7 @@ void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 void MainWindow::importParsToWidget(const Zx4ImportPars & p)
 {
     ui->alphaBox->setChecked(p.alpha);
+    ui->ditherBox->setChecked(p.dithering);
     ui->wizardPaletteBox->setCurrentIndex(p.autopalette ? 0 : 1);
     ui->colorPickBox->setCurrentIndex(p.color_pick);
     ui->mirrored->setChecked(p.horizontal_mirror);
@@ -649,12 +651,14 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     {
         return;
     }
+    const auto pars = _current_scene->importPars();
     QProgressDialog * pd = createProgress(this, "Importing scene\n" + ui->colorPickBox->currentText());
-    _current_scene->transformedImage() = applyTransforms(_current_scene->importPars(), _current_scene->sourceImage());
-    QImage img32 = _current_scene->transformedImage().convertToFormat(QImage::Format_RGB32);
-    pd->setRange(0, (img32.width() / 8) * (img32.height() / 8));
+    _current_scene->transformedImage() = applyTransforms(pars, _current_scene->sourceImage());
+    QImage img = _current_scene->transformedImage()
+        .convertToFormat(pars.dithering ? QImage::Format_Indexed8 : QImage::Format_ARGB32);
+    pd->setRange(0, (img.width() / 8) * (img.height() / 8));
 
-    QImage out(img32.width(), img32.height(), QImage::Format_RGB32);
+    QImage out(img.width(), img.height(), QImage::Format_RGB32);
     for (QMdiSubWindow * msw : ui->mdiArea->subWindowList())
     {
         if (msw->widget() == _current_scene)
@@ -687,8 +691,8 @@ void MainWindow::reimport(SceneWindow * _current_scene)
         break;
     }
 
-    const int width = img32.width();
-    const int height = img32.height();
+    const int width = img.width();
+    const int height = img.height();
     const int color_variations = 1;
     const int current_palette = ui->palettes->currentRow();
 
@@ -701,7 +705,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
             progressCounter++;
 
             int p_idx = -1;
-            QImage small_quad = img32.copy(QRect(x, y, 8, 8));
+            QImage small_quad = img.copy(QRect(x, y, 8, 8));
             if (_current_scene->importPars().autopalette)
             {
                 if (multipass == Zx4ImportPars::SinglePass)
@@ -719,7 +723,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
                     QImage context_quad(rw, rh, QImage::Format_RGB32);
                     // Первыми (0..7, 0..7) кладем пиксели самого знакоместа, далее — пиксели окружения
                     QPainter cp(&context_quad);
-                    cp.drawImage(0, 0, img32, rx, ry, rw, rh);
+                    cp.drawImage(0, 0, img, rx, ry, rw, rh);
                     cp.drawImage(0, 0, small_quad);
                     cp.end();
 
