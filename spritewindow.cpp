@@ -4,6 +4,8 @@
 #include <QFileInfo>
 #include <QSpinBox>
 #include <QTimer>
+#include <QVector>
+
 #include "spritewindow.h"
 #include "ui_spritewindow.h"
 
@@ -54,6 +56,32 @@ QSize SpriteWindow::sizeHint() const
 void SpriteWindow::setAction(ActionEnum e, QAction * a)
 {
     acts[e] = a;
+}
+
+void SpriteWindow::setBrushSize(int s)
+{
+    if (s == 1 || s == 3 || s == 5 || s == 7)
+    {
+        brush_size = s;
+    }
+}
+
+int SpriteWindow::brushSize() const
+{
+    return brush_size;
+}
+
+void SpriteWindow::setEraserSize(int s)
+{
+    if (s == 1 || s == 3 || s == 5 || s == 7)
+    {
+        eraser_size = s;
+    }
+}
+
+int SpriteWindow::eraserSize() const
+{
+    return eraser_size;
 }
 
 void SpriteWindow::setColors(QList<QColor> _colors)
@@ -202,7 +230,6 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
         case QEvent::Paint:
             drawGrid();
             break;
-
         case QEvent::MouseButtonPress:
         case QEvent::MouseMove:
             on_change = nullptr;
@@ -237,6 +264,18 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                             emit undoRedoMenuUpdateIsNeeded();
                         };
                     }
+                    else if (acts[ActionFill] && acts[ActionFill]->isChecked())
+                    {
+                        if (ev->type() == QEvent::MouseButtonPress)
+                        {
+                            floodFill(x, y);
+                            on_change = [=]()
+                            {
+                                storeToHistory("Flood fill");
+                                emit undoRedoMenuUpdateIsNeeded();
+                            };
+                        }
+                    }
                     else if (acts[ActionMove] && acts[ActionMove]->isChecked())
                     {
                         if (ev->type() == QEvent::MouseButtonPress)
@@ -260,7 +299,7 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                 }
                 if (me->buttons().testFlag(Qt::RightButton) || (me->buttons().testFlag(Qt::LeftButton) && acts[ActionEraser] && acts[ActionEraser]->isChecked()))
                 {
-                    eraseDot(x, y);
+                    eraseBrush(x, y);
                     QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
                     on_change = [=]()
                     {
@@ -270,7 +309,6 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                 }
             }
             break;
-
         case QEvent::MouseButtonRelease:
             if (on_change)
             {
@@ -278,7 +316,6 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                 on_change = nullptr;
             }
             break;
-
         default:
             break;
         }
@@ -366,27 +403,94 @@ void SpriteWindow::eraseDot(int x, int y)
 
 void SpriteWindow::drawBrush(int x, int y)
 {
-    drawDot(x - 1, y - 2);
-    drawDot(x, y - 2);
-    drawDot(x + 1, y - 2);
-    drawDot(x - 2, y - 1);
-    drawDot(x - 1, y - 1);
-    drawDot(x, y - 1);
-    drawDot(x + 1, y - 1);
-    drawDot(x + 2, y - 1);
-    drawDot(x - 2, y);
-    drawDot(x - 1, y);
+    const int r = brush_size / 2;
+    for (int dy = -r; dy <= r; ++dy)
+    {
+        for (int dx = -r; dx <= r; ++dx)
+        {
+            if (brush_size == 5 && qAbs(dx) == 2 && qAbs(dy) == 2)
+            {
+                continue;
+            }
+            if (brush_size == 7 && (dx * dx + dy * dy > 11))
+            {
+                continue;
+            }
+            drawDot(x + dx, y + dy);
+        }
+    }
+}
+
+void SpriteWindow::eraseBrush(int x, int y)
+{
+    const int r = eraser_size / 2;
+    for (int dy = -r; dy <= r; ++dy)
+    {
+        for (int dx = -r; dx <= r; ++dx)
+        {
+            if (eraser_size == 5 && qAbs(dx) == 2 && qAbs(dy) == 2)
+            {
+                continue;
+            }
+            if (eraser_size == 7 && (dx * dx + dy * dy > 11))
+            {
+                continue;
+            }
+            eraseDot(x + dx, y + dy);
+        }
+    }
+}
+
+void SpriteWindow::floodFill(int x, int y)
+{
+    if (x < 0 || y < 0 || x >= grid_x || y >= grid_y || zx4_img.isEmpty())
+    {
+        return;
+    }
+    Zx4Image & img = *zx4_img[current_frame];
+    auto pixelState = [&](int px, int py) -> int
+    {
+        if (!img.alpha_layer[px][py])
+        {
+            return -1;
+        }
+        return colorIndex(img, px, py);
+    };
+
+    const int target_state = pixelState(x, y);
+    const int replacement_state = current_color_index;
+    if (target_state == replacement_state)
+    {
+        return;
+    }
+
+    QVector<QPoint> queue;
+    queue.reserve(grid_x * grid_y);
     drawDot(x, y);
-    drawDot(x + 1, y);
-    drawDot(x + 2, y);
-    drawDot(x - 2, y + 1);
-    drawDot(x - 1, y + 1);
-    drawDot(x, y + 1);
-    drawDot(x + 1, y + 1);
-    drawDot(x + 2, y + 1);
-    drawDot(x - 1, y + 2);
-    drawDot(x, y + 2);
-    drawDot(x + 1, y + 2);
+    queue.push_back(QPoint(x, y));
+
+    int head = 0;
+    while (head < queue.size())
+    {
+        const QPoint pt = queue[head++];
+        const QPoint neighbors[4] = {
+            QPoint(pt.x() - 1, pt.y()),
+            QPoint(pt.x() + 1, pt.y()),
+            QPoint(pt.x(), pt.y() - 1),
+            QPoint(pt.x(), pt.y() + 1)
+        };
+        for (const QPoint & n : neighbors)
+        {
+            if (n.x() >= 0 && n.x() < grid_x && n.y() >= 0 && n.y() < grid_y)
+            {
+                if (pixelState(n.x(), n.y()) == target_state)
+                {
+                    drawDot(n.x(), n.y());
+                    queue.push_back(n);
+                }
+            }
+        }
+    }
 }
 
 void SpriteWindow::moveImage(int dx, int dy)
@@ -420,7 +524,6 @@ void SpriteWindow::drawImage(QImage img)
     grid_x = qMax(img.width(), grid_x);
     grid_y = qMax(img.height(), grid_y);
     zx4_img[current_frame]->clear(grid_x, grid_y);
-
     int saved_color_index = current_color_index;
     int x_offs = (grid_x - img.width()) / 2;
     int y_offs = (grid_y - img.height()) / 2;

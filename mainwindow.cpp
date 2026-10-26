@@ -4,6 +4,7 @@
 #include <QActionGroup>
 #include <QPainter>
 #include <QResizeEvent>
+#include <QCloseEvent>
 #include <QInputDialog>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -14,6 +15,10 @@
 #include <QMimeData>
 #include <QImageReader>
 #include <QImageWriter>
+#include <QMenu>
+#include <QSettings>
+#include <QSignalBlocker>
+#include <algorithm>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,15 +26,51 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     ui->preview->installEventFilter(this);
-    ui->sourceImage->installEventFilter(this);
+    ui->preview->setCursor(Qt::SplitHCursor);
     ui->mdiArea->installEventFilter(this);
 
     QActionGroup * ag = new QActionGroup(this);
     ag->setExclusive(true);
     ag->addAction(ui->actionPencil);
     ag->addAction(ui->actionBrush);
+    ag->addAction(ui->actionFill);
     ag->addAction(ui->actionMove);
     ag->addAction(ui->actionEraser);
+
+    // Расширение кнопок Brush и Eraser выпадающим списком толщины (1 - 3 - 5 - 7) со стрелкой справа
+    auto setupToolSizePopup = [this](QAction * toolAction, int & targetSize)
+    {
+        QToolButton * btn = qobject_cast<QToolButton *>(ui->drawToolBar->widgetForAction(toolAction));
+        if (!btn)
+        {
+            return;
+        }
+        btn->setPopupMode(QToolButton::MenuButtonPopup);
+        QMenu * menu = new QMenu(btn);
+        QActionGroup * sizeGroup = new QActionGroup(menu);
+        sizeGroup->setExclusive(true);
+        for (int sz : { 1, 3, 5, 7 })
+        {
+            QAction * act = menu->addAction(QString::number(sz));
+            act->setCheckable(true);
+            act->setChecked(sz == targetSize);
+            sizeGroup->addAction(act);
+            connect(act, &QAction::triggered, this, [this, toolAction, &targetSize, sz]()
+                    {
+                        targetSize = sz;
+                        toolAction->setChecked(true);
+                        if (current_sprite)
+                        {
+                            current_sprite->setBrushSize(current_brush_size);
+                            current_sprite->setEraserSize(current_eraser_size);
+                        }
+                    });
+        }
+        btn->setMenu(menu);
+    };
+
+    setupToolSizePopup(ui->actionBrush, current_brush_size);
+    setupToolSizePopup(ui->actionEraser, current_eraser_size);
 
     ag = new QActionGroup(this);
     ag->setExclusive(true);
@@ -39,11 +80,49 @@ MainWindow::MainWindow(QWidget *parent)
     ag->addAction(ui->actionColor_11);
 
     ui->importWizardApply->setDefaultAction(ui->actionImportWizardApply);
+
+    // Дублирующая секция тулбара импорта (список пресетов readonly, чекбокс дизеринга, кнопка Reimport)
+    QLabel * presetLabel = new QLabel(" Preset ", this);
+    toolbarPresetBox = new QComboBox(this);
+    toolbarPresetBox->setEditable(false);
+    toolbarPresetBox->setMinimumWidth(150);
+
+    toolbarDitherBox = new QCheckBox("Dither (pixelize)", this);
+    toolbarDitherBox->setToolTip(ui->ditherBox->toolTip());
+
+    toolbarReimportBtn = new QToolButton(this);
+    toolbarReimportBtn->setDefaultAction(ui->actionImportWizardApply);
+
+    ui->importToolBar->addWidget(presetLabel);
+    ui->importToolBar->addWidget(toolbarPresetBox);
+    ui->importToolBar->addSeparator();
+    ui->importToolBar->addWidget(toolbarDitherBox);
+    ui->importToolBar->addSeparator();
+    ui->importToolBar->addWidget(toolbarReimportBtn);
+
+    presetMenuGroup = new QActionGroup(this);
+    presetMenuGroup->setExclusive(true);
+
+    // Синхронизация выбора пресета между тулбаром и Import Wizard
+    connect(toolbarPresetBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index)
+            {
+                if (index >= 0 && ui->presetBox->currentIndex() != index)
+                {
+                    ui->presetBox->setCurrentIndex(index);
+                }
+            });
+
+    // Синхронизация чекбокса Dither между Import Wizard, тулбаром и меню Tools
+    connect(ui->ditherBox, &QCheckBox::toggled, this, &MainWindow::syncDitherState);
+    connect(toolbarDitherBox, &QCheckBox::toggled, this, &MainWindow::syncDitherState);
+    connect(ui->actionDither, &QAction::toggled, this, &MainWindow::syncDitherState);
+
     ui->menuWindow->addAction(ui->dockPalette->toggleViewAction());
     ui->menuWindow->addAction(ui->dockPreview->toggleViewAction());
-    ui->menuWindow->addAction(ui->dockSource->toggleViewAction());
-    tabifyDockWidget(ui->dockPreview, ui->dockSource);
-    tabifyDockWidget(ui->dockSource, ui->dockWizard);
+    ui->menuWindow->addAction(ui->dockWizard->toggleViewAction());
+
+    // По умолчанию расположение док-панелей при первом запуске
+    tabifyDockWidget(ui->dockPreview, ui->dockPalette);
     ui->dockPreview->raise();
 
     createPalettes();
@@ -80,16 +159,140 @@ MainWindow::MainWindow(QWidget *parent)
     ensurePreset("Clean Pixel Art",     Zx4ImportPars::Multipass3x3x1, Zx4Palette::SelectPaletteCIE94,      0.00, 0.35, -0.15);
     ensurePreset("Ultra Sharp Poster",  Zx4ImportPars::Multipass5x5x2, Zx4Palette::SelectPaletteCIEDE2000,  0.00, 0.60, -0.40);
 
-    for (const QString & preset_name : QDir(Zx4ImportPars::defaultPresetPath()).entryList(QDir::Files))
-    {
-        ui->presetBox->addItem(preset_name);
-    }
-    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
+    syncPresetsUI("Default");
+    on_presetBox_currentIndexChanged(ui->presetBox->currentIndex());
+
+    updateToolbarWidgetsHeight();
+    loadSettings();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    saveSettings();
+    QMainWindow::closeEvent(event);
+}
+
+QString MainWindow::configFilePath()
+{
+    return QDir::toNativeSeparators(QDir::homePath() + "/." + qApp->applicationName() + "/config.ini");
+}
+
+void MainWindow::saveSettings() const
+{
+    QDir().mkpath(QFileInfo(configFilePath()).absolutePath());
+    QSettings settings(configFilePath(), QSettings::IniFormat);
+    settings.setValue("MainWindow/geometry", saveGeometry());
+    settings.setValue("MainWindow/windowState", saveState());
+}
+
+void MainWindow::loadSettings()
+{
+    QSettings settings(configFilePath(), QSettings::IniFormat);
+    if (settings.contains("MainWindow/geometry"))
+    {
+        restoreGeometry(settings.value("MainWindow/geometry").toByteArray());
+    }
+    if (settings.contains("MainWindow/windowState"))
+    {
+        restoreState(settings.value("MainWindow/windowState").toByteArray());
+    }
+}
+
+void MainWindow::updateToolbarWidgetsHeight()
+{
+    int btn_h = 38;
+    if (QWidget * ref_btn = ui->drawToolBar->widgetForAction(ui->actionPencil))
+    {
+        btn_h = qMax(36, ref_btn->sizeHint().height());
+    }
+    if (QWidget * fill_btn = ui->drawToolBar->widgetForAction(ui->actionFill))
+    {
+        fill_btn->setFixedHeight(btn_h);
+    }
+    if (toolbarPresetBox)
+    {
+        toolbarPresetBox->setFixedHeight(btn_h);
+    }
+    if (toolbarReimportBtn)
+    {
+        toolbarReimportBtn->setFixedHeight(btn_h);
+    }
+    ui->importWizardApply->setFixedHeight(btn_h);
+}
+
+void MainWindow::syncPresetsUI(const QString & selectedPreset)
+{
+    const QString target = !selectedPreset.isEmpty() ? selectedPreset : ui->presetBox->currentText();
+    const QStringList presets = QDir(Zx4ImportPars::defaultPresetPath()).entryList(QDir::Files);
+
+    QSignalBlocker b1(ui->presetBox);
+    QSignalBlocker b2(toolbarPresetBox);
+
+    ui->presetBox->clear();
+    toolbarPresetBox->clear();
+    ui->menuPreset->clear();
+
+    for (const QString & preset_name : presets)
+    {
+        ui->presetBox->addItem(preset_name);
+        toolbarPresetBox->addItem(preset_name);
+
+        QAction * act = ui->menuPreset->addAction(preset_name);
+        act->setCheckable(true);
+        presetMenuGroup->addAction(act);
+        connect(act, &QAction::triggered, this, [this, preset_name]()
+                {
+                    const int idx = ui->presetBox->findText(preset_name);
+                    if (idx >= 0)
+                    {
+                        ui->presetBox->setCurrentIndex(idx);
+                    }
+                });
+    }
+
+    int idx = ui->presetBox->findText(target);
+    if (idx < 0)
+    {
+        idx = ui->presetBox->findText("Default");
+    }
+    if (idx >= 0)
+    {
+        ui->presetBox->setCurrentIndex(idx);
+        toolbarPresetBox->setCurrentIndex(idx);
+        const QList<QAction *> acts = presetMenuGroup->actions();
+        if (idx < acts.size())
+        {
+            acts[idx]->setChecked(true);
+        }
+    }
+}
+
+void MainWindow::syncDitherState(bool checked)
+{
+    {
+        QSignalBlocker b1(ui->ditherBox);
+        QSignalBlocker b2(toolbarDitherBox);
+        QSignalBlocker b3(ui->actionDither);
+        ui->ditherBox->setChecked(checked);
+        if (toolbarDitherBox)
+        {
+            toolbarDitherBox->setChecked(checked);
+        }
+        ui->actionDither->setChecked(checked);
+    }
+    if (current_sprite)
+    {
+        importParsFromWidgetToObject(*current_sprite);
+    }
+    if (current_scene)
+    {
+        importParsFromWidgetToObject(*current_scene);
+    }
 }
 
 void MainWindow::on_actionQuit_triggered()
@@ -173,18 +376,21 @@ void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
 
 void MainWindow::on_actionNew_triggered()
 {
-    current_sprite = new SpriteWindow(palettes);
-    importParsFromObjectToWidget(*current_sprite);
-    current_sprite->setAction(SpriteWindow::ActionPencil, ui->actionPencil);
-    current_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
-    current_sprite->setAction(SpriteWindow::ActionMove, ui->actionMove);
-    current_sprite->setAction(SpriteWindow::ActionEraser, ui->actionEraser);
+    SpriteWindow * new_sprite = new SpriteWindow(palettes);
+    importParsFromWidgetToObject(*new_sprite);
+    new_sprite->setAction(SpriteWindow::ActionPencil, ui->actionPencil);
+    new_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
+    new_sprite->setAction(SpriteWindow::ActionFill, ui->actionFill);
+    new_sprite->setAction(SpriteWindow::ActionMove, ui->actionMove);
+    new_sprite->setAction(SpriteWindow::ActionEraser, ui->actionEraser);
+    new_sprite->setBrushSize(current_brush_size);
+    new_sprite->setEraserSize(current_eraser_size);
+    current_sprite = new_sprite;
     QMdiSubWindow * msw = ui->mdiArea->addSubWindow(current_sprite);
     msw->show();
     current_sprite->image(0); // init 1 frame
     current_sprite->clearCanvas(QSize(64, 64));
     connect(current_sprite, &SpriteWindow::previewUpdateIsNeeded, ui->preview, qOverload<>(&QWidget::update));
-    connect(current_sprite, &SpriteWindow::previewUpdateIsNeeded, ui->sourceImage, qOverload<>(&QWidget::update));
     connect(current_sprite, &SpriteWindow::undoRedoMenuUpdateIsNeeded, this, &MainWindow::undoRedoMenuUpdate);
     current_sprite->storeToHistory("New sprite");
     updateUndoRedoMenu(current_sprite);
@@ -335,7 +541,6 @@ void MainWindow::on_actionOpen_triggered()
     {
         list << src_imp_image;
     }
-    // Если открыт однокадровый PNG, в котором сохранен Sprite Sheet (метаданные ZX4_Frames)
     if (list.count() == 1 && list[0].text("ZX4_Frames").toInt() > 1)
     {
         QImage sheet = list[0];
@@ -350,7 +555,6 @@ void MainWindow::on_actionOpen_triggered()
         }
     }
     openSprite(list, filename);
-    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
 }
 
 void MainWindow::on_actionSave_as_triggered()
@@ -399,8 +603,13 @@ void MainWindow::on_actionSave_triggered()
         ui->actionSave_as->trigger();
         return;
     }
+    int p_idx = _current_sprite->paletteIndex();
+    if (p_idx < 0 || p_idx >= palettes.palettes.count())
+    {
+        p_idx = std::clamp(ui->palettes->currentRow(), 0, int(palettes.palettes.count() - 1));
+    }
     QVector<QRgb> color_table;
-    for (const QColor & color : palettes.palettes[ui->palettes->currentRow()])
+    for (const QColor & color : palettes.palettes[p_idx])
     {
         color_table << color.rgb();
     }
@@ -440,7 +649,6 @@ void MainWindow::on_actionSave_triggered()
     }
     else
     {
-        // Нативное сохранение многокадрового спрайта в PNG Sprite Sheet без плагина qapng
         const int w = _current_sprite->canvasSize().width();
         const int h = _current_sprite->canvasSize().height();
         const int frames = _current_sprite->framesCount();
@@ -491,7 +699,6 @@ void MainWindow::on_actionImport_scene_triggered()
         return;
     }
     importScene(QImage(filename), filename);
-    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
 }
 
 void MainWindow::on_actionExport_scene_triggered()
@@ -570,6 +777,8 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
     if (SpriteWindow * sw = dynamic_cast<SpriteWindow *>(msw->widget()))
     {
         current_sprite = sw;
+        current_sprite->setBrushSize(current_brush_size);
+        current_sprite->setEraserSize(current_eraser_size);
         selectPalette(current_sprite->paletteIndex());
         switch (current_sprite->currentColorIndex())
         {
@@ -594,6 +803,7 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
         importParsFromObjectToWidget(*current_scene);
     }
     updateUndoRedoMenu(dynamic_cast<Zx4BaseObject *>(msw->widget()));
+    ui->preview->update();
 }
 
 void MainWindow::updateUndoRedoMenu(Zx4BaseObject * zbo)
@@ -663,8 +873,22 @@ void MainWindow::on_paletteIndex_currentIndexChanged(int index)
     selectPalette(index);
 }
 
-void MainWindow::on_presetBox_currentIndexChanged(int)
+void MainWindow::on_presetBox_currentIndexChanged(int index)
 {
+    if (toolbarPresetBox && index >= 0 && toolbarPresetBox->currentIndex() != index)
+    {
+        QSignalBlocker b(toolbarPresetBox);
+        toolbarPresetBox->setCurrentIndex(index);
+    }
+    if (presetMenuGroup && index >= 0)
+    {
+        const QList<QAction *> acts = presetMenuGroup->actions();
+        if (index < acts.size())
+        {
+            acts[index]->setChecked(true);
+        }
+    }
+
     if (ui->presetBox->currentText().isEmpty())
     {
         return;
@@ -682,6 +906,15 @@ void MainWindow::on_presetBox_currentIndexChanged(int)
     }
     file.close();
     importParsToWidget(p);
+    if (current_sprite)
+    {
+        importParsFromWidgetToObject(*current_sprite);
+    }
+    if (current_scene)
+    {
+        importParsFromWidgetToObject(*current_scene);
+    }
+    ui->preview->update();
 }
 
 void MainWindow::on_addPreset_clicked()
@@ -697,11 +930,9 @@ void MainWindow::on_addPreset_clicked()
     QFile file(Zx4ImportPars::defaultPresetPath() + "/" + name);
     if (file.open(QFile::WriteOnly))
     {
-        if (file.write(p.serialize()) > 0 && ui->presetBox->findText(name) == -1)
-        {
-            ui->presetBox->addItem(name);
-        }
+        file.write(p.serialize());
         file.close();
+        syncPresetsUI(name);
     }
 }
 
@@ -713,12 +944,8 @@ void MainWindow::on_removePreset_clicked()
         return;
     }
     QFile::remove(Zx4ImportPars::defaultPresetPath() + "/" + name);
-    const int idx = ui->presetBox->currentIndex();
-    ui->presetBox->setCurrentIndex(ui->presetBox->findText("Default"));
-    if (idx >= 0)
-    {
-        ui->presetBox->removeItem(idx);
-    }
+    syncPresetsUI("Default");
+    on_presetBox_currentIndexChanged(ui->presetBox->currentIndex());
 }
 
 void MainWindow::on_actionUndo_triggered()

@@ -41,6 +41,8 @@ int main(int argc, char *argv[])
         QString stylesheet =
             "QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }"
             "QToolButton { border: 2px solid; border-radius: 6px; border-color: rgb(18, 18, 18); }"
+            "QToolButton[popupMode=\"1\"] { padding-right: 14px; }"
+            "QToolButton::menu-button { border: none; width: 14px; }"
             "QToolButton:checked, QToolButton:pressed { border: 2px solid; border-radius: 6px; border-color: rgb(42, 130, 218); }"
             "QListWidget::item:selected { background: rgb(42, 130, 218); }";
         qApp->setStyleSheet(stylesheet);

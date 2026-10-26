@@ -31,16 +31,16 @@
        <bool>true</bool>
       </property>
       <property name="verticalScrollBarPolicy">
-       <enum>Qt::ScrollBarAsNeeded</enum>
+       <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
       </property>
       <property name="horizontalScrollBarPolicy">
-       <enum>Qt::ScrollBarAsNeeded</enum>
+       <enum>Qt::ScrollBarPolicy::ScrollBarAsNeeded</enum>
       </property>
       <property name="sizeAdjustPolicy">
-       <enum>QAbstractScrollArea::AdjustIgnored</enum>
+       <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustIgnored</enum>
       </property>
       <property name="viewMode">
-       <enum>QMdiArea::SubWindowView</enum>
+       <enum>QMdiArea::ViewMode::SubWindowView</enum>
       </property>
       <property name="documentMode">
        <bool>false</bool>
@@ -58,7 +58,7 @@
      <x>0</x>
      <y>0</y>
      <width>1024</width>
-     <height>21</height>
+     <height>17</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -101,6 +101,7 @@
      </property>
      <addaction name="actionPencil"/>
      <addaction name="actionBrush"/>
+     <addaction name="actionFill"/>
      <addaction name="actionMove"/>
      <addaction name="actionEraser"/>
     </widget>
@@ -121,9 +122,24 @@
      <addaction name="actionColor_10"/>
      <addaction name="actionColor_11"/>
     </widget>
+    <widget class="QMenu" name="menuImport_tools">
+     <property name="title">
+      <string>Import tools</string>
+     </property>
+     <widget class="QMenu" name="menuPreset">
+      <property name="title">
+       <string>Preset</string>
+      </property>
+     </widget>
+     <addaction name="menuPreset"/>
+     <addaction name="actionDither"/>
+     <addaction name="separator"/>
+     <addaction name="actionImportWizardApply"/>
+    </widget>
     <addaction name="menuDraw_tools"/>
     <addaction name="menuColor_tools"/>
     <addaction name="menuTransform_tools"/>
+    <addaction name="menuImport_tools"/>
    </widget>
    <widget class="QMenu" name="menuWindow">
     <property name="title">
@@ -188,7 +204,7 @@
         </sizepolicy>
        </property>
        <property name="editTriggers">
-        <set>QAbstractItemView::NoEditTriggers</set>
+        <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
        </property>
        <property name="showDropIndicator" stdset="0">
         <bool>false</bool>
@@ -197,7 +213,7 @@
         <bool>false</bool>
        </property>
        <property name="selectionMode">
-        <enum>QAbstractItemView::SingleSelection</enum>
+        <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
        </property>
        <property name="iconSize">
         <size>
@@ -206,13 +222,13 @@
         </size>
        </property>
        <property name="movement">
-        <enum>QListView::Static</enum>
+        <enum>QListView::Movement::Static</enum>
        </property>
        <property name="flow">
-        <enum>QListView::LeftToRight</enum>
+        <enum>QListView::Flow::LeftToRight</enum>
        </property>
        <property name="resizeMode">
-        <enum>QListView::Adjust</enum>
+        <enum>QListView::ResizeMode::Adjust</enum>
        </property>
        <property name="spacing">
         <number>0</number>
@@ -224,7 +240,7 @@
         </size>
        </property>
        <property name="viewMode">
-        <enum>QListView::IconMode</enum>
+        <enum>QListView::ViewMode::IconMode</enum>
        </property>
        <property name="uniformItemSizes">
         <bool>true</bool>
@@ -236,7 +252,7 @@
   </widget>
   <widget class="QToolBar" name="drawToolBar">
    <property name="windowTitle">
-    <string>toolBar</string>
+    <string>Draw tools</string>
    </property>
    <property name="iconSize">
     <size>
@@ -252,6 +268,7 @@
    </attribute>
    <addaction name="actionPencil"/>
    <addaction name="actionBrush"/>
+   <addaction name="actionFill"/>
    <addaction name="actionMove"/>
    <addaction name="actionEraser"/>
    <addaction name="separator"/>
@@ -261,7 +278,7 @@
   </widget>
   <widget class="QToolBar" name="colorToolBar">
    <property name="windowTitle">
-    <string>toolBar_2</string>
+    <string>Color tools</string>
    </property>
    <property name="iconSize">
     <size>
@@ -279,6 +296,23 @@
    <addaction name="actionColor_01"/>
    <addaction name="actionColor_10"/>
    <addaction name="actionColor_11"/>
+  </widget>
+  <widget class="QToolBar" name="importToolBar">
+   <property name="windowTitle">
+    <string>Import tools</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>32</width>
+     <height>32</height>
+    </size>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
   </widget>
   <widget class="QDockWidget" name="dockPreview">
    <property name="windowTitle">
@@ -309,36 +343,11 @@
          <height>0</height>
         </size>
        </property>
-       <property name="text">
-        <string/>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-  </widget>
-  <widget class="QDockWidget" name="dockSource">
-   <property name="floating">
-    <bool>false</bool>
-   </property>
-   <property name="allowedAreas">
-    <set>Qt::AllDockWidgetAreas</set>
-   </property>
-   <property name="windowTitle">
-    <string>Source image</string>
-   </property>
-   <attribute name="dockWidgetArea">
-    <number>2</number>
-   </attribute>
-   <widget class="QWidget" name="dockWidgetContents_4">
-    <layout class="QGridLayout" name="gridLayout_5">
-     <item row="0" column="0">
-      <widget class="QLabel" name="sourceImage">
-       <property name="text">
-        <string/>
-       </property>
-       <property name="scaledContents">
+       <property name="mouseTracking">
         <bool>true</bool>
+       </property>
+       <property name="text">
+        <string/>
        </property>
       </widget>
      </item>
@@ -353,24 +362,43 @@
     <number>2</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetContents_5">
-    <layout class="QGridLayout" name="gridLayout_2">
-     <item row="6" column="1">
-      <widget class="QDoubleSpinBox" name="xScale">
-       <property name="minimum">
-        <double>0.010000000000000</double>
+    <layout class="QGridLayout" name="gridLayout_2" columnstretch="0,0,0,0,0,0,0,0">
+     <item row="9" column="2" colspan="2">
+      <widget class="QCheckBox" name="ditherBox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked then import tool will use 8 bit indexed palette&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
-       <property name="maximum">
-        <double>1000.000000000000000</double>
+       <property name="text">
+        <string>Dither (pixelize)</string>
        </property>
-       <property name="value">
-        <double>1.000000000000000</double>
+       <property name="checked">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label_13">
+     <item row="13" column="2">
+      <widget class="QSpinBox" name="paletteNumberBox">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>1</number>
+       </property>
+      </widget>
+     </item>
+     <item row="15" column="6" colspan="2">
+      <widget class="QToolButton" name="importWizardApply">
+       <property name="minimumSize">
+        <size>
+         <width>24</width>
+         <height>24</height>
+        </size>
+       </property>
+       <property name="layoutDirection">
+        <enum>Qt::LayoutDirection::LeftToRight</enum>
+       </property>
        <property name="text">
-        <string>Preset</string>
+        <string>Reimport</string>
        </property>
       </widget>
      </item>
@@ -390,56 +418,31 @@
        </property>
       </widget>
      </item>
-     <item row="6" column="4" colspan="2">
-      <widget class="QCheckBox" name="mirrored">
+     <item row="0" column="0" colspan="2">
+      <widget class="QLabel" name="label_13">
        <property name="text">
-        <string>Mirrored</string>
+        <string>Preset</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
-      <widget class="QCheckBox" name="alphaBox">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked then import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
+     <item row="4" column="0" colspan="2">
+      <widget class="QLabel" name="label_4">
        <property name="text">
-        <string>Alpha channel</string>
-       </property>
-       <property name="checked">
-        <bool>true</bool>
+        <string>Color pick method</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
-      <widget class="QCheckBox" name="ditherBox">
-       <property name="toolTip">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked then import tool will use 8 bit indexed palette&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-       </property>
+     <item row="6" column="0">
+      <widget class="QLabel" name="label_8">
        <property name="text">
-        <string>Dither (pixelize)</string>
-       </property>
-       <property name="checked">
-        <bool>false</bool>
+        <string>X scale</string>
        </property>
       </widget>
      </item>
-     <item row="6" column="3">
-      <widget class="QDoubleSpinBox" name="yScale">
-       <property name="minimum">
-        <double>0.010000000000000</double>
-       </property>
-       <property name="maximum">
-        <double>1000.000000000000000</double>
-       </property>
-       <property name="value">
-        <double>1.000000000000000</double>
-       </property>
-      </widget>
-     </item>
-     <item row="7" column="4">
-      <widget class="QLabel" name="label_12">
+     <item row="7" column="0">
+      <widget class="QLabel" name="label_10">
        <property name="text">
-        <string>Light. shift</string>
+        <string>Hue shift</string>
        </property>
       </widget>
      </item>
@@ -453,13 +456,86 @@
        </property>
       </widget>
      </item>
-     <item row="5" column="3">
-      <widget class="QDoubleSpinBox" name="yShift">
+     <item row="10" column="0" colspan="2">
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Palette</string>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="0" colspan="2">
+      <widget class="QCheckBox" name="alphaBox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#d69545;&quot;&gt;If checked then import tool will use alpha channel if image has it or pixel from left top corner as alpha channel chromakey&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
+       <property name="text">
+        <string>Alpha channel</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="13" column="0" colspan="2">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Index in sequence</string>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="3">
+      <widget class="QDoubleSpinBox" name="saturationShift">
        <property name="minimum">
-        <double>-192.000000000000000</double>
+        <double>-1.000000000000000</double>
        </property>
        <property name="maximum">
-        <double>192.000000000000000</double>
+        <double>1.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.050000000000000</double>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="1">
+      <widget class="QDoubleSpinBox" name="xScale">
+       <property name="minimum">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1000.000000000000000</double>
+       </property>
+       <property name="value">
+        <double>1.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="2">
+      <widget class="QLabel" name="label_9">
+       <property name="text">
+        <string>Y scale</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0" colspan="2">
+      <widget class="QLabel" name="label_14">
+       <property name="text">
+        <string>Method</string>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="3">
+      <widget class="QDoubleSpinBox" name="yScale">
+       <property name="minimum">
+        <double>0.010000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1000.000000000000000</double>
+       </property>
+       <property name="value">
+        <double>1.000000000000000</double>
        </property>
       </widget>
      </item>
@@ -477,51 +553,34 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="0" colspan="2">
-      <widget class="QLabel" name="label_4">
+     <item row="7" column="2">
+      <widget class="QLabel" name="label_11">
        <property name="text">
-        <string>Color pick method</string>
+        <string>Sat. shift</string>
        </property>
       </widget>
      </item>
-     <item row="0" column="5">
-      <widget class="QToolButton" name="addPreset">
-       <property name="minimumSize">
-        <size>
-         <width>24</width>
-         <height>24</height>
-        </size>
+     <item row="5" column="3">
+      <widget class="QDoubleSpinBox" name="yShift">
+       <property name="minimum">
+        <double>-192.000000000000000</double>
        </property>
-       <property name="text">
-        <string>+</string>
+       <property name="maximum">
+        <double>192.000000000000000</double>
        </property>
       </widget>
      </item>
-     <item row="7" column="0">
-      <widget class="QLabel" name="label_10">
+     <item row="7" column="4">
+      <widget class="QLabel" name="label_12">
        <property name="text">
-        <string>Hue shift</string>
+        <string>Light. shift</string>
        </property>
       </widget>
      </item>
-     <item row="5" column="4">
-      <widget class="QLabel" name="label_7">
-       <property name="text">
-        <string>Rotate</string>
-       </property>
-      </widget>
-     </item>
-     <item row="6" column="0">
-      <widget class="QLabel" name="label_8">
-       <property name="text">
-        <string>X scale</string>
-       </property>
-      </widget>
-     </item>
-     <item row="9" column="3" colspan="2">
+     <item row="16" column="3" colspan="2">
       <spacer name="verticalSpacer_2">
        <property name="orientation">
-        <enum>Qt::Vertical</enum>
+        <enum>Qt::Orientation::Vertical</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -531,7 +590,170 @@
        </property>
       </spacer>
      </item>
-     <item row="3" column="3" colspan="2">
+     <item row="5" column="4">
+      <widget class="QLabel" name="label_7">
+       <property name="text">
+        <string>Rotate</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="6">
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QToolButton" name="addPreset">
+         <property name="minimumSize">
+          <size>
+           <width>24</width>
+           <height>24</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>+</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="removePreset">
+         <property name="minimumSize">
+          <size>
+           <width>24</width>
+           <height>24</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>-</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Policy::Preferred</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+     <item row="5" column="6">
+      <widget class="QDoubleSpinBox" name="rotate">
+       <property name="minimum">
+        <double>-360.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>360.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="6">
+      <widget class="QDoubleSpinBox" name="lightnessShift">
+       <property name="minimum">
+        <double>-1.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>1.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>0.050000000000000</double>
+       </property>
+       <property name="value">
+        <double>0.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2" colspan="4">
+      <widget class="QComboBox" name="presetBox">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+       <property name="insertPolicy">
+        <enum>QComboBox::InsertPolicy::NoInsert</enum>
+       </property>
+       <property name="placeholderText">
+        <string>Enter preset name and press &quot;+&quot;</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="2" colspan="5">
+      <widget class="QComboBox" name="colorPickBox">
+       <item>
+        <property name="text">
+         <string>HSL-based color pick</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>CIE76-based color pick</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>CIE94-based color pick</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>CIEDE2000-based color pick</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="6" column="4" colspan="3">
+      <widget class="QCheckBox" name="mirrored">
+       <property name="text">
+        <string>Mirrored</string>
+       </property>
+      </widget>
+     </item>
+     <item row="10" column="2" colspan="5">
+      <widget class="QComboBox" name="wizardPaletteBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <item>
+        <property name="text">
+         <string>auto selection (any colors)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>current selection</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item row="14" column="0" colspan="7">
+      <widget class="Line" name="line_2">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="8" column="0" colspan="7">
+      <widget class="Line" name="line">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2" colspan="5">
       <widget class="QComboBox" name="multipass">
        <item>
         <property name="text">
@@ -563,178 +785,6 @@
          <string>Multipass (scan 7x7 step 1)</string>
         </property>
        </item>
-      </widget>
-     </item>
-     <item row="3" column="0" colspan="2">
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Index in sequence</string>
-       </property>
-      </widget>
-     </item>
-     <item row="6" column="2">
-      <widget class="QLabel" name="label_9">
-       <property name="text">
-        <string>Y scale</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Palette</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="2">
-      <widget class="QSpinBox" name="paletteNumberBox">
-       <property name="minimum">
-        <number>1</number>
-       </property>
-       <property name="maximum">
-        <number>1</number>
-       </property>
-      </widget>
-     </item>
-     <item row="7" column="2">
-      <widget class="QLabel" name="label_11">
-       <property name="text">
-        <string>Sat. shift</string>
-       </property>
-      </widget>
-     </item>
-     <item row="7" column="3">
-      <widget class="QDoubleSpinBox" name="saturationShift">
-       <property name="minimum">
-        <double>-1.000000000000000</double>
-       </property>
-       <property name="maximum">
-        <double>1.000000000000000</double>
-       </property>
-       <property name="singleStep">
-        <double>0.050000000000000</double>
-       </property>
-       <property name="value">
-        <double>0.000000000000000</double>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="6">
-      <widget class="QToolButton" name="removePreset">
-       <property name="minimumSize">
-        <size>
-         <width>24</width>
-         <height>24</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>-</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="2" colspan="5">
-      <widget class="QComboBox" name="wizardPaletteBox">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <item>
-        <property name="text">
-         <string>auto selection (any colors)</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>current selection</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-     <item row="4" column="2" colspan="5">
-      <widget class="QComboBox" name="colorPickBox">
-       <item>
-        <property name="text">
-         <string>HSL-based color pick</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>CIE76-based color pick</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>CIE94-based color pick</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>CIEDE2000-based color pick</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-     <item row="5" column="5" colspan="2">
-      <widget class="QDoubleSpinBox" name="rotate">
-       <property name="minimum">
-        <double>-360.000000000000000</double>
-       </property>
-       <property name="maximum">
-        <double>360.000000000000000</double>
-       </property>
-      </widget>
-     </item>
-     <item row="7" column="5" colspan="2">
-      <widget class="QDoubleSpinBox" name="lightnessShift">
-       <property name="minimum">
-        <double>-1.000000000000000</double>
-       </property>
-       <property name="maximum">
-        <double>1.000000000000000</double>
-       </property>
-       <property name="singleStep">
-        <double>0.050000000000000</double>
-       </property>
-       <property name="value">
-        <double>0.000000000000000</double>
-       </property>
-      </widget>
-     </item>
-     <item row="8" column="5" colspan="2">
-      <widget class="QToolButton" name="importWizardApply">
-       <property name="minimumSize">
-        <size>
-         <width>24</width>
-         <height>24</height>
-        </size>
-       </property>
-       <property name="layoutDirection">
-        <enum>Qt::LeftToRight</enum>
-       </property>
-       <property name="text">
-        <string>Reimport</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="2" colspan="3">
-      <widget class="QComboBox" name="presetBox">
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-       <property name="insertPolicy">
-        <enum>QComboBox::NoInsert</enum>
-       </property>
-       <property name="placeholderText">
-        <string>Enter preset name and press &quot;+&quot;</string>
-       </property>
       </widget>
      </item>
     </layout>
@@ -820,6 +870,17 @@
     <string>Brush</string>
    </property>
   </action>
+  <action name="actionFill">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Fill</string>
+   </property>
+   <property name="toolTip">
+    <string>Flood fill</string>
+   </property>
+  </action>
   <action name="actionEraser">
    <property name="checkable">
     <bool>true</bool>
@@ -847,6 +908,14 @@
   <action name="actionImportWizardApply">
    <property name="text">
     <string>Reimport</string>
+   </property>
+  </action>
+  <action name="actionDither">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Dither (pixelize)</string>
    </property>
   </action>
   <action name="actionInvert_colors">

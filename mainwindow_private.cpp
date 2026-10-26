@@ -14,7 +14,9 @@
 #include <QMessageBox>
 #include <QProgressDialog>
 #include <QMimeData>
+#include <QSignalBlocker>
 #include <algorithm>
+#include <cmath>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -107,7 +109,6 @@ QImage MainWindow::applyTransforms(const Zx4ImportPars & p, const QImage & src, 
                     while (h > 1.0f) h -= 1.0f;
                 }
 
-                // Сначала корректируем яркость (при отрицательном ls уводим темные шумы в чистый 0)
                 if (ls < 0.0f)
                 {
                     float black_cut = -ls * 0.55f;
@@ -126,8 +127,6 @@ QImage MainWindow::applyTransforms(const Zx4ImportPars & p, const QImage & src, 
                     l = std::clamp(l + ls, 0.0f, 1.0f);
                 }
 
-                // Усиливаем насыщенность пропорционально текущей яркости и цветности,
-                // чтобы почти чёрные и нейтрально-серые тени не взрывались лиловым шумом
                 if (ss > 0.0f)
                 {
                     float shadow_gate = std::clamp(l / 0.22f, 0.0f, 1.0f);
@@ -157,13 +156,13 @@ void MainWindow::importScene(QImage img, QString filename)
         return;
     }
 
-    current_scene = new SceneWindow(palettes);
-    importParsFromObjectToWidget(*current_scene);
+    SceneWindow * new_scene = new SceneWindow(palettes);
+    importParsFromWidgetToObject(*new_scene);
+    current_scene = new_scene;
     ui->mdiArea->addSubWindow(current_scene);
     current_scene->show();
     connect(current_scene, &SceneWindow::charSelected, this, &MainWindow::selectPalette, Qt::QueuedConnection);
     connect(current_scene, &SceneWindow::previewUpdateIsNeeded, ui->preview, qOverload<>(&QWidget::update));
-    connect(current_scene, &SceneWindow::previewUpdateIsNeeded, ui->sourceImage, qOverload<>(&QWidget::update));
     connect(current_scene, &SceneWindow::undoRedoMenuUpdateIsNeeded, this, &MainWindow::undoRedoMenuUpdate);
 
     current_scene->setFileName(filename);
@@ -209,7 +208,7 @@ void MainWindow::openSprite(QList<QImage> src_imp_image, QString filename)
     SpriteWindow * _current_sprite = current_sprite;
     selectPalette(p_idx);
     QProgressDialog * pd = createProgress(this, "Opening sprite");
-    pd->setRange(0, src_imp_image.count() - 1);
+    pd->setRange(0, src_imp_image.count());
     _current_sprite->setPaletteIndex(p_idx);
     _current_sprite->clearCanvas(QSize(qMin(src_imp_image[0].width(), 255), qMin(src_imp_image[0].height(), 192)));
     _current_sprite->setFileName(filename);
@@ -218,7 +217,7 @@ void MainWindow::openSprite(QList<QImage> src_imp_image, QString filename)
     {
         _current_sprite->setCurrentFrame(k);
         _current_sprite->drawImage(_current_sprite->sourceImage(k));
-        pd->setValue(k);
+        pd->setValue(k + 1);
         qApp->processEvents();
     }
     _current_sprite->setCurrentFrame(0);
@@ -281,9 +280,6 @@ void MainWindow::importSpriteZx4Format(QString filename)
         QMessageBox::critical(this, "Error", QString("Error occured while applying palette for \"%1\"").arg(filename));
         return;
     }
-    ui->actionNew->trigger();
-    selectPalette(p_idx);
-    current_sprite->setPaletteIndex(p_idx);
 
     const int width = static_cast<quint8>(zx4[2]);
     const int height = static_cast<quint8>(zx4[3]);
@@ -293,7 +289,17 @@ void MainWindow::importSpriteZx4Format(QString filename)
         QMessageBox::critical(this, "Error", QString("Corrupted header in \"%1\"").arg(filename));
         return;
     }
+
+    ui->actionNew->trigger();
+    selectPalette(p_idx);
+    current_sprite->setPaletteIndex(p_idx);
+    current_sprite->setFileName(filename);
     current_sprite->setCanvasSize(QSize(width, height));
+
+    QProgressDialog * pd = createProgress(this, "Importing sprite");
+    pd->setRange(0, 2 * frames_count);
+    pd->setValue(0);
+    qApp->processEvents();
 
     QByteArray zx4_data = zx4.mid(5);
 #ifndef USE_RLE8
@@ -304,6 +310,8 @@ void MainWindow::importSpriteZx4Format(QString filename)
     int osize = ::LZ4_uncompress_unknownOutputSize(zx4_lz4.constData(), zx4.data(), &isize, zx4.count());
     if (osize <= 0)
     {
+        pd->hide();
+        pd->deleteLater();
         QMessageBox::critical(this, "Error", QString("Error occured while decompressing \"%1\"").arg(filename));
         return;
     }
@@ -342,6 +350,8 @@ void MainWindow::importSpriteZx4Format(QString filename)
                 }
             }
         }
+        pd->setValue(k + 1);
+        qApp->processEvents();
     }
     zx4 = zx4.mid((alpha_bit + 7) / 8);
     int color_bit = 0;
@@ -368,7 +378,11 @@ void MainWindow::importSpriteZx4Format(QString filename)
                 }
             }
         }
+        pd->setValue(frames_count + k + 1);
+        qApp->processEvents();
     }
+    pd->hide();
+    pd->deleteLater();
     current_sprite->update();
     current_sprite->clearHistory();
     current_sprite->storeToHistory("Import sprite");
@@ -568,7 +582,17 @@ void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 void MainWindow::importParsToWidget(const Zx4ImportPars & p)
 {
     ui->alphaBox->setChecked(p.alpha);
-    ui->ditherBox->setChecked(p.dithering);
+    {
+        QSignalBlocker b1(ui->ditherBox);
+        QSignalBlocker b2(toolbarDitherBox);
+        QSignalBlocker b3(ui->actionDither);
+        ui->ditherBox->setChecked(p.dithering);
+        if (toolbarDitherBox)
+        {
+            toolbarDitherBox->setChecked(p.dithering);
+        }
+        ui->actionDither->setChecked(p.dithering);
+    }
     ui->wizardPaletteBox->setCurrentIndex(p.autopalette ? 0 : 1);
     ui->colorPickBox->setCurrentIndex(p.color_pick);
     ui->mirrored->setChecked(p.horizontal_mirror);
@@ -604,8 +628,12 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
     {
         return;
     }
+    const auto pars = _current_sprite->importPars();
     QProgressDialog * pd = createProgress(this, "Importing sprite\n" + ui->colorPickBox->currentText());
-    pd->setRange(0, _current_sprite->framesCount() - 1);
+    pd->setRange(0, _current_sprite->framesCount() + 1);
+    pd->setValue(0);
+    qApp->processEvents();
+
     if (p_idx < 0)
     {
         auto sel_method = selectPaletteMethod();
@@ -628,15 +656,23 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         }
     }
     _current_sprite->setPaletteIndex(p_idx);
+    pd->setValue(1);
+    qApp->processEvents();
+
     int current_frame = _current_sprite->currentFrame();
     for (int k = 0; k < _current_sprite->framesCount(); k++)
     {
         _current_sprite->setCurrentFrame(k);
         if (!_current_sprite->sourceImage(k).isNull())
         {
-            _current_sprite->drawImage(importImage(applyTransforms(_current_sprite->importPars(), _current_sprite->sourceImage(k).convertToFormat(QImage::Format_ARGB32)), p_idx, ui->alphaBox->isChecked()));
+            QImage transformed = applyTransforms(pars, _current_sprite->sourceImage(k).convertToFormat(QImage::Format_ARGB32));
+            if (pars.dithering)
+            {
+                transformed = transformed.convertToFormat(QImage::Format_Indexed8).convertToFormat(QImage::Format_ARGB32);
+            }
+            _current_sprite->drawImage(importImage(transformed, p_idx, ui->alphaBox->isChecked()));
         }
-        pd->setValue(k);
+        pd->setValue(k + 2);
         qApp->processEvents();
     }
     _current_sprite->setCurrentFrame(current_frame);
@@ -654,7 +690,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     const auto pars = _current_scene->importPars();
     QProgressDialog * pd = createProgress(this, "Importing scene\n" + ui->colorPickBox->currentText());
     QImage img = applyTransforms(pars, _current_scene->sourceImage())
-        .convertToFormat(pars.dithering ? QImage::Format_Indexed8 : QImage::Format_RGB32);
+                     .convertToFormat(pars.dithering ? QImage::Format_Indexed8 : QImage::Format_RGB32);
     _current_scene->transformedImage() = img;
     pd->setRange(0, (img.width() / 8) * (img.height() / 8));
 
@@ -714,14 +750,11 @@ void MainWindow::reimport(SceneWindow * _current_scene)
                 }
                 else
                 {
-                    // Передаем блок 8x8 вместе с расширенным контекстом соседних клеток,
-                    // где центральные 8x8 пикселей имеют приоритетный вес (см. selectPalette)
                     int rx = qMax(0, x - multipass_offset);
                     int ry = qMax(0, y - multipass_offset);
                     int rw = qMin(width - rx, 8 + 2 * multipass_offset);
                     int rh = qMin(height - ry, 8 + 2 * multipass_offset);
                     QImage context_quad(rw, rh, QImage::Format_RGB32);
-                    // Первыми (0..7, 0..7) кладем пиксели самого знакоместа, далее — пиксели окружения
                     QPainter cp(&context_quad);
                     cp.drawImage(0, 0, img, rx, ry, rw, rh);
                     cp.drawImage(0, 0, small_quad);
@@ -754,7 +787,11 @@ QProgressDialog * MainWindow::createProgress(QWidget * parent, QString text)
     pd->setWindowIcon(QPixmap(":/sonic.zx4.png"));
     pd->setWindowTitle("ZX4 Pixelizer");
     pd->setLabelText(text);
-    pd->setRange(0, 0);
+    pd->setMinimumDuration(0);
+    pd->setAutoClose(false);
+    pd->setAutoReset(false);
+    pd->setRange(0, 100);
+    pd->setValue(0);
     pd->setCancelButton(nullptr);
     pd->show();
     qApp->processEvents();
