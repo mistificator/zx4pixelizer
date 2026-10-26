@@ -226,6 +226,9 @@ void MainWindow::saveSettings() const
     settings.setValue("MainWindow/windowState", saveState());
     settings.setValue("Settings/alpha", ui->alphaBox->isChecked());
     settings.setValue("Settings/dithering", ui->ditherBox->isChecked());
+    settings.setValue("Paths/openSave", open_save_path);
+    settings.setValue("Paths/import", import_path);
+    settings.setValue("Paths/export", export_path);
 }
 
 void MainWindow::loadSettings()
@@ -247,6 +250,10 @@ void MainWindow::loadSettings()
     {
         syncDitherState(settings.value("Settings/dithering").toBool());
     }
+
+    open_save_path = ensureValidDir(settings.value("Paths/openSave").toString());
+    import_path    = ensureValidDir(settings.value("Paths/import").toString());
+    export_path    = ensureValidDir(settings.value("Paths/export").toString());
 }
 
 void MainWindow::updateToolbarWidgetsHeight()
@@ -499,24 +506,22 @@ void MainWindow::on_actionInvert_colors_triggered()
 
 void MainWindow::on_actionImport_triggered()
 {
-    QString path = (current_sprite && !current_sprite->fileName().isEmpty())
-    ? QFileInfo(current_sprite->fileName()).absolutePath()
-    : QString();
-    if (path.isEmpty())
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
+    open_save_path = ensureValidDir(open_save_path);
+    import_path = ensureValidDir(import_path);
 
     QString filter;
     QStringList filters = {
         "Images (*.png *.apng *.webp *.jpg *.jpeg *.jfif *.gif *.bmp)",
         "ZX4 Pixelizer sprites (*.zx4)"
     };
-    QStringList filenames = QFileDialog::getOpenFileNames(this, "Import files", path, filters.join(";;"), &filter);
+    QStringList filenames = QFileDialog::getOpenFileNames(this, "Import files", import_path, filters.join(";;"), &filter);
     if (filenames.isEmpty())
     {
         return;
     }
+
+    import_path = QFileInfo(filenames.first()).absolutePath();
+    saveSettings();
 
     if (filters.indexOf(filter) == 0)
     {
@@ -538,14 +543,9 @@ void MainWindow::on_actionImport_triggered()
                 break;
             }
         }
-
-        QSize sz;
-        if (current_sprite)
-        {
-            sz = current_sprite->canvasSize();
-        }
-        // Передаём p_idx = -1, чтобы палитра подбиралась по первому кадру (первому файлу)
-        importSprite(list, filenames.first(), sz, -1);
+        // Передаём пустой QSize(), чтобы по умолчанию предлагался размер 64x64,
+        // и p_idx = -1 для подбора палитры по первому импортированному файлу
+        importSprite(list, filenames.first(), QSize(), -1);
     }
     else if (filters.indexOf(filter) == 1)
     {
@@ -562,22 +562,18 @@ void MainWindow::on_actionExport_triggered()
     {
         return;
     }
-    QString path = !current_sprite->fileName().isEmpty() ? QFileInfo(current_sprite->fileName()).absolutePath() : QString();
-    if (!path.isEmpty())
-    {
-        path += "/" + QFileInfo(current_sprite->fileName()).baseName();
-    }
-    else
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
+    const QString initial_path = buildDialogFilePath(export_path, current_sprite->fileName());
     QString filter;
     QStringList filters = { "ZX4 Pixelizer sprites (*.zx4)", "ZX Spectrum tape (*.tap)" };
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), &filter);
+    QString filename = QFileDialog::getSaveFileName(this, "Export sprite", initial_path, filters.join(";;"), &filter);
     if (filename.isEmpty())
     {
         return;
     }
+
+    export_path = QFileInfo(filename).absolutePath();
+    saveSettings();
+
     if (filters.indexOf(filter) == 0)
     {
         exportSpriteZx4Format(filename);
@@ -610,21 +606,20 @@ void MainWindow::on_actionExport_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-    QString path;
-    SpriteWindow * _current_sprite = current_sprite;
-    if (_current_sprite && !_current_sprite->fileName().isEmpty())
-    {
-        path = QFileInfo(_current_sprite->fileName()).absolutePath();
-    }
-    if (path.isEmpty())
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
-    QString filename = QFileDialog::getOpenFileName(this, "Open file", path, "ZX4 Pixelizer images (*.zx4.png *.zx4.apng)");
+    open_save_path = ensureValidDir(open_save_path);
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        "Open file",
+        open_save_path,
+        "ZX4 Pixelizer images (*.zx4.png *.zx4.apng)");
     if (filename.isEmpty())
     {
         return;
     }
+
+    open_save_path = QFileInfo(filename).absolutePath();
+    saveSettings();
+
     QImageReader img_rdr(filename);
     QImage src_imp_image;
     QList<QImage> list;
@@ -655,24 +650,21 @@ void MainWindow::on_actionSave_as_triggered()
     {
         return;
     }
-    QString path = !_current_sprite->fileName().isEmpty() ? QFileInfo(_current_sprite->fileName()).absolutePath() : QString();
-    if (!path.isEmpty())
-    {
-        path += "/" + QFileInfo(_current_sprite->fileName()).baseName();
-    }
-    else
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
     const bool has_apng = QImageWriter::supportedImageFormats().contains("apng");
-    QString ext = (_current_sprite->framesCount() <= 1 || !has_apng) ? "zx4.png" : "zx4.apng";
+    const QString ext = (_current_sprite->framesCount() <= 1 || !has_apng) ? "zx4.png" : "zx4.apng";
+    const QString initial_path = buildDialogFilePath(open_save_path, _current_sprite->fileName());
+
     QString filter;
     QStringList filters = { "ZX4 Pixelizer images (*." + ext + ")" };
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), &filter);
+    QString filename = QFileDialog::getSaveFileName(this, "Save file", initial_path, filters.join(";;"), &filter);
     if (filename.isEmpty())
     {
         return;
     }
+
+    open_save_path = QFileInfo(filename).absolutePath();
+    saveSettings();
+
     while (filename.endsWith("." + ext, Qt::CaseInsensitive))
     {
         filename.chop(ext.length() + 1);
@@ -689,7 +681,9 @@ void MainWindow::on_actionSave_triggered()
     {
         return;
     }
-    if (_current_sprite->fileName().isEmpty())
+    const QString fn = _current_sprite->fileName();
+    if (fn.isEmpty() ||
+        (!fn.endsWith(".zx4.png", Qt::CaseInsensitive) && !fn.endsWith(".zx4.apng", Qt::CaseInsensitive)))
     {
         ui->actionSave_as->trigger();
         return;
@@ -779,16 +773,20 @@ void MainWindow::on_wizardPaletteBox_currentIndexChanged(int)
 
 void MainWindow::on_actionImport_scene_triggered()
 {
-    QString path = (current_scene && !current_scene->fileName().isEmpty()) ? QFileInfo(current_scene->fileName()).absolutePath() : QString();
-    if (path.isEmpty())
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, "Images (*.png *.webp *.jpg *.jpeg *.jfif *.gif *.bmp)");
+    import_path = ensureValidDir(import_path);
+    QString filename = QFileDialog::getOpenFileName(
+        this,
+        "Import file",
+        import_path,
+        "Images (*.png *.webp *.jpg *.jpeg *.jfif *.gif *.bmp)");
     if (filename.isEmpty())
     {
         return;
     }
+
+    import_path = QFileInfo(filename).absolutePath();
+    saveSettings();
+
     importScene(QImage(filename), filename);
 }
 
@@ -804,22 +802,18 @@ void MainWindow::on_actionExport_scene_triggered()
     {
         return;
     }
-    QString path = !current_scene->fileName().isEmpty() ? QFileInfo(current_scene->fileName()).absolutePath() : QString();
-    if (!path.isEmpty())
-    {
-        path += "/" + QFileInfo(current_scene->fileName()).baseName();
-    }
-    else
-    {
-        path = QDir::homePath() + "/Pictures/";
-    }
+    const QString initial_path = buildDialogFilePath(export_path, current_scene->fileName());
     QString filter;
     QStringList filters = { "ZX Spectrum screen (*.scr0)", "ZX Spectrum tape (*.tap)", "PNG image (*.png)" };
-    QString filename = QFileDialog::getSaveFileName(this, "Save file", path, filters.join(";;"), &filter);
+    QString filename = QFileDialog::getSaveFileName(this, "Export scene", initial_path, filters.join(";;"), &filter);
     if (filename.isEmpty())
     {
         return;
     }
+
+    export_path = QFileInfo(filename).absolutePath();
+    saveSettings();
+
     const Zx4ImageWithAttributes * scene_with_attr = dynamic_cast<const Zx4ImageWithAttributes *>(&current_scene->image());
     if (!scene_with_attr)
     {

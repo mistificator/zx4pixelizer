@@ -15,6 +15,7 @@
 #include <QMimeData>
 #include <QSignalBlocker>
 #include <QClipboard>
+#include <QStandardPaths>
 #include <algorithm>
 #include <cmath>
 #ifdef _OPENMP
@@ -244,8 +245,7 @@ void MainWindow::importSprite(QList<QImage> src_imp_image, QString filename, QSi
     }
     if (!sz.isValid())
     {
-        sz = QSize(std::clamp(src_imp_image[0].width(), 1, 255),
-                   std::clamp(src_imp_image[0].height(), 1, 192));
+        sz = QSize(64, 64);
         if (!askResizeSize("Resize canvas", sz))
         {
             return;
@@ -876,6 +876,58 @@ QProgressDialog * MainWindow::createProgress(QWidget * parent, QString text)
     pd->repaint();
     qApp->processEvents();
     return pd;
+}
+
+QString MainWindow::defaultPicturesPath()
+{
+    QString p = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+    if (p.isEmpty() || !QDir(p).exists())
+    {
+        p = QDir::homePath() + "/Pictures";
+    }
+    if (!QDir(p).exists())
+    {
+        p = QDir::homePath();
+    }
+    return QDir::cleanPath(p);
+}
+
+QString MainWindow::ensureValidDir(const QString & dirPath)
+{
+    if (!dirPath.isEmpty() && QDir(dirPath).exists())
+    {
+        return QDir::cleanPath(dirPath);
+    }
+    return defaultPicturesPath();
+}
+
+QString MainWindow::extractBaseName(const QString & filePath)
+{
+    if (filePath.isEmpty() ||
+        filePath == "clipboard" ||
+        filePath == "url_image" ||
+        filePath == "data_url" ||
+        filePath == "dropped_image")
+    {
+        return QString();
+    }
+    QString name = QFileInfo(filePath).fileName();
+    for (const QString & ext : { ".zx4.png", ".zx4.apng", ".zx4", ".scr0", ".scr1", ".tap" })
+    {
+        if (name.endsWith(ext, Qt::CaseInsensitive))
+        {
+            name.chop(ext.length());
+            return name;
+        }
+    }
+    return QFileInfo(name).completeBaseName();
+}
+
+QString MainWindow::buildDialogFilePath(const QString & dirPath, const QString & currentFilePath)
+{
+    const QString dir = ensureValidDir(dirPath);
+    const QString base = extractBaseName(currentFilePath);
+    return base.isEmpty() ? dir : (dir + "/" + base);
 }
 
 

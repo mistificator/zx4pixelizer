@@ -89,6 +89,15 @@ private:
     QToolButton * toolbarReimportBtn = nullptr;
     QActionGroup * presetMenuGroup = nullptr;
 
+    QString open_save_path;
+    QString import_path;
+    QString export_path;
+
+    static QString defaultPicturesPath();
+    static QString ensureValidDir(const QString & dirPath);
+    static QString extractBaseName(const QString & filePath);
+    static QString buildDialogFilePath(const QString & dirPath, const QString & currentFilePath);
+
     void createPalettes();
     void syncPresetsUI(const QString & selectedPreset = QString());
     void syncAlphaState(bool checked);
