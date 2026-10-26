@@ -9,6 +9,7 @@
 #include <QPair>
 #include <QImage>
 #include <QImageReader>
+#include <QCursor>
 #include <QSharedPointer>
 #include <QHashFunctions>
 #include <functional>
@@ -16,6 +17,16 @@
 enum ZxColorEnum {
     ZxBlack = 0, ZxBlue, ZxRed, ZxMagenta, ZxGreen, ZxCyan, ZxYellow, ZxWhite,
     ZxBrightBlack, ZxBrightBlue, ZxBrightRed, ZxBrightMagenta, ZxBrightGreen, ZxBrightCyan, ZxBrightYellow, ZxBrightWhite
+};
+
+enum Zx4CursorType {
+    CursorPencil = 0,
+    CursorBrush,
+    CursorFill,
+    CursorEraser,
+    CursorMove,
+    CursorPipette,
+    CursorStamp
 };
 
 inline bool operator<(const QColor &t1, const QColor &t2) noexcept
@@ -126,6 +137,8 @@ public:
     Zx4BaseObject(const Zx4Palette & _palettes);
     virtual ~Zx4BaseObject();
 
+    static QCursor makeCursor(Zx4CursorType type);
+
     virtual void setFileName(QString);
     QString fileName() const;
 
@@ -168,6 +181,7 @@ public:
 
 protected:
     void setCanvas(QWidget *);
+    virtual void onHistoryRestored() {}
 
     const Zx4Palette & palettes;
     QString file_name;

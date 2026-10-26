@@ -1,6 +1,10 @@
 #include <QSet>
+#include <QHash>
 #include <QApplication>
 #include <QWidget>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPixmap>
 #include <QDir>
 #include <QDebug>
 #include <algorithm>
@@ -162,7 +166,6 @@ QString Zx4ImportPars::defaultPresetPath()
 
 void Zx4Palette::init()
 {
-    // Инициализируем LUT цветов при старте вместе с палитрами
     RGB_color_Lab_difference_CIE76(0, 0, 0, 0, 0, 0);
 
     const int level = 0xC0;
@@ -728,6 +731,230 @@ QByteArray Zx4Processing::inflateRle8(QByteArray ba)
     return out;
 }
 
+QCursor Zx4BaseObject::makeCursor(Zx4CursorType type)
+{
+    static QHash<int, QCursor> cache;
+    if (cache.contains(type))
+    {
+        return cache.value(type);
+    }
+
+    QPixmap px(24, 24);
+    px.fill(Qt::transparent);
+    QPainter p(&px);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    int hotX = 2;
+    int hotY = 21;
+
+    switch (type)
+    {
+    case CursorPencil:
+    {
+        hotX = 2;
+        hotY = 21;
+        // Остриё и корпус карандаша
+        QPolygonF shaft;
+        shaft << QPointF(5, 15) << QPointF(16, 4) << QPointF(19, 7) << QPointF(8, 18);
+        QPolygonF cone;
+        cone << QPointF(2, 21) << QPointF(5, 15) << QPointF(8, 18);
+        QPolygonF cap;
+        cap << QPointF(16, 4) << QPointF(18, 2) << QPointF(21, 5) << QPointF(19, 7);
+
+        p.setPen(QPen(Qt::black, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolygon(shaft);
+        p.drawPolygon(cone);
+        p.drawPolygon(cap);
+
+        p.setPen(QPen(Qt::white, 0.8));
+        p.setBrush(QColor(245, 195, 45));
+        p.drawPolygon(shaft);
+        p.setBrush(QColor(240, 215, 175));
+        p.drawPolygon(cone);
+        p.setBrush(QColor(235, 110, 140));
+        p.drawPolygon(cap);
+
+        // Грифель
+        p.setPen(Qt::NoPen);
+        p.setBrush(Qt::black);
+        QPolygonF tip;
+        tip << QPointF(2, 21) << QPointF(4, 17) << QPointF(6, 19);
+        p.drawPolygon(tip);
+        break;
+    }
+    case CursorBrush:
+    {
+        hotX = 2;
+        hotY = 21;
+        // Ручка кисти
+        QPolygonF handle;
+        handle << QPointF(9, 11) << QPointF(19, 2) << QPointF(21, 4) << QPointF(12, 14);
+        // Ворс кисти
+        QPainterPath bristles;
+        bristles.moveTo(2, 21);
+        bristles.quadTo(4, 15, 9, 11);
+        bristles.lineTo(12, 14);
+        bristles.quadTo(9, 20, 2, 21);
+
+        p.setPen(QPen(Qt::black, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolygon(handle);
+        p.drawPath(bristles);
+
+        p.setPen(QPen(Qt::white, 0.8));
+        p.setBrush(QColor(180, 115, 55));
+        p.drawPolygon(handle);
+        p.setBrush(QColor(55, 175, 250));
+        p.drawPath(bristles);
+        break;
+    }
+    case CursorFill:
+    {
+        hotX = 3;
+        hotY = 20;
+        // Наклонённое ведро
+        QPolygonF bucket;
+        bucket << QPointF(6, 11) << QPointF(14, 5) << QPointF(20, 12) << QPointF(12, 18);
+        // Капля краски в точке заливки
+        QPainterPath drop;
+        drop.moveTo(6, 12);
+        drop.quadTo(1, 17, 3, 20);
+        drop.quadTo(6, 18, 6, 12);
+
+        p.setPen(QPen(Qt::black, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolygon(bucket);
+        p.drawPath(drop);
+
+        p.setPen(QPen(Qt::white, 0.8));
+        p.setBrush(QColor(210, 215, 225));
+        p.drawPolygon(bucket);
+        p.setBrush(QColor(45, 200, 95));
+        p.drawPath(drop);
+
+        // Дужка ведра
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(Qt::white, 1.5));
+        p.drawArc(QRectF(11, 2, 9, 9), 20 * 16, 150 * 16);
+        break;
+    }
+    case CursorEraser:
+    {
+        hotX = 4;
+        hotY = 19;
+        // Двухцветный ластик под углом
+        QPolygonF pinkPart;
+        pinkPart << QPointF(3, 16) << QPointF(10, 9) << QPointF(15, 14) << QPointF(8, 21);
+        QPolygonF whitePart;
+        whitePart << QPointF(10, 9) << QPointF(15, 4) << QPointF(20, 9) << QPointF(15, 14);
+
+        p.setPen(QPen(Qt::black, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolygon(pinkPart);
+        p.drawPolygon(whitePart);
+
+        p.setPen(QPen(Qt::black, 0.9));
+        p.setBrush(QColor(245, 130, 155));
+        p.drawPolygon(pinkPart);
+        p.setBrush(QColor(240, 245, 250));
+        p.drawPolygon(whitePart);
+        break;
+    }
+    case CursorMove:
+    {
+        hotX = 12;
+        hotY = 12;
+        QPainterPath cross;
+        // Горизонтальная и вертикальная оси со стрелками
+        cross.moveTo(12, 2);
+        cross.lineTo(8, 6);
+        cross.lineTo(10.5, 6);
+        cross.lineTo(10.5, 10.5);
+        cross.lineTo(6, 10.5);
+        cross.lineTo(6, 8);
+        cross.lineTo(2, 12);
+        cross.lineTo(6, 16);
+        cross.lineTo(6, 13.5);
+        cross.lineTo(10.5, 13.5);
+        cross.lineTo(10.5, 18);
+        cross.lineTo(8, 18);
+        cross.lineTo(12, 22);
+        cross.lineTo(16, 18);
+        cross.lineTo(13.5, 18);
+        cross.lineTo(13.5, 13.5);
+        cross.lineTo(18, 13.5);
+        cross.lineTo(18, 16);
+        cross.lineTo(22, 12);
+        cross.lineTo(18, 8);
+        cross.lineTo(18, 10.5);
+        cross.lineTo(13.5, 10.5);
+        cross.lineTo(13.5, 6);
+        cross.lineTo(16, 6);
+        cross.closeSubpath();
+
+        p.setPen(QPen(Qt::black, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Qt::white);
+        p.drawPath(cross);
+        break;
+    }
+    case CursorPipette:
+    {
+        hotX = 2;
+        hotY = 21;
+        // Стеклянная трубка пипетки
+        QPolygonF tube;
+        tube << QPointF(2, 21) << QPointF(5, 15) << QPointF(13, 7) << QPointF(16, 10) << QPointF(8, 18);
+        // Поперечный упор
+        QPolygonF collar;
+        collar << QPointF(11, 5) << QPointF(18, 12) << QPointF(19.5, 10.5) << QPointF(12.5, 3.5);
+        // Резиновая груша
+        QPainterPath bulb;
+        bulb.addEllipse(QPointF(18, 5), 3.8, 3.8);
+
+        p.setPen(QPen(Qt::black, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawPolygon(tube);
+        p.drawPolygon(collar);
+        p.drawPath(bulb);
+
+        p.setPen(QPen(Qt::white, 0.8));
+        p.setBrush(QColor(175, 235, 255));
+        p.drawPolygon(tube);
+        p.setBrush(QColor(210, 210, 210));
+        p.drawPolygon(collar);
+        p.setBrush(QColor(235, 80, 95));
+        p.drawPath(bulb);
+        break;
+    }
+    case CursorStamp:
+    {
+        hotX = 12;
+        hotY = 20;
+        // Подошва штампа
+        QRectF pad(4, 17, 16, 4);
+        QRectF mount(6, 14, 12, 3);
+        QPolygonF neck;
+        neck << QPointF(9, 14) << QPointF(10.5, 9) << QPointF(13.5, 9) << QPointF(15, 14);
+
+        p.setPen(QPen(Qt::black, 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.drawRect(pad);
+        p.drawRect(mount);
+        p.drawPolygon(neck);
+        p.drawEllipse(QPointF(12, 6), 4.5, 4.0);
+
+        p.setPen(QPen(Qt::white, 0.8));
+        p.setBrush(QColor(230, 95, 95));
+        p.drawRect(pad);
+        p.setBrush(QColor(190, 200, 210));
+        p.drawRect(mount);
+        p.setBrush(QColor(215, 150, 75));
+        p.drawPolygon(neck);
+        p.drawEllipse(QPointF(12, 6), 4.5, 4.0);
+        break;
+    }
+    }
+
+    QCursor cur(px, hotX, hotY);
+    cache.insert(type, cur);
+    return cur;
+}
+
 Zx4BaseObject::Zx4BaseObject(const Zx4Palette & _palettes) : palettes(_palettes)
 {
     clearHistory();
@@ -885,6 +1112,7 @@ int Zx4BaseObject::paletteSequenceMax() const
 void Zx4BaseObject::setCanvas(QWidget * w)
 {
     widget = w;
+    widget->setMouseTracking(true);
     widget->installEventFilter(dynamic_cast<QWidget *>(this));
 }
 
@@ -944,6 +1172,7 @@ void Zx4BaseObject::undo()
             grid_y = zx4_img.first()->height();
             current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
         }
+        onHistoryRestored();
     }
 }
 
@@ -962,6 +1191,7 @@ void Zx4BaseObject::redo()
             grid_y = zx4_img.first()->height();
             current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
         }
+        onHistoryRestored();
     }
 }
 

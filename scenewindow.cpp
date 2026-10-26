@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QGuiApplication>
 #include <algorithm>
 #include "color_conversions.h"
 #include "scenewindow.h"
@@ -16,6 +17,7 @@ SceneWindow::SceneWindow(const Zx4Palette & palettes, QWidget *parent) :
     setCanvas(ui->canvas);
     SceneWindow::setFileName(QString());
     selected_char = update_char = QPoint(-1, -1);
+    updateCanvasCursor();
 }
 
 SceneWindow::~SceneWindow()
@@ -110,16 +112,43 @@ void SceneWindow::setPixel(QPoint p, int color_index)
     scene().color_layer1[p.x()][p.y()] = (color_index == 0 || color_index == 2) ? Zx4Image::BitOff : Zx4Image::BitOn;
 }
 
+void SceneWindow::updateCanvasCursor()
+{
+    if (!ui->canvas)
+    {
+        return;
+    }
+    const Qt::KeyboardModifiers mods = QGuiApplication::keyboardModifiers();
+    if (mods.testFlag(Qt::ControlModifier))
+    {
+        ui->canvas->setCursor(makeCursor(CursorPipette));
+    }
+    else if (mods.testFlag(Qt::ShiftModifier))
+    {
+        ui->canvas->setCursor(makeCursor(CursorStamp));
+    }
+    else if (selected_char != QPoint(-1, -1))
+    {
+        ui->canvas->setCursor(makeCursor(CursorPencil));
+    }
+    else
+    {
+        ui->canvas->setCursor(Qt::ArrowCursor);
+    }
+}
+
 bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
 {
     if (o == ui->canvas)
     {
         switch (ev->type())
         {
+        case QEvent::Enter:
+            updateCanvasCursor();
+            break;
         case QEvent::Paint:
             drawGrid();
             break;
-
         case QEvent::Wheel:
         {
             on_change = nullptr;
@@ -145,11 +174,11 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             }
             break;
         }
-
         case QEvent::MouseButtonPress:
         case QEvent::MouseMove:
         case QEvent::MouseButtonDblClick:
         {
+            updateCanvasCursor();
             on_change = nullptr;
             QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
             if (!me || transformed_img.isEmpty() || transformed_img[current_frame].isNull())
@@ -190,6 +219,7 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
                         selected_char = QPoint(x / 8, y / 8);
                         emit charSelected(scene().attr[selected_char.x()][selected_char.y()]);
                     }
+                    updateCanvasCursor();
                 }
                 else if (me->modifiers().testFlag(Qt::NoModifier))
                 {
@@ -207,9 +237,9 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             }
             break;
         }
-
         case QEvent::MouseButtonRelease:
         {
+            updateCanvasCursor();
             if (on_change)
             {
                 on_change();
@@ -219,7 +249,6 @@ bool SceneWindow::eventFilter(QObject * o, QEvent * ev)
             QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
             break;
         }
-
         default:
             break;
         }
@@ -255,7 +284,6 @@ void SceneWindow::drawGrid()
 
     double kx = 8.0 * grid_x / transformed_img[current_frame].width();
     double ky = 8.0 * grid_y / transformed_img[current_frame].height();
-
     const QList<QPair<QPoint, QColor>> list = {
         { selected_char, QColor(0, 255, 0, 128) },
         { update_char,   QColor(255, 0, 0, 128) }
@@ -269,7 +297,6 @@ void SceneWindow::drawGrid()
             p.drawRect(item.first.x() * kx - pen_width / 2.0, item.first.y() * ky - pen_width / 2.0, kx + pen_width, ky + pen_width);
         }
     }
-
     QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
 }
 
@@ -280,12 +307,12 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
         return -1;
     }
 
-    // Собираем точный список цветов блока (с квантованием 5 бит на канал для подавления мелкого шума)
     struct Cluster {
         int r, g, b;
         int weight;
         int max_c, chroma;
     };
+
     QMap<QRgb, int> raw_counts;
     int dark_pixels_weight = 0;
     int total_pixels = 0;
@@ -301,9 +328,9 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
             if (luma < min_luma) min_luma = luma;
             if (luma > max_luma) max_luma = luma;
 
-            // В центральном квадрате 8x8 вес пикселей выше, чем на краях расширенного окна Multipass
             int w = (x < 8 && y < 8) ? 3 : 1;
             total_pixels += w;
+
             if (qMax(r, qMax(g, b)) < 36)
             {
                 dark_pixels_weight += w;
@@ -331,8 +358,6 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
         clusters.push_back({ r, g, b, it.value(), mx, mx - mn });
     }
 
-    // Нужен ли в этом блоке минимум 2 разных цвета палитры?
-    // Только если в самом блоке есть заметный перепад яркости/цвета выше порога шага Gigascreen (96)!
     const bool has_real_contrast = (max_luma - min_luma >= 45) && (dark_pixels_weight < total_pixels);
     const int effective_criteria = has_real_contrast ? dist_colors_criteria : 0;
 
@@ -343,7 +368,6 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
     {
         const QList<QColor> & pal = palettes.palettes[pal_idx];
 
-        // Проверяем, есть ли в палитре чёрный цвет (0,0,0)
         bool pal_has_black = false;
         for (int s = 0; s < 4; ++s)
         {
@@ -379,16 +403,13 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
                     d = RGB_color_Lab_difference_CIEDE2000(cr, cg, cb, cl.r, cl.g, cl.b);
                 else
                 {
-                    // Быстрая и точная метрика HSL/RGB без искажений оттенка в тенях
                     double dr = cr - cl.r, dg = cg - cl.g, db = cb - cl.b;
                     d = std::sqrt(dr * dr * 0.30 + dg * dg * 0.59 + db * db * 0.11) * 0.5;
                 }
 
-                // Усиливаем вес разницы яркости, чтобы почти чёрный цвет никогда не притягивался к серому (96,96,96)
                 double luma_diff = qAbs((cl.r * 77 + cl.g * 150 + cl.b * 29) - (cr * 77 + cg * 150 + cb * 29)) / 256.0;
                 d += luma_diff * 0.14;
 
-                // Защищаем цветные участки от выбора серого цвета палитры (96,96,96 / 192,192,192)
                 if (cl.chroma > 18 && c_chroma == 0 && c_max > 0)
                 {
                     d += cl.chroma * 0.30;
@@ -400,18 +421,16 @@ int SceneWindow::selectPalette(QImage small_quad, Zx4Palette::SelectPaletteMetho
                     chosen_slot = slot;
                 }
             }
+
             used_mask |= (1 << chosen_slot);
             total_err += min_d * cl.weight;
         }
 
-        // Если в блоке есть тёмные/чёрные пиксели, жёстко штрафуем палитры без чёрного цвета,
-        // чтобы чёрный фон никогда не становился серым или лиловым квадратом!
         if (dark_pixels_weight > 0 && !pal_has_black)
         {
             total_err += dark_pixels_weight * 45.0;
         }
 
-        // Мягкий штраф за схлопывание контрастных деталей в 1 цвет (только когда перепад яркости реально высокий)
         int unique_used = ((used_mask & 1) != 0) + ((used_mask & 2) != 0) + ((used_mask & 4) != 0) + ((used_mask & 8) != 0);
         if (effective_criteria > 0 && unique_used <= effective_criteria)
         {
@@ -476,7 +495,6 @@ void SceneWindow::importChar(QPoint char_pos, int p_idx, QImage small_quad)
         return;
     }
     small_quad = Zx4Processing::importImage(small_quad.convertToFormat(QImage::Format_RGB32), palettes.colorTable(p_idx));
-
 #pragma omp critical
     {
         if (!scene().isNull())

@@ -32,6 +32,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->preview->setCursor(Qt::SplitHCursor);
     ui->mdiArea->installEventFilter(this);
 
+    qApp->installEventFilter(this);
+
     QActionGroup * ag = new QActionGroup(this);
     ag->setExclusive(true);
     ag->addAction(ui->actionPencil);
@@ -39,6 +41,13 @@ MainWindow::MainWindow(QWidget *parent)
     ag->addAction(ui->actionFill);
     ag->addAction(ui->actionMove);
     ag->addAction(ui->actionEraser);
+    connect(ag, &QActionGroup::triggered, this, [this](QAction *)
+            {
+                if (current_sprite)
+                {
+                    current_sprite->updateCanvasCursor();
+                }
+            });
 
     auto setupToolSizePopup = [this](QAction * toolAction, int & targetSize)
     {

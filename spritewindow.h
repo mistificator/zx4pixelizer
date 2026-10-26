@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QLabel>
+#include <QScrollArea>
 #include <QMap>
 
 #include "zx4pixelizer.h"
@@ -49,19 +50,34 @@ public:
     void drawImage(QImage img);
     void invertColors();
 
+    void updateCanvasCursor();
+    void updateFrameStrip();
+    void selectFrame(int index);
+
 signals:
     void previewUpdateIsNeeded();
     void undoRedoMenuUpdateIsNeeded();
+
+protected:
+    void onHistoryRestored() override;
 
 private slots:
     void drawGrid();
     void on_actionAnimate_toggled(bool);
     void on_actionStop_triggered();
-    void on_frameBox_valueChanged(int);
+    void on_actionAddFrame_triggered();
+    void on_actionRemoveFrame_triggered();
     void animationFrame();
 
 private:
     Ui::SpriteWindow *ui;
+    QScrollArea * frame_scroll = nullptr;
+    QWidget * frame_strip = nullptr;
+    int drag_initial_frame = -1;
+    int drag_source_frame = -1;
+    bool is_dragging_frame = false;
+    QPoint drag_start_pos;
+
     Zx4Image stored_sprite;
     QPoint old_grid_pos;
     QMap<ActionEnum, QAction *> acts;
@@ -69,6 +85,12 @@ private:
     int p_idx = 0;
     int brush_size = 5;
     int eraser_size = 5;
+
+    void drawFrameStrip();
+    int frameIndexAtPos(const QPoint & pos) const;
+    QRect frameCellRect(int index) const;
+    QImage renderFrameThumbnail(int frame_idx, const QSize & box_size) const;
+    void ensureFrameVisible(int index);
     bool eventFilter(QObject *, QEvent *);
 };
 

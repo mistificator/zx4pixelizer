@@ -1,13 +1,25 @@
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QAction>
+#include <QToolButton>
+#include <QScrollBar>
 #include <QPainter>
 #include <QFileInfo>
-#include <QSpinBox>
 #include <QTimer>
 #include <QVector>
+#include <QApplication>
+#include <QGuiApplication>
+#include <algorithm>
 
 #include "spritewindow.h"
 #include "ui_spritewindow.h"
+
+namespace {
+constexpr int kStripCellSize = 52;
+constexpr int kStripThumbSize = 44;
+constexpr int kStripSpacing = 6;
+constexpr int kStripMargin = 4;
+}
 
 SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
     QWidget(parent), Zx4BaseObject(palettes),
@@ -15,11 +27,41 @@ SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
 {
     ui->setupUi(this);
     setCanvas(ui->canvas);
-    ui->toolBar->addWidget(new QLabel("Frame"));
-    ui->frameBox->setVisible(true);
-    ui->toolBar->addWidget(ui->frameBox);
+
+    // Оформление кнопок + и - в тулбаре кадров
+    for (QAction * act : { ui->actionAddFrame, ui->actionRemoveFrame })
+    {
+        if (QToolButton * btn = qobject_cast<QToolButton *>(ui->toolBar->widgetForAction(act)))
+        {
+            QFont f = btn->font();
+            f.setBold(true);
+            f.setPointSize(qMax(11, f.pointSize() + 2));
+            btn->setFont(f);
+            btn->setFixedSize(36, 36);
+        }
+    }
+
+    // Полоска превью кадров с горизонтальным скроллом
+    frame_scroll = new QScrollArea(ui->toolBar);
+    frame_scroll->setWidgetResizable(false);
+    frame_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    frame_scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    frame_scroll->setFrameShape(QFrame::StyledPanel);
+    frame_scroll->setFixedHeight(kStripCellSize + kStripMargin * 2 + 16);
+    frame_scroll->setMinimumWidth(100);
+    frame_scroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    frame_strip = new QWidget(frame_scroll);
+    frame_strip->setMouseTracking(true);
+    frame_strip->installEventFilter(this);
+    frame_scroll->setWidget(frame_strip);
+
+    ui->toolBar->addWidget(frame_scroll);
+
     clrs << Qt::black << Qt::black << Qt::black << Qt::black;
     setFileName(QString());
+    updateFrameStrip();
+    updateCanvasCursor();
 }
 
 SpriteWindow::~SpriteWindow()
@@ -38,14 +80,20 @@ void SpriteWindow::setSourceImage(const QList<QImage> & i)
 {
     ui->actionAnimate->setChecked(false);
     Zx4BaseObject::setSourceImage(i);
-    ui->frameBox->setMaximum(qMax(1, int(i.count())));
+    updateFrameStrip();
 }
 
 void SpriteWindow::setImage(const QList<const Zx4Image *> & i)
 {
     ui->actionAnimate->setChecked(false);
     Zx4BaseObject::setImage(i);
-    ui->frameBox->setMaximum(qMax(1, int(i.count())));
+    updateFrameStrip();
+}
+
+void SpriteWindow::onHistoryRestored()
+{
+    updateFrameStrip();
+    ensureFrameVisible(current_frame);
 }
 
 QSize SpriteWindow::sizeHint() const
@@ -92,6 +140,10 @@ void SpriteWindow::setColors(QList<QColor> _colors)
     }
     clrs = _colors;
     ui->canvas->update();
+    if (frame_strip)
+    {
+        frame_strip->update();
+    }
 }
 
 QList<QColor> SpriteWindow::colors() const
@@ -117,6 +169,7 @@ void SpriteWindow::clearCanvas(QSize s)
     {
         zx4_img[k]->clear(grid_x, grid_y);
     }
+    updateFrameStrip();
     ui->canvas->update();
 }
 
@@ -128,6 +181,7 @@ void SpriteWindow::setCanvasSize(QSize s)
     {
         zx4_img[k]->resize(grid_x, grid_y);
     }
+    updateFrameStrip();
     ui->canvas->update();
 }
 
@@ -218,20 +272,341 @@ void SpriteWindow::resizeImage(QSize s)
             }
         }
     }
+    updateFrameStrip();
     ui->canvas->update();
+}
+
+void SpriteWindow::updateCanvasCursor()
+{
+    if (!ui->canvas)
+    {
+        return;
+    }
+    if (ui->actionAnimate->isChecked())
+    {
+        ui->canvas->setCursor(Qt::ArrowCursor);
+        return;
+    }
+
+    const Qt::KeyboardModifiers mods = QGuiApplication::keyboardModifiers();
+    if (mods.testFlag(Qt::ControlModifier))
+    {
+        ui->canvas->setCursor(makeCursor(CursorPipette));
+        return;
+    }
+    if (mods.testFlag(Qt::ShiftModifier))
+    {
+        ui->canvas->setCursor(makeCursor(CursorStamp));
+        return;
+    }
+
+    if (QGuiApplication::mouseButtons().testFlag(Qt::RightButton) ||
+        (acts[ActionEraser] && acts[ActionEraser]->isChecked()))
+    {
+        ui->canvas->setCursor(makeCursor(CursorEraser));
+    }
+    else if (acts[ActionBrush] && acts[ActionBrush]->isChecked())
+    {
+        ui->canvas->setCursor(makeCursor(CursorBrush));
+    }
+    else if (acts[ActionFill] && acts[ActionFill]->isChecked())
+    {
+        ui->canvas->setCursor(makeCursor(CursorFill));
+    }
+    else if (acts[ActionMove] && acts[ActionMove]->isChecked())
+    {
+        ui->canvas->setCursor(makeCursor(CursorMove));
+    }
+    else
+    {
+        ui->canvas->setCursor(makeCursor(CursorPencil));
+    }
+}
+
+QRect SpriteWindow::frameCellRect(int index) const
+{
+    const int x = kStripMargin + index * (kStripCellSize + kStripSpacing);
+    return QRect(x, kStripMargin, kStripCellSize, kStripCellSize);
+}
+
+int SpriteWindow::frameIndexAtPos(const QPoint & pos) const
+{
+    if (zx4_img.isEmpty())
+    {
+        return -1;
+    }
+    const int step = kStripCellSize + kStripSpacing;
+    const int idx = (pos.x() - kStripMargin + kStripSpacing / 2) / step;
+    return std::clamp(idx, 0, int(zx4_img.count() - 1));
+}
+
+QImage SpriteWindow::renderFrameThumbnail(int frame_idx, const QSize & box_size) const
+{
+    QImage thumb(box_size, QImage::Format_ARGB32);
+    thumb.fill(Qt::transparent);
+    if (frame_idx < 0 || frame_idx >= zx4_img.count() || zx4_img[frame_idx]->isNull())
+    {
+        return thumb;
+    }
+
+    const Zx4Image & frame = *zx4_img[frame_idx];
+    const int fw = qMax(1, frame.width());
+    const int fh = qMax(1, frame.height());
+    QImage raw(fw, fh, QImage::Format_ARGB32);
+    for (int y = 0; y < fh; ++y)
+    {
+        for (int x = 0; x < fw; ++x)
+        {
+            if (frame.alpha_layer[x][y])
+            {
+                raw.setPixelColor(x, y, clrs[colorIndex(frame, x, y)]);
+            }
+            else
+            {
+                const int checker = ((x / 4 + y / 4) % 2 == 0) ? 38 : 22;
+                raw.setPixelColor(x, y, QColor(checker, checker, checker));
+            }
+        }
+    }
+
+    QImage scaled = raw.scaled(box_size, Qt::KeepAspectRatio, Qt::FastTransformation);
+    QPainter p(&thumb);
+    p.fillRect(thumb.rect(), QColor(25, 25, 25));
+    p.drawImage((box_size.width() - scaled.width()) / 2,
+                (box_size.height() - scaled.height()) / 2,
+                scaled);
+    return thumb;
+}
+
+void SpriteWindow::updateFrameStrip()
+{
+    if (!frame_strip)
+    {
+        return;
+    }
+    const int count = qMax(1, int(zx4_img.count()));
+    current_frame = std::clamp(current_frame, 0, count - 1);
+
+    ui->actionRemoveFrame->setEnabled(zx4_img.count() > 1);
+    ui->actionAddFrame->setEnabled(zx4_img.count() < 255);
+
+    const int total_w = kStripMargin * 2 + count * kStripCellSize + (count - 1) * kStripSpacing;
+    const int total_h = kStripMargin * 2 + kStripCellSize;
+    frame_strip->setFixedSize(total_w, total_h);
+    frame_strip->update();
+}
+
+void SpriteWindow::ensureFrameVisible(int index)
+{
+    if (!frame_scroll || index < 0 || index >= zx4_img.count())
+    {
+        return;
+    }
+    const QRect r = frameCellRect(index);
+    frame_scroll->ensureVisible(r.center().x(), r.center().y(), kStripCellSize, kStripCellSize / 2);
+}
+
+void SpriteWindow::selectFrame(int index)
+{
+    if (zx4_img.isEmpty())
+    {
+        return;
+    }
+    index = std::clamp(index, 0, int(zx4_img.count() - 1));
+    setCurrentFrame(index);
+    updateFrameStrip();
+    ensureFrameVisible(current_frame);
+    ui->canvas->update();
+    emit previewUpdateIsNeeded();
+}
+
+void SpriteWindow::drawFrameStrip()
+{
+    QPainter p(frame_strip);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.fillRect(frame_strip->rect(), QColor(32, 32, 32));
+
+    const int count = zx4_img.count();
+    for (int i = 0; i < count; ++i)
+    {
+        const QRect cell = frameCellRect(i);
+        const bool is_selected = (i == current_frame);
+        const bool is_dragged = (is_dragging_frame && i == drag_source_frame);
+
+        p.setPen(Qt::NoPen);
+        p.setBrush(is_selected ? QColor(50, 95, 150) : QColor(45, 45, 45));
+        p.drawRoundedRect(cell, 4, 4);
+
+        const QSize thumb_sz(kStripThumbSize, kStripThumbSize);
+        const QImage thumb = renderFrameThumbnail(i, thumb_sz);
+        p.drawImage(cell.x() + (cell.width() - thumb_sz.width()) / 2,
+                    cell.y() + (cell.height() - thumb_sz.height()) / 2,
+                    thumb);
+
+        // Рамка выделения активного/перетаскиваемого кадра
+        if (is_dragged)
+        {
+            p.setPen(QPen(QColor(255, 215, 0), 2.5));
+        }
+        else if (is_selected)
+        {
+            p.setPen(QPen(QColor(42, 130, 218), 2.5));
+        }
+        else
+        {
+            p.setPen(QPen(QColor(80, 80, 80), 1.0));
+        }
+        p.setBrush(Qt::NoBrush);
+        p.drawRoundedRect(cell.adjusted(1, 1, -1, -1), 4, 4);
+
+        // Бейдж с номером кадра
+        const QString num_str = QString::number(i + 1);
+        QFont f = p.font();
+        f.setPointSize(7);
+        f.setBold(true);
+        p.setFont(f);
+        const QRect badge_rect(cell.x() + 3, cell.y() + 3, 16, 12);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor(0, 0, 0, 175));
+        p.drawRoundedRect(badge_rect, 2, 2);
+        p.setPen(Qt::white);
+        p.drawText(badge_rect, Qt::AlignCenter, num_str);
+    }
 }
 
 bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
 {
-    if (o == ui->canvas)
+    if (o == frame_strip)
     {
         switch (ev->type())
         {
+        case QEvent::Paint:
+            drawFrameStrip();
+            return true;
+
+        case QEvent::Wheel:
+        {
+            if (auto * we = dynamic_cast<QWheelEvent *>(ev))
+            {
+                if (frame_scroll && frame_scroll->horizontalScrollBar())
+                {
+                    int delta = we->angleDelta().y() != 0 ? we->angleDelta().y() : we->angleDelta().x();
+                    frame_scroll->horizontalScrollBar()->setValue(
+                        frame_scroll->horizontalScrollBar()->value() - delta / 2);
+                    we->accept();
+                    return true;
+                }
+            }
+            break;
+        }
+
+        case QEvent::MouseButtonPress:
+        {
+            auto * me = dynamic_cast<QMouseEvent *>(ev);
+            if (me && me->button() == Qt::LeftButton && !zx4_img.isEmpty())
+            {
+                const int idx = frameIndexAtPos(me->position().toPoint());
+                if (idx >= 0 && idx < zx4_img.count())
+                {
+                    ui->actionAnimate->setChecked(false);
+                    drag_initial_frame = idx;
+                    drag_source_frame = idx;
+                    drag_start_pos = me->position().toPoint();
+                    is_dragging_frame = false;
+                    frame_strip->setCursor(Qt::PointingHandCursor);
+                    selectFrame(idx);
+                }
+                return true;
+            }
+            break;
+        }
+
+        case QEvent::MouseMove:
+        {
+            auto * me = dynamic_cast<QMouseEvent *>(ev);
+            if (!me)
+            {
+                break;
+            }
+            if (me->buttons().testFlag(Qt::LeftButton) && drag_source_frame >= 0)
+            {
+                if (!is_dragging_frame &&
+                    (me->position().toPoint() - drag_start_pos).manhattanLength() >= QApplication::startDragDistance())
+                {
+                    is_dragging_frame = true;
+                    frame_strip->setCursor(Qt::ClosedHandCursor);
+                }
+
+                if (is_dragging_frame)
+                {
+                    const int target_idx = frameIndexAtPos(me->position().toPoint());
+                    if (target_idx >= 0 && target_idx < zx4_img.count() && target_idx != drag_source_frame)
+                    {
+                        zx4_img.move(drag_source_frame, target_idx);
+                        if (src_imp_img.count() == zx4_img.count())
+                        {
+                            src_imp_img.move(drag_source_frame, target_idx);
+                        }
+                        if (transformed_img.count() == zx4_img.count())
+                        {
+                            transformed_img.move(drag_source_frame, target_idx);
+                        }
+                        drag_source_frame = target_idx;
+                        selectFrame(target_idx);
+                    }
+                    else
+                    {
+                        frame_strip->update();
+                    }
+                }
+                return true;
+            }
+            else
+            {
+                frame_strip->setCursor(zx4_img.isEmpty() ? Qt::ArrowCursor : Qt::PointingHandCursor);
+            }
+            break;
+        }
+
+        case QEvent::MouseButtonRelease:
+        {
+            if (drag_source_frame >= 0)
+            {
+                const bool order_changed = is_dragging_frame &&
+                                           drag_initial_frame >= 0 &&
+                                           drag_source_frame != drag_initial_frame;
+                drag_initial_frame = -1;
+                drag_source_frame = -1;
+                is_dragging_frame = false;
+                frame_strip->setCursor(Qt::PointingHandCursor);
+                frame_strip->update();
+                if (order_changed)
+                {
+                    storeToHistory("Reorder frames");
+                    emit undoRedoMenuUpdateIsNeeded();
+                }
+                return true;
+            }
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+    else if (o == ui->canvas)
+    {
+        switch (ev->type())
+        {
+        case QEvent::Enter:
+            updateCanvasCursor();
+            break;
         case QEvent::Paint:
             drawGrid();
             break;
         case QEvent::MouseButtonPress:
         case QEvent::MouseMove:
+            updateCanvasCursor();
             on_change = nullptr;
             if (!ui->actionAnimate->isChecked())
             {
@@ -310,6 +685,7 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
             }
             break;
         case QEvent::MouseButtonRelease:
+            updateCanvasCursor();
             if (on_change)
             {
                 on_change();
@@ -360,6 +736,7 @@ void SpriteWindow::drawGrid()
     {
         return;
     }
+    current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
     zx4_img[current_frame]->resize(grid_x, grid_y);
     int step = qMax(1, qMin((ui->canvas->width() - 1) / grid_x, (ui->canvas->height() - 1) / grid_y));
     int side_x = step * grid_x;
@@ -377,6 +754,10 @@ void SpriteWindow::drawGrid()
     for (int x = 0; x <= grid_x; x++)
     {
         p.drawLine(x * step, 0, x * step, side_y);
+    }
+    if (frame_strip)
+    {
+        frame_strip->update();
     }
     QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
 }
@@ -540,6 +921,7 @@ void SpriteWindow::drawImage(QImage img)
         }
     }
     current_color_index = saved_color_index;
+    updateFrameStrip();
     ui->canvas->update();
 }
 
@@ -557,6 +939,7 @@ void SpriteWindow::invertColors()
             zx4_img[current_frame]->color_layer1[x][y] = zx4_img[current_frame]->color_layer1[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
         }
     }
+    updateFrameStrip();
     ui->canvas->update();
     storeToHistory("Colors inversion");
     emit undoRedoMenuUpdateIsNeeded();
@@ -564,6 +947,7 @@ void SpriteWindow::invertColors()
 
 void SpriteWindow::on_actionAnimate_toggled(bool state)
 {
+    updateCanvasCursor();
     if (state)
     {
         animationFrame();
@@ -573,20 +957,67 @@ void SpriteWindow::on_actionAnimate_toggled(bool state)
 void SpriteWindow::on_actionStop_triggered()
 {
     ui->actionAnimate->setChecked(false);
-    on_frameBox_valueChanged(ui->frameBox->minimum());
+    selectFrame(0);
+}
+
+void SpriteWindow::on_actionAddFrame_triggered()
+{
+    if (zx4_img.isEmpty() || zx4_img.count() >= 255)
+    {
+        return;
+    }
+    ui->actionAnimate->setChecked(false);
+    current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
+    const int insert_idx = current_frame + 1;
+
+    zx4_img.insert(insert_idx, QSharedPointer<Zx4Image>(zx4_img[current_frame]->clone()));
+    if (current_frame >= 0 && current_frame < src_imp_img.count())
+    {
+        src_imp_img.insert(insert_idx, src_imp_img[current_frame]);
+    }
+    if (current_frame >= 0 && current_frame < transformed_img.count())
+    {
+        transformed_img.insert(insert_idx, transformed_img[current_frame]);
+    }
+
+    selectFrame(insert_idx);
+    storeToHistory("Add frame");
+    emit undoRedoMenuUpdateIsNeeded();
+}
+
+void SpriteWindow::on_actionRemoveFrame_triggered()
+{
+    if (zx4_img.count() <= 1)
+    {
+        return;
+    }
+    ui->actionAnimate->setChecked(false);
+    current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
+
+    zx4_img.removeAt(current_frame);
+    if (current_frame >= 0 && current_frame < src_imp_img.count())
+    {
+        src_imp_img.removeAt(current_frame);
+    }
+    if (current_frame >= 0 && current_frame < transformed_img.count())
+    {
+        transformed_img.removeAt(current_frame);
+    }
+
+    selectFrame(std::clamp(current_frame, 0, int(zx4_img.count() - 1)));
+    storeToHistory("Delete frame");
+    emit undoRedoMenuUpdateIsNeeded();
 }
 
 void SpriteWindow::animationFrame()
 {
     if (ui->actionAnimate->isChecked())
     {
-        ui->frameBox->setValue(ui->frameBox->value() == ui->frameBox->maximum() ? ui->frameBox->minimum() : ui->frameBox->value() + 1);
+        if (!zx4_img.isEmpty())
+        {
+            const int next = (current_frame + 1) % zx4_img.count();
+            selectFrame(next);
+        }
         QTimer::singleShot(200, this, &SpriteWindow::animationFrame);
     }
-}
-
-void SpriteWindow::on_frameBox_valueChanged(int i)
-{
-    setCurrentFrame(i - 1);
-    ui->canvas->update();
 }

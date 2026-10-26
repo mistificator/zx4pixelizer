@@ -26,6 +26,17 @@ void MainWindow::resizeEvent(QResizeEvent *)
 
 bool MainWindow::eventFilter(QObject * o, QEvent * ev)
 {
+    if (ev->type() == QEvent::KeyPress || ev->type() == QEvent::KeyRelease)
+    {
+        if (current_sprite)
+        {
+            current_sprite->updateCanvasCursor();
+        }
+        if (current_scene)
+        {
+            current_scene->updateCanvasCursor();
+        }
+    }
     if (o == ui->preview)
     {
         switch (ev->type())
