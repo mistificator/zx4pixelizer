@@ -5,7 +5,10 @@
 #include <QPainter>
 #include <QResizeEvent>
 #include <QCloseEvent>
-#include <QInputDialog>
+#include <QDialog>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include <QSpinBox>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>
@@ -37,7 +40,6 @@ MainWindow::MainWindow(QWidget *parent)
     ag->addAction(ui->actionMove);
     ag->addAction(ui->actionEraser);
 
-    // Расширение кнопок Brush и Eraser выпадающим списком толщины (1 - 3 - 5 - 7) со стрелкой справа
     auto setupToolSizePopup = [this](QAction * toolAction, int & targetSize)
     {
         QToolButton * btn = qobject_cast<QToolButton *>(ui->drawToolBar->widgetForAction(toolAction));
@@ -81,7 +83,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->importWizardApply->setDefaultAction(ui->actionImportWizardApply);
 
-    // Дублирующая секция тулбара импорта (список пресетов readonly, чекбокс дизеринга, кнопка Reimport)
     QLabel * presetLabel = new QLabel(" Preset ", this);
     toolbarPresetBox = new QComboBox(this);
     toolbarPresetBox->setEditable(false);
@@ -103,7 +104,6 @@ MainWindow::MainWindow(QWidget *parent)
     presetMenuGroup = new QActionGroup(this);
     presetMenuGroup->setExclusive(true);
 
-    // Синхронизация выбора пресета между тулбаром и Import Wizard
     connect(toolbarPresetBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int index)
             {
                 if (index >= 0 && ui->presetBox->currentIndex() != index)
@@ -112,7 +112,7 @@ MainWindow::MainWindow(QWidget *parent)
                 }
             });
 
-    // Синхронизация чекбокса Dither между Import Wizard, тулбаром и меню Tools
+    connect(ui->alphaBox, &QCheckBox::toggled, this, &MainWindow::syncAlphaState);
     connect(ui->ditherBox, &QCheckBox::toggled, this, &MainWindow::syncDitherState);
     connect(toolbarDitherBox, &QCheckBox::toggled, this, &MainWindow::syncDitherState);
     connect(ui->actionDither, &QAction::toggled, this, &MainWindow::syncDitherState);
@@ -121,7 +121,6 @@ MainWindow::MainWindow(QWidget *parent)
     ui->menuWindow->addAction(ui->dockPreview->toggleViewAction());
     ui->menuWindow->addAction(ui->dockWizard->toggleViewAction());
 
-    // По умолчанию расположение док-панелей при первом запуске
     tabifyDockWidget(ui->dockPreview, ui->dockPalette);
     ui->dockPreview->raise();
 
@@ -130,12 +129,21 @@ MainWindow::MainWindow(QWidget *parent)
     QMetaObject::invokeMethod(this, "selectPalette", Qt::QueuedConnection, Q_ARG(int, palettes.grayscale_index));
 
     QDir().mkpath(Zx4ImportPars::defaultPresetPath());
-
     auto ensurePreset = [](const QString &name, Zx4ImportPars::PassMethod pass, Zx4Palette::SelectPaletteMethod pick,
                            double hue, double sat, double light)
     {
         QString filePath = Zx4ImportPars::defaultPresetPath() + "/" + name;
-        if (!QFileInfo::exists(filePath))
+        bool needWrite = !QFileInfo::exists(filePath);
+        if (!needWrite)
+        {
+            QFile f(filePath);
+            Zx4ImportPars test;
+            if (!f.open(QFile::ReadOnly) || !test.deserialize(f.readAll()))
+            {
+                needWrite = true;
+            }
+        }
+        if (needWrite)
         {
             Zx4ImportPars p;
             p.multipass = pass;
@@ -161,7 +169,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     syncPresetsUI("Default");
     on_presetBox_currentIndexChanged(ui->presetBox->currentIndex());
-
     updateToolbarWidgetsHeight();
     loadSettings();
 }
@@ -188,6 +195,8 @@ void MainWindow::saveSettings() const
     QSettings settings(configFilePath(), QSettings::IniFormat);
     settings.setValue("MainWindow/geometry", saveGeometry());
     settings.setValue("MainWindow/windowState", saveState());
+    settings.setValue("Settings/alpha", ui->alphaBox->isChecked());
+    settings.setValue("Settings/dithering", ui->ditherBox->isChecked());
 }
 
 void MainWindow::loadSettings()
@@ -200,6 +209,14 @@ void MainWindow::loadSettings()
     if (settings.contains("MainWindow/windowState"))
     {
         restoreState(settings.value("MainWindow/windowState").toByteArray());
+    }
+    if (settings.contains("Settings/alpha"))
+    {
+        syncAlphaState(settings.value("Settings/alpha").toBool());
+    }
+    if (settings.contains("Settings/dithering"))
+    {
+        syncDitherState(settings.value("Settings/dithering").toBool());
     }
 }
 
@@ -272,27 +289,56 @@ void MainWindow::syncPresetsUI(const QString & selectedPreset)
     }
 }
 
+void MainWindow::syncAlphaState(bool checked)
+{
+    QSignalBlocker b(ui->alphaBox);
+    ui->alphaBox->setChecked(checked);
+}
+
 void MainWindow::syncDitherState(bool checked)
 {
+    QSignalBlocker b1(ui->ditherBox);
+    QSignalBlocker b2(toolbarDitherBox);
+    QSignalBlocker b3(ui->actionDither);
+
+    ui->ditherBox->setChecked(checked);
+    if (toolbarDitherBox)
     {
-        QSignalBlocker b1(ui->ditherBox);
-        QSignalBlocker b2(toolbarDitherBox);
-        QSignalBlocker b3(ui->actionDither);
-        ui->ditherBox->setChecked(checked);
-        if (toolbarDitherBox)
-        {
-            toolbarDitherBox->setChecked(checked);
-        }
-        ui->actionDither->setChecked(checked);
+        toolbarDitherBox->setChecked(checked);
     }
-    if (current_sprite)
+    ui->actionDither->setChecked(checked);
+}
+
+bool MainWindow::askResizeSize(const QString & title, QSize & ioSize)
+{
+    QDialog dlg(this, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
+    dlg.setWindowTitle(title);
+
+    QFormLayout * form = new QFormLayout(&dlg);
+
+    QSpinBox * widthSpin = new QSpinBox(&dlg);
+    widthSpin->setRange(1, 255);
+    widthSpin->setValue(ioSize.width());
+
+    QSpinBox * heightSpin = new QSpinBox(&dlg);
+    heightSpin->setRange(1, 192);
+    heightSpin->setValue(ioSize.height());
+
+    form->addRow("Width:", widthSpin);
+    form->addRow("Height:", heightSpin);
+
+    QDialogButtonBox * buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    form->addRow(buttons);
+
+    if (dlg.exec() != QDialog::Accepted)
     {
-        importParsFromWidgetToObject(*current_sprite);
+        return false;
     }
-    if (current_scene)
-    {
-        importParsFromWidgetToObject(*current_scene);
-    }
+
+    ioSize = QSize(widthSpin->value(), heightSpin->value());
+    return true;
 }
 
 void MainWindow::on_actionQuit_triggered()
@@ -335,18 +381,14 @@ void MainWindow::on_actionResize_canvas_triggered()
     {
         return;
     }
-    bool ok = false;
-    int new_grid_x = QInputDialog::getInt(this, "Width", "New canvas width", current_sprite->canvasSize().width(), 1, 255, 1, &ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-    if (!ok)
+    QSize new_size = current_sprite->canvasSize();
+    if (!askResizeSize("Resize canvas", new_size))
     {
         return;
     }
-    int new_grid_y = QInputDialog::getInt(this, "Height", "New canvas height", current_sprite->canvasSize().height(), 1, 192, 1, &ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-    if (!ok)
-    {
-        return;
-    }
-    current_sprite->setCanvasSize(QSize(new_grid_x, new_grid_y));
+    current_sprite->setCanvasSize(new_size);
+    current_sprite->storeToHistory("Resize canvas");
+    updateUndoRedoMenu(current_sprite);
 }
 
 void MainWindow::on_actionResize_image_triggered()
@@ -355,18 +397,14 @@ void MainWindow::on_actionResize_image_triggered()
     {
         return;
     }
-    bool ok = false;
-    int new_image_x = QInputDialog::getInt(this, "Width", "New image width", current_sprite->canvasSize().width(), 1, 255, 1, &ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-    if (!ok)
+    QSize new_size = current_sprite->canvasSize();
+    if (!askResizeSize("Resize image", new_size))
     {
         return;
     }
-    int new_image_y = QInputDialog::getInt(this, "Height", "New image height", current_sprite->canvasSize().height(), 1, 192, 1, &ok, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
-    if (!ok)
-    {
-        return;
-    }
-    current_sprite->resizeImage(QSize(new_image_x, new_image_y));
+    current_sprite->resizeImage(new_size);
+    current_sprite->storeToHistory("Resize image");
+    updateUndoRedoMenu(current_sprite);
 }
 
 void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
@@ -888,7 +926,6 @@ void MainWindow::on_presetBox_currentIndexChanged(int index)
             acts[index]->setChecked(true);
         }
     }
-
     if (ui->presetBox->currentText().isEmpty())
     {
         return;
@@ -982,5 +1019,6 @@ void MainWindow::undoRedoMenuUpdate()
     {
         updateUndoRedoMenu(zbo);
         zbo->canvas()->update();
+        ui->preview->update();
     }
 }

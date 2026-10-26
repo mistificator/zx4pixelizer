@@ -105,11 +105,6 @@ struct Zx4Processing
 
 struct Zx4ImportPars
 {
-    bool alpha = true;
-    bool dithering = false;
-    bool autopalette = true;
-    int palette_index = 1;
-    int palette_index_max = 1;
     enum PassMethod {SinglePass = 0, Multipass5x5x2, Multipass7x7x3, Multipass3x3x1, Multipass5x5x1, Multipass7x7x1};
     PassMethod multipass = SinglePass;
     Zx4Palette::SelectPaletteMethod color_pick = Zx4Palette::SelectPaletteHSL;
@@ -150,6 +145,12 @@ public:
     virtual void setImportPars(const Zx4ImportPars &);
     const Zx4ImportPars & importPars() const;
 
+    void setAutoPalette(bool);
+    bool autoPalette() const;
+    void setPaletteSequenceIndex(int index, int max_index);
+    int paletteSequenceIndex() const;
+    int paletteSequenceMax() const;
+
     QWidget * canvas() const;
 
     void setCurrentFrame(int frame);
@@ -176,6 +177,9 @@ protected:
     int grid_x = 64, grid_y = 64;
     int current_color_index = 0;
     int current_frame = 0;
+    bool auto_palette = true;
+    int palette_seq_index = 1;
+    int palette_seq_max = 1;
     Zx4ImportPars imp_pars;
     QWidget * widget = nullptr;
 };

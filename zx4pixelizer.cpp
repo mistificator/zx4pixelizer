@@ -343,7 +343,6 @@ QMultiMap<double, int> Zx4Palette::selectPalette(QMap<QColor, int> color_distrib
         const QList<QColor> & pal = palettes[i];
         double total_error = 0.0;
 
-        // Для каждого доминирующего цвета изображения ищем ближайший цвет в палитре с учётом его веса
         for (auto c = color_distrib4.cbegin(); c != color_distrib4.cend(); ++c)
         {
             const QColor img_c = c.key().toRgb();
@@ -497,7 +496,6 @@ QMultiMap<int, QColor> Zx4Processing::colorDistribution(QImage img, bool use_alp
     bool src_alpha_channel = img.hasAlphaChannel() && qAlpha(img.pixel(0, 0)) < 128;
     QRgb corner_rgb = img.pixel(0, 0) & 0x00FFFFFF;
 
-    // Квантуем близкие шумовые оттенки до 5 бит на канал (шаг 8), чтобы подавить градиентный шум
     QMap<QRgb, int> counts;
     for (int y = 0; y < img.height(); y++)
     {
@@ -620,7 +618,6 @@ QImage Zx4Processing::importImage(QImage small_quad, QVector<QRgb> color_table)
     QImage converted(small_quad.size(), QImage::Format_Indexed8);
     converted.setColorTable(color_table);
     const int n_colors = qMin(4, int(color_table.count()));
-
     for (int iy = 0; iy < converted.height(); iy++)
     {
         for (int ix = 0; ix < converted.width(); ix++)
@@ -642,13 +639,9 @@ QImage Zx4Processing::importImage(QImage small_quad, QVector<QRgb> color_table)
                 int c_chroma = c_max - c_min;
 
                 double d = RGB_color_Lab_difference_CIEDE2000(pr, pg, pb, cr, cg, cb);
-
-                // Компенсируем занижение разницы яркости в CIEDE2000 на тёмных тонах,
-                // чтобы тёмные пиксели (L < 36) не прыгали в средне-серый/яркий цвет (96..255)
                 double luma_diff = qAbs((pr * 77 + pg * 150 + pb * 29) - (cr * 77 + cg * 150 + cb * 29)) / 256.0;
                 d += luma_diff * 0.12;
 
-                // Запрещаем красить цветные пиксели ахроматическим серым цветом палитры (96,96,96)
                 if (p_chroma > 18 && c_chroma == 0 && c_max > 0)
                 {
                     d += p_chroma * 0.25;
@@ -863,6 +856,32 @@ const Zx4ImportPars & Zx4BaseObject::importPars() const
     return imp_pars;
 }
 
+void Zx4BaseObject::setAutoPalette(bool auto_pal)
+{
+    auto_palette = auto_pal;
+}
+
+bool Zx4BaseObject::autoPalette() const
+{
+    return auto_palette;
+}
+
+void Zx4BaseObject::setPaletteSequenceIndex(int index, int max_index)
+{
+    palette_seq_max = qMax(1, max_index);
+    palette_seq_index = std::clamp(index, 1, palette_seq_max);
+}
+
+int Zx4BaseObject::paletteSequenceIndex() const
+{
+    return palette_seq_index;
+}
+
+int Zx4BaseObject::paletteSequenceMax() const
+{
+    return palette_seq_max;
+}
+
 void Zx4BaseObject::setCanvas(QWidget * w)
 {
     widget = w;
@@ -919,6 +938,12 @@ void Zx4BaseObject::undo()
         {
             zx4_img << QSharedPointer<Zx4Image>(entry->clone());
         }
+        if (!zx4_img.isEmpty() && !zx4_img.first()->isNull())
+        {
+            grid_x = zx4_img.first()->width();
+            grid_y = zx4_img.first()->height();
+            current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
+        }
     }
 }
 
@@ -930,6 +955,12 @@ void Zx4BaseObject::redo()
         for (const auto & entry : history.second.at(++history.first).second)
         {
             zx4_img << QSharedPointer<Zx4Image>(entry->clone());
+        }
+        if (!zx4_img.isEmpty() && !zx4_img.first()->isNull())
+        {
+            grid_x = zx4_img.first()->width();
+            grid_y = zx4_img.first()->height();
+            current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
         }
     }
 }

@@ -5,7 +5,6 @@
 
 #include <QPainter>
 #include <QResizeEvent>
-#include <QInputDialog>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QLineEdit>
@@ -102,6 +101,7 @@ QImage MainWindow::applyTransforms(const Zx4ImportPars & p, const QImage & src, 
                 QColor c = color_shifted.pixelColor(x, y).toHsl();
                 float h = 0.0f, s = 0.0f, l = 0.0f;
                 c.getHslF(&h, &s, &l);
+
                 if (h >= 0.0f)
                 {
                     h += hs;
@@ -561,14 +561,9 @@ void MainWindow::exportTape(const Zx4ImageWithAttributes & image, QString filena
 
 void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 {
-    p.alpha = ui->alphaBox->isChecked();
-    p.dithering = ui->ditherBox->isChecked();
-    p.autopalette = ui->wizardPaletteBox->currentIndex() == 0;
     p.color_pick = static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
     p.horizontal_mirror = ui->mirrored->isChecked();
     p.multipass = static_cast<Zx4ImportPars::PassMethod>(ui->multipass->currentIndex());
-    p.palette_index_max = ui->paletteNumberBox->maximum();
-    p.palette_index = ui->paletteNumberBox->value();
     p.rotate = ui->rotate->value();
     p.x_scale = ui->xScale->value();
     p.x_shift = ui->xShift->value();
@@ -581,24 +576,9 @@ void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 
 void MainWindow::importParsToWidget(const Zx4ImportPars & p)
 {
-    ui->alphaBox->setChecked(p.alpha);
-    {
-        QSignalBlocker b1(ui->ditherBox);
-        QSignalBlocker b2(toolbarDitherBox);
-        QSignalBlocker b3(ui->actionDither);
-        ui->ditherBox->setChecked(p.dithering);
-        if (toolbarDitherBox)
-        {
-            toolbarDitherBox->setChecked(p.dithering);
-        }
-        ui->actionDither->setChecked(p.dithering);
-    }
-    ui->wizardPaletteBox->setCurrentIndex(p.autopalette ? 0 : 1);
     ui->colorPickBox->setCurrentIndex(p.color_pick);
     ui->mirrored->setChecked(p.horizontal_mirror);
     ui->multipass->setCurrentIndex(p.multipass);
-    ui->paletteNumberBox->setMaximum(qMax(1, p.palette_index_max));
-    ui->paletteNumberBox->setValue(qMax(1, p.palette_index));
     ui->rotate->setValue(p.rotate);
     ui->xScale->setValue(p.x_scale);
     ui->xShift->setValue(p.x_shift);
@@ -614,12 +594,16 @@ void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
     Zx4ImportPars p = b.importPars();
     importParsFromWidget(p);
     b.setImportPars(p);
+    b.setAutoPalette(ui->wizardPaletteBox->currentIndex() == 0);
+    b.setPaletteSequenceIndex(ui->paletteNumberBox->value(), ui->paletteNumberBox->maximum());
 }
 
 void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
 {
-    Zx4ImportPars p = b.importPars();
-    importParsToWidget(p);
+    importParsToWidget(b.importPars());
+    ui->wizardPaletteBox->setCurrentIndex(b.autoPalette() ? 0 : 1);
+    ui->paletteNumberBox->setMaximum(b.paletteSequenceMax());
+    ui->paletteNumberBox->setValue(b.paletteSequenceIndex());
 }
 
 void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
@@ -629,6 +613,9 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         return;
     }
     const auto pars = _current_sprite->importPars();
+    const bool use_dither = ui->ditherBox->isChecked();
+    const bool use_alpha = ui->alphaBox->isChecked();
+
     QProgressDialog * pd = createProgress(this, "Importing sprite\n" + ui->colorPickBox->currentText());
     pd->setRange(0, _current_sprite->framesCount() + 1);
     pd->setValue(0);
@@ -648,6 +635,7 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
                 {
                     ui->paletteNumberBox->setRange(1, dist.count());
                     ui->paletteNumberBox->setToolTip(QString("%1..%2").arg(1).arg(dist.count()));
+                    _current_sprite->setPaletteSequenceIndex(ui->paletteNumberBox->value(), dist.count());
                     auto it = dist.begin();
                     std::advance(it, ui->paletteNumberBox->value() - 1);
                     p_idx = *it;
@@ -666,11 +654,11 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         if (!_current_sprite->sourceImage(k).isNull())
         {
             QImage transformed = applyTransforms(pars, _current_sprite->sourceImage(k).convertToFormat(QImage::Format_ARGB32));
-            if (pars.dithering)
+            if (use_dither)
             {
                 transformed = transformed.convertToFormat(QImage::Format_Indexed8).convertToFormat(QImage::Format_ARGB32);
             }
-            _current_sprite->drawImage(importImage(transformed, p_idx, ui->alphaBox->isChecked()));
+            _current_sprite->drawImage(importImage(transformed, p_idx, use_alpha));
         }
         pd->setValue(k + 2);
         qApp->processEvents();
@@ -688,9 +676,12 @@ void MainWindow::reimport(SceneWindow * _current_scene)
         return;
     }
     const auto pars = _current_scene->importPars();
+    const bool use_dither = ui->ditherBox->isChecked();
+    const bool use_autopalette = _current_scene->autoPalette();
+
     QProgressDialog * pd = createProgress(this, "Importing scene\n" + ui->colorPickBox->currentText());
     QImage img = applyTransforms(pars, _current_scene->sourceImage())
-                     .convertToFormat(pars.dithering ? QImage::Format_Indexed8 : QImage::Format_RGB32);
+                     .convertToFormat(use_dither ? QImage::Format_Indexed8 : QImage::Format_RGB32);
     _current_scene->transformedImage() = img;
     pd->setRange(0, (img.width() / 8) * (img.height() / 8));
 
@@ -742,7 +733,7 @@ void MainWindow::reimport(SceneWindow * _current_scene)
 
             int p_idx = -1;
             QImage small_quad = img.copy(QRect(x, y, 8, 8));
-            if (_current_scene->importPars().autopalette)
+            if (use_autopalette)
             {
                 if (multipass == Zx4ImportPars::SinglePass)
                 {
@@ -759,7 +750,6 @@ void MainWindow::reimport(SceneWindow * _current_scene)
                     cp.drawImage(0, 0, img, rx, ry, rw, rh);
                     cp.drawImage(0, 0, small_quad);
                     cp.end();
-
                     p_idx = _current_scene->selectPalette(context_quad, sel_method, color_variations);
                 }
             }

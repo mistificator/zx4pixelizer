@@ -84,8 +84,10 @@ private:
 
     void createPalettes();
     void syncPresetsUI(const QString & selectedPreset = QString());
+    void syncAlphaState(bool checked);
     void syncDitherState(bool checked);
     void updateToolbarWidgetsHeight();
+    bool askResizeSize(const QString & title, QSize & ioSize);
     static QString configFilePath();
     void saveSettings() const;
     void loadSettings();
