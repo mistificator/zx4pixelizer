@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QTimer>
 #include <QVector>
+#include <QMessageBox>
 #include <QApplication>
 #include <QGuiApplication>
 #include <algorithm>
@@ -420,6 +421,103 @@ void SpriteWindow::selectFrame(int index)
     emit previewUpdateIsNeeded();
 }
 
+SpriteWindow * SpriteWindow::spriteWindowAtGlobalPos(const QPoint & globalPos)
+{
+    QWidget * w = QApplication::widgetAt(globalPos);
+    while (w)
+    {
+        if (auto * sw = qobject_cast<SpriteWindow *>(w))
+        {
+            return sw;
+        }
+        w = w->parentWidget();
+    }
+    return nullptr;
+}
+
+bool SpriteWindow::insertFrameAt(int insert_idx, const Zx4Image & frame_img, const QString & history_desc)
+{
+    if (zx4_img.count() >= 255)
+    {
+        return false;
+    }
+    if (QSize(frame_img.width(), frame_img.height()) != canvasSize())
+    {
+        QMessageBox::warning(
+            window(),
+            "Size mismatch",
+            QString("Cannot copy/paste frame: sprite sizes do not match (%1x%2 vs %3x%4).")
+                .arg(frame_img.width())
+                .arg(frame_img.height())
+                .arg(canvasSize().width())
+                .arg(canvasSize().height()));
+        return false;
+    }
+
+    ui->actionAnimate->setChecked(false);
+    insert_idx = std::clamp(insert_idx, 0, int(zx4_img.count()));
+
+    zx4_img.insert(insert_idx, QSharedPointer<Zx4Image>(frame_img.clone()));
+    if (!src_imp_img.isEmpty())
+    {
+        src_imp_img.insert(std::clamp(insert_idx, 0, int(src_imp_img.count())), QImage());
+    }
+    if (!transformed_img.isEmpty())
+    {
+        transformed_img.insert(std::clamp(insert_idx, 0, int(transformed_img.count())), QImage());
+    }
+
+    selectFrame(insert_idx);
+    storeToHistory(history_desc);
+    emit undoRedoMenuUpdateIsNeeded();
+    return true;
+}
+
+void SpriteWindow::clearCurrentFrame(const QString & history_desc)
+{
+    if (zx4_img.isEmpty())
+    {
+        return;
+    }
+    ui->actionAnimate->setChecked(false);
+    current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
+    zx4_img[current_frame]->clear(grid_x, grid_y);
+    updateFrameStrip();
+    ui->canvas->update();
+    storeToHistory(history_desc);
+    emit undoRedoMenuUpdateIsNeeded();
+}
+
+void SpriteWindow::cutCurrentFrame()
+{
+    if (zx4_img.isEmpty())
+    {
+        return;
+    }
+    ui->actionAnimate->setChecked(false);
+    current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
+
+    if (zx4_img.count() > 1)
+    {
+        zx4_img.removeAt(current_frame);
+        if (current_frame >= 0 && current_frame < src_imp_img.count())
+        {
+            src_imp_img.removeAt(current_frame);
+        }
+        if (current_frame >= 0 && current_frame < transformed_img.count())
+        {
+            transformed_img.removeAt(current_frame);
+        }
+        selectFrame(std::clamp(current_frame, 0, int(zx4_img.count() - 1)));
+        storeToHistory("Cut frame");
+        emit undoRedoMenuUpdateIsNeeded();
+    }
+    else
+    {
+        clearCurrentFrame("Cut frame");
+    }
+}
+
 void SpriteWindow::drawFrameStrip()
 {
     QPainter p(frame_strip);
@@ -534,29 +632,56 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                     (me->position().toPoint() - drag_start_pos).manhattanLength() >= QApplication::startDragDistance())
                 {
                     is_dragging_frame = true;
-                    frame_strip->setCursor(Qt::ClosedHandCursor);
                 }
 
                 if (is_dragging_frame)
                 {
-                    const int target_idx = frameIndexAtPos(me->position().toPoint());
-                    if (target_idx >= 0 && target_idx < zx4_img.count() && target_idx != drag_source_frame)
+                    SpriteWindow * target_sprite = spriteWindowAtGlobalPos(me->globalPosition().toPoint());
+                    if (target_sprite && target_sprite != this)
                     {
-                        zx4_img.move(drag_source_frame, target_idx);
-                        if (src_imp_img.count() == zx4_img.count())
+                        // Если курсор переведён на другое окно спрайта — возвращаем исходный порядок кадров в текущем спрайте
+                        if (drag_initial_frame >= 0 && drag_source_frame != drag_initial_frame)
                         {
-                            src_imp_img.move(drag_source_frame, target_idx);
+                            zx4_img.move(drag_source_frame, drag_initial_frame);
+                            if (src_imp_img.count() == zx4_img.count())
+                            {
+                                src_imp_img.move(drag_source_frame, drag_initial_frame);
+                            }
+                            if (transformed_img.count() == zx4_img.count())
+                            {
+                                transformed_img.move(drag_source_frame, drag_initial_frame);
+                            }
+                            drag_source_frame = drag_initial_frame;
+                            selectFrame(drag_initial_frame);
                         }
-                        if (transformed_img.count() == zx4_img.count())
+                        frame_strip->setCursor(Qt::DragCopyCursor);
+                    }
+                    else if (target_sprite == this)
+                    {
+                        frame_strip->setCursor(Qt::ClosedHandCursor);
+                        const int target_idx = frameIndexAtPos(me->position().toPoint());
+                        if (target_idx >= 0 && target_idx < zx4_img.count() && target_idx != drag_source_frame)
                         {
-                            transformed_img.move(drag_source_frame, target_idx);
+                            zx4_img.move(drag_source_frame, target_idx);
+                            if (src_imp_img.count() == zx4_img.count())
+                            {
+                                src_imp_img.move(drag_source_frame, target_idx);
+                            }
+                            if (transformed_img.count() == zx4_img.count())
+                            {
+                                transformed_img.move(drag_source_frame, target_idx);
+                            }
+                            drag_source_frame = target_idx;
+                            selectFrame(target_idx);
                         }
-                        drag_source_frame = target_idx;
-                        selectFrame(target_idx);
+                        else
+                        {
+                            frame_strip->update();
+                        }
                     }
                     else
                     {
-                        frame_strip->update();
+                        frame_strip->setCursor(Qt::ClosedHandCursor);
                     }
                 }
                 return true;
@@ -572,15 +697,50 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
         {
             if (drag_source_frame >= 0)
             {
-                const bool order_changed = is_dragging_frame &&
-                                           drag_initial_frame >= 0 &&
-                                           drag_source_frame != drag_initial_frame;
+                auto * me = dynamic_cast<QMouseEvent *>(ev);
+                SpriteWindow * target_sprite = me ? spriteWindowAtGlobalPos(me->globalPosition().toPoint()) : nullptr;
+
+                const bool was_dragging = is_dragging_frame;
+                const int init_frame = drag_initial_frame;
+                const int src_frame = drag_source_frame;
+
                 drag_initial_frame = -1;
                 drag_source_frame = -1;
                 is_dragging_frame = false;
                 frame_strip->setCursor(Qt::PointingHandCursor);
                 frame_strip->update();
-                if (order_changed)
+
+                if (was_dragging && target_sprite && target_sprite != this)
+                {
+                    if (init_frame >= 0 && init_frame < zx4_img.count() && src_frame != init_frame)
+                    {
+                        zx4_img.move(src_frame, init_frame);
+                        if (src_imp_img.count() == zx4_img.count())
+                        {
+                            src_imp_img.move(src_frame, init_frame);
+                        }
+                        if (transformed_img.count() == zx4_img.count())
+                        {
+                            transformed_img.move(src_frame, init_frame);
+                        }
+                        selectFrame(init_frame);
+                    }
+
+                    if (init_frame >= 0 && init_frame < zx4_img.count())
+                    {
+                        int insert_idx = target_sprite->currentFrame() + 1;
+                        if (me && target_sprite->frame_strip)
+                        {
+                            const QPoint strip_pt = target_sprite->frame_strip->mapFromGlobal(me->globalPosition().toPoint());
+                            if (target_sprite->frame_strip->rect().contains(strip_pt))
+                            {
+                                insert_idx = target_sprite->frameIndexAtPos(strip_pt) + 1;
+                            }
+                        }
+                        target_sprite->insertFrameAt(insert_idx, image(init_frame), "Copy frame");
+                    }
+                }
+                else if (was_dragging && init_frame >= 0 && src_frame != init_frame)
                 {
                     storeToHistory("Reorder frames");
                     emit undoRedoMenuUpdateIsNeeded();

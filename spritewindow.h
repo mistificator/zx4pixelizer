@@ -53,6 +53,9 @@ public:
     void updateCanvasCursor();
     void updateFrameStrip();
     void selectFrame(int index);
+    bool insertFrameAt(int insert_idx, const Zx4Image & frame_img, const QString & history_desc);
+    void clearCurrentFrame(const QString & history_desc = "Clear frame");
+    void cutCurrentFrame();
 
 signals:
     void previewUpdateIsNeeded();
@@ -86,12 +89,13 @@ private:
     int brush_size = 5;
     int eraser_size = 5;
 
+    static SpriteWindow * spriteWindowAtGlobalPos(const QPoint & globalPos);
     void drawFrameStrip();
     int frameIndexAtPos(const QPoint & pos) const;
     QRect frameCellRect(int index) const;
     QImage renderFrameThumbnail(int frame_idx, const QSize & box_size) const;
     void ensureFrameVisible(int index);
-    bool eventFilter(QObject *, QEvent *);
+    bool eventFilter(QObject *, QEvent *) override;
 };
 
 #endif // SPRITEWINDOW_H

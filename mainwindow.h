@@ -10,6 +10,7 @@
 #include <QActionGroup>
 #include <QMdiSubWindow>
 #include <QProgressDialog>
+#include <QSharedPointer>
 
 #include "zx4pixelizer.h"
 #include "spritewindow.h"
@@ -61,6 +62,10 @@ private slots:
     void on_removePreset_clicked();
     void on_actionUndo_triggered();
     void on_actionRedo_triggered();
+    void on_actionCut_triggered();
+    void on_actionCopy_triggered();
+    void on_actionPaste_triggered();
+    void on_actionClear_triggered();
 
 protected:
     bool eventFilter(QObject *, QEvent *) override;
@@ -72,6 +77,7 @@ private:
     Ui::MainWindow *ui;
     SpriteWindow * current_sprite = nullptr;
     SceneWindow * current_scene = nullptr;
+    QSharedPointer<Zx4Image> clipboard_frame;
     Zx4Palette palettes;
     double preview_split_pos = 0.5;
     int current_brush_size = 5;
@@ -94,7 +100,7 @@ private:
 
     QImage importImage(QImage img, int palette_number, bool use_alpha);
     Zx4Palette::SelectPaletteMethod selectPaletteMethod() const;
-    QImage applyTransforms(const Zx4ImportPars & p, const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
+    QImage applyTransforms(const Zx4BaseObject & obj, const QImage & src, QColor bg_color = QColor(0, 0, 0, 0)) const;
     void importScene(QImage img, QString filename = QString());
     void openSprite(QList<QImage> img, QString filename = QString());
     void importSprite(QList<QImage> img, QString filename = QString(), QSize sz = QSize(), int p_idx = -1);

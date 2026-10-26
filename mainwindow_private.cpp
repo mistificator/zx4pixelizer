@@ -73,18 +73,19 @@ Zx4Palette::SelectPaletteMethod MainWindow::selectPaletteMethod() const
     return static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
 }
 
-QImage MainWindow::applyTransforms(const Zx4ImportPars & p, const QImage & src, QColor bg_color) const
+QImage MainWindow::applyTransforms(const Zx4BaseObject & obj, const QImage & src, QColor bg_color) const
 {
-    int mirror = p.horizontal_mirror ? -1 : 1;
+    const Zx4ImportPars & p = obj.importPars();
+    int mirror = obj.horizontalMirror() ? -1 : 1;
     QImage img(src.size(), src.format());
     img.fill(bg_color);
     QPainter pmx(&img);
     QTransform mx;
-    mx.translate(p.x_shift, p.y_shift);
+    mx.translate(obj.xShift(), obj.yShift());
     mx.translate(img.width() / 2.0, img.height() / 2.0);
-    mx.rotate(p.rotate);
+    mx.rotate(obj.rotateAngle());
     mx.translate(-img.width() / 2.0, -img.height() / 2.0);
-    mx.scale(p.x_scale * mirror, p.y_scale);
+    mx.scale(obj.xScale() * mirror, obj.yScale());
     pmx.setTransform(mx);
 
     QImage color_shifted = src;
@@ -157,22 +158,26 @@ void MainWindow::importScene(QImage img, QString filename)
     }
 
     SceneWindow * new_scene = new SceneWindow(palettes);
-    importParsFromWidgetToObject(*new_scene);
-    current_scene = new_scene;
-    ui->mdiArea->addSubWindow(current_scene);
-    current_scene->show();
-    connect(current_scene, &SceneWindow::charSelected, this, &MainWindow::selectPalette, Qt::QueuedConnection);
-    connect(current_scene, &SceneWindow::previewUpdateIsNeeded, ui->preview, qOverload<>(&QWidget::update));
-    connect(current_scene, &SceneWindow::undoRedoMenuUpdateIsNeeded, this, &MainWindow::undoRedoMenuUpdate);
+    Zx4ImportPars pars;
+    importParsFromWidget(pars);
+    new_scene->setImportPars(pars);
+    connect(new_scene, &SceneWindow::charSelected, this, &MainWindow::selectPalette, Qt::QueuedConnection);
+    connect(new_scene, &SceneWindow::previewUpdateIsNeeded, ui->preview, qOverload<>(&QWidget::update));
+    connect(new_scene, &SceneWindow::undoRedoMenuUpdateIsNeeded, this, &MainWindow::undoRedoMenuUpdate);
 
-    current_scene->setFileName(filename);
+    new_scene->setFileName(filename);
     img = img.scaled(qMin(((img.width() + 7) / 8) * 8, 256), qMin(((img.height() + 7) / 8) * 8, 192), Qt::KeepAspectRatio);
     QImage dst_img(256, 192, img.format());
     dst_img.fill(0);
     QPainter p(&dst_img);
     p.drawImage((dst_img.width() - img.width()) / 2, (dst_img.height() - img.height()) / 2, img);
 
-    current_scene->Zx4BaseObject::setSourceImage(dst_img);
+    new_scene->Zx4BaseObject::setSourceImage(dst_img);
+
+    ui->mdiArea->addSubWindow(new_scene);
+    new_scene->show();
+    current_scene = new_scene;
+
     reimport(current_scene);
     current_scene->clearHistory();
     current_scene->storeToHistory("Import scene");
@@ -562,13 +567,7 @@ void MainWindow::exportTape(const Zx4ImageWithAttributes & image, QString filena
 void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 {
     p.color_pick = static_cast<Zx4Palette::SelectPaletteMethod>(ui->colorPickBox->currentIndex());
-    p.horizontal_mirror = ui->mirrored->isChecked();
     p.multipass = static_cast<Zx4ImportPars::PassMethod>(ui->multipass->currentIndex());
-    p.rotate = ui->rotate->value();
-    p.x_scale = ui->xScale->value();
-    p.x_shift = ui->xShift->value();
-    p.y_scale = ui->yScale->value();
-    p.y_shift = ui->yShift->value();
     p.hue_shift = ui->hueShift->value();
     p.saturation_shift = ui->saturationShift->value();
     p.lightness_shift = ui->lightnessShift->value();
@@ -577,13 +576,7 @@ void MainWindow::importParsFromWidget(Zx4ImportPars & p)
 void MainWindow::importParsToWidget(const Zx4ImportPars & p)
 {
     ui->colorPickBox->setCurrentIndex(p.color_pick);
-    ui->mirrored->setChecked(p.horizontal_mirror);
     ui->multipass->setCurrentIndex(p.multipass);
-    ui->rotate->setValue(p.rotate);
-    ui->xScale->setValue(p.x_scale);
-    ui->xShift->setValue(p.x_shift);
-    ui->yScale->setValue(p.y_scale);
-    ui->yShift->setValue(p.y_shift);
     ui->hueShift->setValue(p.hue_shift);
     ui->saturationShift->setValue(p.saturation_shift);
     ui->lightnessShift->setValue(p.lightness_shift);
@@ -596,6 +589,12 @@ void MainWindow::importParsFromWidgetToObject(Zx4BaseObject & b)
     b.setImportPars(p);
     b.setAutoPalette(ui->wizardPaletteBox->currentIndex() == 0);
     b.setPaletteSequenceIndex(ui->paletteNumberBox->value(), ui->paletteNumberBox->maximum());
+    b.setHorizontalMirror(ui->mirrored->isChecked());
+    b.setRotate(ui->rotate->value());
+    b.setXScale(ui->xScale->value());
+    b.setXShift(ui->xShift->value());
+    b.setYScale(ui->yScale->value());
+    b.setYShift(ui->yShift->value());
 }
 
 void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
@@ -604,6 +603,12 @@ void MainWindow::importParsFromObjectToWidget(const Zx4BaseObject & b)
     ui->wizardPaletteBox->setCurrentIndex(b.autoPalette() ? 0 : 1);
     ui->paletteNumberBox->setMaximum(b.paletteSequenceMax());
     ui->paletteNumberBox->setValue(b.paletteSequenceIndex());
+    ui->mirrored->setChecked(b.horizontalMirror());
+    ui->rotate->setValue(b.rotateAngle());
+    ui->xScale->setValue(b.xScale());
+    ui->xShift->setValue(b.xShift());
+    ui->yScale->setValue(b.yScale());
+    ui->yShift->setValue(b.yShift());
 }
 
 void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
@@ -612,7 +617,6 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
     {
         return;
     }
-    const auto pars = _current_sprite->importPars();
     const bool use_dither = ui->ditherBox->isChecked();
     const bool use_alpha = ui->alphaBox->isChecked();
 
@@ -653,7 +657,7 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         _current_sprite->setCurrentFrame(k);
         if (!_current_sprite->sourceImage(k).isNull())
         {
-            QImage transformed = applyTransforms(pars, _current_sprite->sourceImage(k).convertToFormat(QImage::Format_ARGB32));
+            QImage transformed = applyTransforms(*_current_sprite, _current_sprite->sourceImage(k).convertToFormat(QImage::Format_ARGB32));
             if (use_dither)
             {
                 transformed = transformed.convertToFormat(QImage::Format_Indexed8).convertToFormat(QImage::Format_ARGB32);
@@ -675,12 +679,11 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     {
         return;
     }
-    const auto pars = _current_scene->importPars();
     const bool use_dither = ui->ditherBox->isChecked();
     const bool use_autopalette = _current_scene->autoPalette();
 
     QProgressDialog * pd = createProgress(this, "Importing scene\n" + ui->colorPickBox->currentText());
-    QImage img = applyTransforms(pars, _current_scene->sourceImage())
+    QImage img = applyTransforms(*_current_scene, _current_scene->sourceImage())
                      .convertToFormat(use_dither ? QImage::Format_Indexed8 : QImage::Format_RGB32);
     _current_scene->transformedImage() = img;
     pd->setRange(0, (img.width() / 8) * (img.height() / 8));

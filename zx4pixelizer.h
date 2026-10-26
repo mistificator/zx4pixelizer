@@ -119,11 +119,6 @@ struct Zx4ImportPars
     enum PassMethod {SinglePass = 0, Multipass5x5x2, Multipass7x7x3, Multipass3x3x1, Multipass5x5x1, Multipass7x7x1};
     PassMethod multipass = SinglePass;
     Zx4Palette::SelectPaletteMethod color_pick = Zx4Palette::SelectPaletteHSL;
-    bool horizontal_mirror = false;
-    bool vertical_mirror = false;
-    double x_shift = 0, y_shift = 0;
-    double x_scale = 1, y_scale = 1;
-    double rotate = 0;
     double hue_shift = 0, saturation_shift = 0, lightness_shift = 0;
 
     QByteArray serialize() const;
@@ -164,6 +159,19 @@ public:
     int paletteSequenceIndex() const;
     int paletteSequenceMax() const;
 
+    void setHorizontalMirror(bool);
+    bool horizontalMirror() const;
+    void setXShift(double);
+    double xShift() const;
+    void setYShift(double);
+    double yShift() const;
+    void setXScale(double);
+    double xScale() const;
+    void setYScale(double);
+    double yScale() const;
+    void setRotate(double);
+    double rotateAngle() const;
+
     QWidget * canvas() const;
 
     void setCurrentFrame(int frame);
@@ -194,6 +202,10 @@ protected:
     bool auto_palette = true;
     int palette_seq_index = 1;
     int palette_seq_max = 1;
+    bool horizontal_mirror = false;
+    double x_shift = 0, y_shift = 0;
+    double x_scale = 1, y_scale = 1;
+    double rotate = 0;
     Zx4ImportPars imp_pars;
     QWidget * widget = nullptr;
 };

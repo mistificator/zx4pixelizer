@@ -99,7 +99,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                             src_h = src_frame.height() * side_y / qMax(1, src_frame.width());
                         }
                         QImage transformed_src = applyTransforms(
-                            current_sprite->importPars(),
+                            *current_sprite,
                             src_frame.convertToFormat(QImage::Format_ARGB32));
                         p.drawImage((side_x - src_w) / 2,
                                     (side_y - src_h) / 2,
@@ -163,7 +163,7 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                 // Левая часть ("Было" — исходное изображение сцены)
                 if (split_x > 0 && !current_scene->sourceImage().isNull())
                 {
-                    QImage before_img = applyTransforms(current_scene->importPars(), current_scene->sourceImage())
+                    QImage before_img = applyTransforms(*current_scene, current_scene->sourceImage())
                     .scaled(ui->preview->size(), Qt::KeepAspectRatio);
                     p.save();
                     p.setClipRect(0, 0, split_x, side_y);

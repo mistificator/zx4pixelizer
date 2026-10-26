@@ -424,7 +424,9 @@ void MainWindow::on_palettes_itemClicked(QListWidgetItem *)
 void MainWindow::on_actionNew_triggered()
 {
     SpriteWindow * new_sprite = new SpriteWindow(palettes);
-    importParsFromWidgetToObject(*new_sprite);
+    Zx4ImportPars p;
+    importParsFromWidget(p);
+    new_sprite->setImportPars(p);
     new_sprite->setAction(SpriteWindow::ActionPencil, ui->actionPencil);
     new_sprite->setAction(SpriteWindow::ActionBrush, ui->actionBrush);
     new_sprite->setAction(SpriteWindow::ActionFill, ui->actionFill);
@@ -432,14 +434,15 @@ void MainWindow::on_actionNew_triggered()
     new_sprite->setAction(SpriteWindow::ActionEraser, ui->actionEraser);
     new_sprite->setBrushSize(current_brush_size);
     new_sprite->setEraserSize(current_eraser_size);
-    current_sprite = new_sprite;
-    QMdiSubWindow * msw = ui->mdiArea->addSubWindow(current_sprite);
+    new_sprite->image(0); // init 1 frame
+    new_sprite->clearCanvas(QSize(64, 64));
+    connect(new_sprite, &SpriteWindow::previewUpdateIsNeeded, ui->preview, qOverload<>(&QWidget::update));
+    connect(new_sprite, &SpriteWindow::undoRedoMenuUpdateIsNeeded, this, &MainWindow::undoRedoMenuUpdate);
+    new_sprite->storeToHistory("New sprite");
+
+    QMdiSubWindow * msw = ui->mdiArea->addSubWindow(new_sprite);
     msw->show();
-    current_sprite->image(0); // init 1 frame
-    current_sprite->clearCanvas(QSize(64, 64));
-    connect(current_sprite, &SpriteWindow::previewUpdateIsNeeded, ui->preview, qOverload<>(&QWidget::update));
-    connect(current_sprite, &SpriteWindow::undoRedoMenuUpdateIsNeeded, this, &MainWindow::undoRedoMenuUpdate);
-    current_sprite->storeToHistory("New sprite");
+    current_sprite = new_sprite;
     updateUndoRedoMenu(current_sprite);
 }
 
@@ -819,6 +822,8 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
     current_scene = nullptr;
     if (!msw)
     {
+        updateUndoRedoMenu(nullptr);
+        ui->preview->update();
         return;
     }
     if (SpriteWindow * sw = dynamic_cast<SpriteWindow *>(msw->widget()))
@@ -855,14 +860,21 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
 
 void MainWindow::updateUndoRedoMenu(Zx4BaseObject * zbo)
 {
-    if (!zbo)
-    {
-        return;
-    }
     ui->actionUndo->setEnabled(false);
     ui->actionRedo->setEnabled(false);
     ui->actionUndo->setText(QString("Undo"));
     ui->actionRedo->setText(QString("Redo"));
+
+    const bool has_sprite = (current_sprite != nullptr && current_sprite->framesCount() > 0);
+    ui->actionCut->setEnabled(has_sprite);
+    ui->actionCopy->setEnabled(has_sprite);
+    ui->actionPaste->setEnabled(current_sprite != nullptr && !clipboard_frame.isNull());
+    ui->actionClear->setEnabled(has_sprite);
+
+    if (!zbo)
+    {
+        return;
+    }
     QString desc;
     if (zbo->canUndo(&desc))
     {
@@ -954,11 +966,11 @@ void MainWindow::on_presetBox_currentIndexChanged(int index)
     importParsToWidget(p);
     if (current_sprite)
     {
-        importParsFromWidgetToObject(*current_sprite);
+        current_sprite->setImportPars(p);
     }
     if (current_scene)
     {
-        importParsFromWidgetToObject(*current_scene);
+        current_scene->setImportPars(p);
     }
     ui->preview->update();
 }
@@ -1030,4 +1042,46 @@ void MainWindow::undoRedoMenuUpdate()
         zbo->canvas()->update();
         ui->preview->update();
     }
+}
+
+void MainWindow::on_actionCut_triggered()
+{
+    if (!current_sprite || current_sprite->framesCount() <= 0)
+    {
+        return;
+    }
+    clipboard_frame.reset(current_sprite->image(current_sprite->currentFrame()).clone());
+    current_sprite->cutCurrentFrame();
+    updateUndoRedoMenu(current_sprite);
+}
+
+void MainWindow::on_actionCopy_triggered()
+{
+    if (!current_sprite || current_sprite->framesCount() <= 0)
+    {
+        return;
+    }
+    clipboard_frame.reset(current_sprite->image(current_sprite->currentFrame()).clone());
+    updateUndoRedoMenu(current_sprite);
+}
+
+void MainWindow::on_actionPaste_triggered()
+{
+    if (!current_sprite || clipboard_frame.isNull())
+    {
+        return;
+    }
+    const int insert_idx = current_sprite->currentFrame() + 1;
+    current_sprite->insertFrameAt(insert_idx, *clipboard_frame, "Paste frame");
+    updateUndoRedoMenu(current_sprite);
+}
+
+void MainWindow::on_actionClear_triggered()
+{
+    if (!current_sprite || current_sprite->framesCount() <= 0)
+    {
+        return;
+    }
+    current_sprite->clearCurrentFrame("Clear frame");
+    updateUndoRedoMenu(current_sprite);
 }

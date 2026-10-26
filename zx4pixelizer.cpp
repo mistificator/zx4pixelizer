@@ -1109,6 +1109,66 @@ int Zx4BaseObject::paletteSequenceMax() const
     return palette_seq_max;
 }
 
+void Zx4BaseObject::setHorizontalMirror(bool v)
+{
+    horizontal_mirror = v;
+}
+
+bool Zx4BaseObject::horizontalMirror() const
+{
+    return horizontal_mirror;
+}
+
+void Zx4BaseObject::setXShift(double v)
+{
+    x_shift = v;
+}
+
+double Zx4BaseObject::xShift() const
+{
+    return x_shift;
+}
+
+void Zx4BaseObject::setYShift(double v)
+{
+    y_shift = v;
+}
+
+double Zx4BaseObject::yShift() const
+{
+    return y_shift;
+}
+
+void Zx4BaseObject::setXScale(double v)
+{
+    x_scale = v;
+}
+
+double Zx4BaseObject::xScale() const
+{
+    return x_scale;
+}
+
+void Zx4BaseObject::setYScale(double v)
+{
+    y_scale = v;
+}
+
+double Zx4BaseObject::yScale() const
+{
+    return y_scale;
+}
+
+void Zx4BaseObject::setRotate(double v)
+{
+    rotate = v;
+}
+
+double Zx4BaseObject::rotateAngle() const
+{
+    return rotate;
+}
+
 void Zx4BaseObject::setCanvas(QWidget * w)
 {
     widget = w;
