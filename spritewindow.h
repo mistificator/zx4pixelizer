@@ -5,6 +5,7 @@
 #include <QLabel>
 #include <QScrollArea>
 #include <QMap>
+#include <QVector>
 
 #include "zx4pixelizer.h"
 
@@ -52,6 +53,7 @@ public:
 
     void updateCanvasCursor();
     void updateFrameStrip();
+    void invalidateThumbnails(int frame_idx = -1);
     void selectFrame(int index);
     bool insertFrameAt(int insert_idx, const Zx4Image & frame_img, const QString & history_desc);
     void clearCurrentFrame(const QString & history_desc = "Clear frame");
@@ -76,10 +78,12 @@ private:
     Ui::SpriteWindow *ui;
     QScrollArea * frame_scroll = nullptr;
     QWidget * frame_strip = nullptr;
+    mutable QVector<QImage> thumb_cache;
     int drag_initial_frame = -1;
     int drag_source_frame = -1;
     bool is_dragging_frame = false;
     QPoint drag_start_pos;
+    QPoint last_draw_pos = QPoint(-1, -1);
 
     Zx4Image stored_sprite;
     QPoint old_grid_pos;

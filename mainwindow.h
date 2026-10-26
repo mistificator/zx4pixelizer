@@ -78,6 +78,7 @@ private:
     SpriteWindow * current_sprite = nullptr;
     SceneWindow * current_scene = nullptr;
     QSharedPointer<Zx4Image> clipboard_frame;
+    bool internal_clipboard_active = false;
     Zx4Palette palettes;
     double preview_split_pos = 0.5;
     int current_brush_size = 5;
@@ -115,6 +116,7 @@ private:
     void reimport(SpriteWindow *, int p_idx = -1);
     void reimport(SceneWindow *);
     void updateUndoRedoMenu(Zx4BaseObject * zbo);
+    static QImage clipboardImage();
 };
 
 #endif // MAINWINDOW_H

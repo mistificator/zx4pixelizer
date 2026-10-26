@@ -21,6 +21,7 @@
 #include <QMenu>
 #include <QSettings>
 #include <QSignalBlocker>
+#include <QClipboard>
 #include <algorithm>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -31,8 +32,26 @@ MainWindow::MainWindow(QWidget *parent)
     ui->preview->installEventFilter(this);
     ui->preview->setCursor(Qt::SplitHCursor);
     ui->mdiArea->installEventFilter(this);
-
+    if (ui->mdiArea->viewport())
+    {
+        ui->mdiArea->viewport()->setAcceptDrops(true);
+        ui->mdiArea->viewport()->installEventFilter(this);
+    }
     qApp->installEventFilter(this);
+
+    connect(QApplication::clipboard(), &QClipboard::dataChanged, this, [this]()
+            {
+                if (!clipboardImage().isNull())
+                {
+                    internal_clipboard_active = false;
+                }
+                Zx4BaseObject * active_obj = nullptr;
+                if (ui->mdiArea->activeSubWindow())
+                {
+                    active_obj = dynamic_cast<Zx4BaseObject *>(ui->mdiArea->activeSubWindow()->widget());
+                }
+                updateUndoRedoMenu(active_obj);
+            });
 
     QActionGroup * ag = new QActionGroup(this);
     ag->setExclusive(true);
@@ -180,6 +199,7 @@ MainWindow::MainWindow(QWidget *parent)
     on_presetBox_currentIndexChanged(ui->presetBox->currentIndex());
     updateToolbarWidgetsHeight();
     loadSettings();
+    updateUndoRedoMenu(nullptr);
 }
 
 MainWindow::~MainWindow()
@@ -479,39 +499,60 @@ void MainWindow::on_actionInvert_colors_triggered()
 
 void MainWindow::on_actionImport_triggered()
 {
-    QString path = (current_sprite && !current_sprite->fileName().isEmpty()) ? QFileInfo(current_sprite->fileName()).absolutePath() : QString();
+    QString path = (current_sprite && !current_sprite->fileName().isEmpty())
+    ? QFileInfo(current_sprite->fileName()).absolutePath()
+    : QString();
     if (path.isEmpty())
     {
         path = QDir::homePath() + "/Pictures/";
     }
+
     QString filter;
-    QStringList filters = { "Images (*.png *.apng *.webp *.jpg *.jpeg *.jfif *.gif *.bmp)", "ZX4 Pixelizer sprites (*.zx4)" };
-    QString filename = QFileDialog::getOpenFileName(this, "Import file", path, filters.join(";;"), &filter);
-    if (filename.isEmpty())
+    QStringList filters = {
+        "Images (*.png *.apng *.webp *.jpg *.jpeg *.jfif *.gif *.bmp)",
+        "ZX4 Pixelizer sprites (*.zx4)"
+    };
+    QStringList filenames = QFileDialog::getOpenFileNames(this, "Import files", path, filters.join(";;"), &filter);
+    if (filenames.isEmpty())
     {
         return;
     }
+
     if (filters.indexOf(filter) == 0)
     {
-        QImageReader img_rdr(filename);
-        QImage src_imp_image;
-        QSize sz;
-        int p_idx = -1;
         QList<QImage> list;
-        while (!(src_imp_image = img_rdr.read()).isNull())
+        for (const QString & filename : filenames)
         {
-            list << src_imp_image;
+            QImageReader img_rdr(filename);
+            QImage src_imp_image;
+            while (!(src_imp_image = img_rdr.read()).isNull())
+            {
+                list << src_imp_image;
+                if (list.count() >= 255)
+                {
+                    break;
+                }
+            }
+            if (list.count() >= 255)
+            {
+                break;
+            }
         }
+
+        QSize sz;
         if (current_sprite)
         {
             sz = current_sprite->canvasSize();
-            p_idx = current_sprite->paletteIndex();
         }
-        importSprite(list, filename, sz, p_idx);
+        // Передаём p_idx = -1, чтобы палитра подбиралась по первому кадру (первому файлу)
+        importSprite(list, filenames.first(), sz, -1);
     }
     else if (filters.indexOf(filter) == 1)
     {
-        importSpriteZx4Format(filename);
+        for (const QString & filename : filenames)
+        {
+            importSpriteZx4Format(filename);
+        }
     }
 }
 
@@ -858,36 +899,6 @@ void MainWindow::on_mdiArea_subWindowActivated(QMdiSubWindow *msw)
     ui->preview->update();
 }
 
-void MainWindow::updateUndoRedoMenu(Zx4BaseObject * zbo)
-{
-    ui->actionUndo->setEnabled(false);
-    ui->actionRedo->setEnabled(false);
-    ui->actionUndo->setText(QString("Undo"));
-    ui->actionRedo->setText(QString("Redo"));
-
-    const bool has_sprite = (current_sprite != nullptr && current_sprite->framesCount() > 0);
-    ui->actionCut->setEnabled(has_sprite);
-    ui->actionCopy->setEnabled(has_sprite);
-    ui->actionPaste->setEnabled(current_sprite != nullptr && !clipboard_frame.isNull());
-    ui->actionClear->setEnabled(has_sprite);
-
-    if (!zbo)
-    {
-        return;
-    }
-    QString desc;
-    if (zbo->canUndo(&desc))
-    {
-        ui->actionUndo->setEnabled(true);
-        ui->actionUndo->setText(QString("Undo \"%1\"").arg(desc));
-    }
-    if (zbo->canRedo(&desc))
-    {
-        ui->actionRedo->setEnabled(true);
-        ui->actionRedo->setText(QString("Redo \"%1\"").arg(desc));
-    }
-}
-
 void MainWindow::selectPalette(int p_idx)
 {
     if (p_idx < 0 || p_idx >= palettes.palettes.count())
@@ -1051,6 +1062,7 @@ void MainWindow::on_actionCut_triggered()
         return;
     }
     clipboard_frame.reset(current_sprite->image(current_sprite->currentFrame()).clone());
+    internal_clipboard_active = true;
     current_sprite->cutCurrentFrame();
     updateUndoRedoMenu(current_sprite);
 }
@@ -1062,18 +1074,26 @@ void MainWindow::on_actionCopy_triggered()
         return;
     }
     clipboard_frame.reset(current_sprite->image(current_sprite->currentFrame()).clone());
+    internal_clipboard_active = true;
     updateUndoRedoMenu(current_sprite);
 }
 
 void MainWindow::on_actionPaste_triggered()
 {
-    if (!current_sprite || clipboard_frame.isNull())
+    const QImage ext_img = clipboardImage();
+
+    if (current_sprite && !clipboard_frame.isNull() && (internal_clipboard_active || ext_img.isNull()))
     {
+        const int insert_idx = current_sprite->currentFrame() + 1;
+        current_sprite->insertFrameAt(insert_idx, *clipboard_frame, "Paste frame");
+        updateUndoRedoMenu(current_sprite);
         return;
     }
-    const int insert_idx = current_sprite->currentFrame() + 1;
-    current_sprite->insertFrameAt(insert_idx, *clipboard_frame, "Paste frame");
-    updateUndoRedoMenu(current_sprite);
+
+    if (!ext_img.isNull())
+    {
+        importScene(ext_img, "clipboard");
+    }
 }
 
 void MainWindow::on_actionClear_triggered()

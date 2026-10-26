@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QTimer>
 #include <QVector>
+#include <QLine>
 #include <QMessageBox>
 #include <QApplication>
 #include <QGuiApplication>
@@ -29,7 +30,6 @@ SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
     ui->setupUi(this);
     setCanvas(ui->canvas);
 
-    // Оформление кнопок + и - в тулбаре кадров
     for (QAction * act : { ui->actionAddFrame, ui->actionRemoveFrame })
     {
         if (QToolButton * btn = qobject_cast<QToolButton *>(ui->toolBar->widgetForAction(act)))
@@ -42,7 +42,6 @@ SpriteWindow::SpriteWindow(const Zx4Palette & palettes, QWidget *parent) :
         }
     }
 
-    // Полоска превью кадров с горизонтальным скроллом
     frame_scroll = new QScrollArea(ui->toolBar);
     frame_scroll->setWidgetResizable(false);
     frame_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -70,6 +69,20 @@ SpriteWindow::~SpriteWindow()
     delete ui;
 }
 
+SpriteWindow * SpriteWindow::spriteWindowAtGlobalPos(const QPoint & globalPos)
+{
+    QWidget * w = QApplication::widgetAt(globalPos);
+    while (w)
+    {
+        if (auto * sw = qobject_cast<SpriteWindow *>(w))
+        {
+            return sw;
+        }
+        w = w->parentWidget();
+    }
+    return nullptr;
+}
+
 void SpriteWindow::setFileName(QString s)
 {
     ui->actionAnimate->setChecked(false);
@@ -81,6 +94,7 @@ void SpriteWindow::setSourceImage(const QList<QImage> & i)
 {
     ui->actionAnimate->setChecked(false);
     Zx4BaseObject::setSourceImage(i);
+    invalidateThumbnails();
     updateFrameStrip();
 }
 
@@ -88,13 +102,16 @@ void SpriteWindow::setImage(const QList<const Zx4Image *> & i)
 {
     ui->actionAnimate->setChecked(false);
     Zx4BaseObject::setImage(i);
+    invalidateThumbnails();
     updateFrameStrip();
 }
 
 void SpriteWindow::onHistoryRestored()
 {
+    invalidateThumbnails();
     updateFrameStrip();
     ensureFrameVisible(current_frame);
+    emit previewUpdateIsNeeded();
 }
 
 QSize SpriteWindow::sizeHint() const
@@ -135,16 +152,18 @@ int SpriteWindow::eraserSize() const
 
 void SpriteWindow::setColors(QList<QColor> _colors)
 {
-    if (_colors.count() != 4)
+    if (_colors.count() != 4 || clrs == _colors)
     {
         return;
     }
     clrs = _colors;
+    invalidateThumbnails();
     ui->canvas->update();
     if (frame_strip)
     {
         frame_strip->update();
     }
+    emit previewUpdateIsNeeded();
 }
 
 QList<QColor> SpriteWindow::colors() const
@@ -162,6 +181,18 @@ int SpriteWindow::paletteIndex() const
     return p_idx;
 }
 
+void SpriteWindow::invalidateThumbnails(int frame_idx)
+{
+    if (frame_idx < 0)
+    {
+        thumb_cache.clear();
+    }
+    else if (frame_idx < thumb_cache.size())
+    {
+        thumb_cache[frame_idx] = QImage();
+    }
+}
+
 void SpriteWindow::clearCanvas(QSize s)
 {
     grid_x = s.width();
@@ -170,8 +201,10 @@ void SpriteWindow::clearCanvas(QSize s)
     {
         zx4_img[k]->clear(grid_x, grid_y);
     }
+    invalidateThumbnails();
     updateFrameStrip();
     ui->canvas->update();
+    emit previewUpdateIsNeeded();
 }
 
 void SpriteWindow::setCanvasSize(QSize s)
@@ -182,8 +215,10 @@ void SpriteWindow::setCanvasSize(QSize s)
     {
         zx4_img[k]->resize(grid_x, grid_y);
     }
+    invalidateThumbnails();
     updateFrameStrip();
     ui->canvas->update();
+    emit previewUpdateIsNeeded();
 }
 
 QSize SpriteWindow::canvasSize() const
@@ -193,32 +228,34 @@ QSize SpriteWindow::canvasSize() const
 
 void SpriteWindow::resizeImage(QSize s)
 {
+    const int orig_grid_x = grid_x;
+    const int orig_grid_y = grid_y;
+    const int target_grid_x = qMax(orig_grid_x, s.width());
+    const int target_grid_y = qMax(orig_grid_y, s.height());
+
     for (int i = 0; i < zx4_img.count(); ++i)
     {
         int new_image_x = s.width();
         int new_image_y = s.height();
         stored_sprite = *zx4_img[i];
-        int old_grid_x = grid_x;
+        int old_grid_x = orig_grid_x;
+        int cur_w = target_grid_x;
+        zx4_img[i]->resize(cur_w, orig_grid_y);
         if (new_image_x > old_grid_x)
         {
-            grid_x = new_image_x;
-        }
-        zx4_img[i]->resize(grid_x, grid_y);
-        if (new_image_x > old_grid_x)
-        {
-            for (int y = 0; y < grid_y; y++)
+            for (int y = 0; y < orig_grid_y; y++)
             {
-                for (int x = 0; x < grid_x; x++)
+                for (int x = 0; x < cur_w; x++)
                 {
-                    zx4_img[i]->color_layer0[x][y] = stored_sprite.color_layer0[x * old_grid_x / grid_x][y];
-                    zx4_img[i]->color_layer1[x][y] = stored_sprite.color_layer1[x * old_grid_x / grid_x][y];
-                    zx4_img[i]->alpha_layer[x][y] = stored_sprite.alpha_layer[x * old_grid_x / grid_x][y];
+                    zx4_img[i]->color_layer0[x][y] = stored_sprite.color_layer0[x * old_grid_x / cur_w][y];
+                    zx4_img[i]->color_layer1[x][y] = stored_sprite.color_layer1[x * old_grid_x / cur_w][y];
+                    zx4_img[i]->alpha_layer[x][y] = stored_sprite.alpha_layer[x * old_grid_x / cur_w][y];
                 }
             }
         }
         else if (new_image_x < old_grid_x)
         {
-            for (int y = 0; y < grid_y; y++)
+            for (int y = 0; y < orig_grid_y; y++)
             {
                 int x = 0;
                 for (; x < new_image_x; x++)
@@ -227,28 +264,25 @@ void SpriteWindow::resizeImage(QSize s)
                     zx4_img[i]->color_layer1[x][y] = stored_sprite.color_layer1[x * old_grid_x / new_image_x][y];
                     zx4_img[i]->alpha_layer[x][y] = stored_sprite.alpha_layer[x * old_grid_x / new_image_x][y];
                 }
-                for (; x < grid_x; x++)
+                for (; x < cur_w; x++)
                 {
                     zx4_img[i]->alpha_layer[x][y] = Zx4Image::BitOff;
                 }
             }
         }
         stored_sprite = *zx4_img[i];
-        int old_grid_y = grid_y;
+        int old_grid_y = orig_grid_y;
+        int cur_h = target_grid_y;
+        zx4_img[i]->resize(cur_w, cur_h);
         if (new_image_y > old_grid_y)
         {
-            grid_y = new_image_y;
-        }
-        zx4_img[i]->resize(grid_x, grid_y);
-        if (new_image_y > old_grid_y)
-        {
-            for (int y = 0; y < grid_y; y++)
+            for (int y = 0; y < cur_h; y++)
             {
-                for (int x = 0; x < grid_x; x++)
+                for (int x = 0; x < cur_w; x++)
                 {
-                    zx4_img[i]->color_layer0[x][y] = stored_sprite.color_layer0[x][y * old_grid_y / grid_y];
-                    zx4_img[i]->color_layer1[x][y] = stored_sprite.color_layer1[x][y * old_grid_y / grid_y];
-                    zx4_img[i]->alpha_layer[x][y] = stored_sprite.alpha_layer[x][y * old_grid_y / grid_y];
+                    zx4_img[i]->color_layer0[x][y] = stored_sprite.color_layer0[x][y * old_grid_y / cur_h];
+                    zx4_img[i]->color_layer1[x][y] = stored_sprite.color_layer1[x][y * old_grid_y / cur_h];
+                    zx4_img[i]->alpha_layer[x][y] = stored_sprite.alpha_layer[x][y * old_grid_y / cur_h];
                 }
             }
         }
@@ -257,24 +291,28 @@ void SpriteWindow::resizeImage(QSize s)
             int y = 0;
             for (; y < new_image_y; y++)
             {
-                for (int x = 0; x < grid_x; x++)
+                for (int x = 0; x < cur_w; x++)
                 {
                     zx4_img[i]->color_layer0[x][y] = stored_sprite.color_layer0[x][y * old_grid_y / new_image_y];
                     zx4_img[i]->color_layer1[x][y] = stored_sprite.color_layer1[x][y * old_grid_y / new_image_y];
                     zx4_img[i]->alpha_layer[x][y] = stored_sprite.alpha_layer[x][y * old_grid_y / new_image_y];
                 }
             }
-            for (; y < grid_y; y++)
+            for (; y < cur_h; y++)
             {
-                for (int x = 0; x < grid_x; x++)
+                for (int x = 0; x < cur_w; x++)
                 {
                     zx4_img[i]->alpha_layer[x][y] = Zx4Image::BitOff;
                 }
             }
         }
     }
+    grid_x = target_grid_x;
+    grid_y = target_grid_y;
+    invalidateThumbnails();
     updateFrameStrip();
     ui->canvas->update();
+    emit previewUpdateIsNeeded();
 }
 
 void SpriteWindow::updateCanvasCursor()
@@ -344,7 +382,7 @@ int SpriteWindow::frameIndexAtPos(const QPoint & pos) const
 QImage SpriteWindow::renderFrameThumbnail(int frame_idx, const QSize & box_size) const
 {
     QImage thumb(box_size, QImage::Format_ARGB32);
-    thumb.fill(Qt::transparent);
+    thumb.fill(QColor(25, 25, 25));
     if (frame_idx < 0 || frame_idx >= zx4_img.count() || zx4_img[frame_idx]->isNull())
     {
         return thumb;
@@ -353,26 +391,33 @@ QImage SpriteWindow::renderFrameThumbnail(int frame_idx, const QSize & box_size)
     const Zx4Image & frame = *zx4_img[frame_idx];
     const int fw = qMax(1, frame.width());
     const int fh = qMax(1, frame.height());
-    QImage raw(fw, fh, QImage::Format_ARGB32);
+    const QRgb c_rgb[4] = {
+        clrs[0].rgba(),
+        clrs[1].rgba(),
+        clrs[2].rgba(),
+        clrs[3].rgba()
+    };
+
+    QImage raw(fw, fh, QImage::Format_RGB32);
     for (int y = 0; y < fh; ++y)
     {
+        QRgb * scan = reinterpret_cast<QRgb *>(raw.scanLine(y));
         for (int x = 0; x < fw; ++x)
         {
             if (frame.alpha_layer[x][y])
             {
-                raw.setPixelColor(x, y, clrs[colorIndex(frame, x, y)]);
+                scan[x] = c_rgb[colorIndex(frame, x, y)];
             }
             else
             {
                 const int checker = ((x / 4 + y / 4) % 2 == 0) ? 38 : 22;
-                raw.setPixelColor(x, y, QColor(checker, checker, checker));
+                scan[x] = qRgb(checker, checker, checker);
             }
         }
     }
 
     QImage scaled = raw.scaled(box_size, Qt::KeepAspectRatio, Qt::FastTransformation);
     QPainter p(&thumb);
-    p.fillRect(thumb.rect(), QColor(25, 25, 25));
     p.drawImage((box_size.width() - scaled.width()) / 2,
                 (box_size.height() - scaled.height()) / 2,
                 scaled);
@@ -387,13 +432,20 @@ void SpriteWindow::updateFrameStrip()
     }
     const int count = qMax(1, int(zx4_img.count()));
     current_frame = std::clamp(current_frame, 0, count - 1);
+    if (thumb_cache.size() != zx4_img.count())
+    {
+        thumb_cache.resize(zx4_img.count());
+    }
 
     ui->actionRemoveFrame->setEnabled(zx4_img.count() > 1);
     ui->actionAddFrame->setEnabled(zx4_img.count() < 255);
 
     const int total_w = kStripMargin * 2 + count * kStripCellSize + (count - 1) * kStripSpacing;
     const int total_h = kStripMargin * 2 + kStripCellSize;
-    frame_strip->setFixedSize(total_w, total_h);
+    if (frame_strip->size() != QSize(total_w, total_h))
+    {
+        frame_strip->setFixedSize(total_w, total_h);
+    }
     frame_strip->update();
 }
 
@@ -419,20 +471,6 @@ void SpriteWindow::selectFrame(int index)
     ensureFrameVisible(current_frame);
     ui->canvas->update();
     emit previewUpdateIsNeeded();
-}
-
-SpriteWindow * SpriteWindow::spriteWindowAtGlobalPos(const QPoint & globalPos)
-{
-    QWidget * w = QApplication::widgetAt(globalPos);
-    while (w)
-    {
-        if (auto * sw = qobject_cast<SpriteWindow *>(w))
-        {
-            return sw;
-        }
-        w = w->parentWidget();
-    }
-    return nullptr;
 }
 
 bool SpriteWindow::insertFrameAt(int insert_idx, const Zx4Image & frame_img, const QString & history_desc)
@@ -467,6 +505,7 @@ bool SpriteWindow::insertFrameAt(int insert_idx, const Zx4Image & frame_img, con
         transformed_img.insert(std::clamp(insert_idx, 0, int(transformed_img.count())), QImage());
     }
 
+    invalidateThumbnails();
     selectFrame(insert_idx);
     storeToHistory(history_desc);
     emit undoRedoMenuUpdateIsNeeded();
@@ -482,8 +521,10 @@ void SpriteWindow::clearCurrentFrame(const QString & history_desc)
     ui->actionAnimate->setChecked(false);
     current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
     zx4_img[current_frame]->clear(grid_x, grid_y);
+    invalidateThumbnails(current_frame);
     updateFrameStrip();
     ui->canvas->update();
+    emit previewUpdateIsNeeded();
     storeToHistory(history_desc);
     emit undoRedoMenuUpdateIsNeeded();
 }
@@ -508,6 +549,7 @@ void SpriteWindow::cutCurrentFrame()
         {
             transformed_img.removeAt(current_frame);
         }
+        invalidateThumbnails();
         selectFrame(std::clamp(current_frame, 0, int(zx4_img.count() - 1)));
         storeToHistory("Cut frame");
         emit undoRedoMenuUpdateIsNeeded();
@@ -525,6 +567,12 @@ void SpriteWindow::drawFrameStrip()
     p.fillRect(frame_strip->rect(), QColor(32, 32, 32));
 
     const int count = zx4_img.count();
+    if (thumb_cache.size() != count)
+    {
+        thumb_cache.resize(count);
+    }
+
+    const QSize thumb_sz(kStripThumbSize, kStripThumbSize);
     for (int i = 0; i < count; ++i)
     {
         const QRect cell = frameCellRect(i);
@@ -535,13 +583,14 @@ void SpriteWindow::drawFrameStrip()
         p.setBrush(is_selected ? QColor(50, 95, 150) : QColor(45, 45, 45));
         p.drawRoundedRect(cell, 4, 4);
 
-        const QSize thumb_sz(kStripThumbSize, kStripThumbSize);
-        const QImage thumb = renderFrameThumbnail(i, thumb_sz);
+        if (thumb_cache[i].isNull())
+        {
+            thumb_cache[i] = renderFrameThumbnail(i, thumb_sz);
+        }
         p.drawImage(cell.x() + (cell.width() - thumb_sz.width()) / 2,
                     cell.y() + (cell.height() - thumb_sz.height()) / 2,
-                    thumb);
+                    thumb_cache[i]);
 
-        // Рамка выделения активного/перетаскиваемого кадра
         if (is_dragged)
         {
             p.setPen(QPen(QColor(255, 215, 0), 2.5));
@@ -557,7 +606,6 @@ void SpriteWindow::drawFrameStrip()
         p.setBrush(Qt::NoBrush);
         p.drawRoundedRect(cell.adjusted(1, 1, -1, -1), 4, 4);
 
-        // Бейдж с номером кадра
         const QString num_str = QString::number(i + 1);
         QFont f = p.font();
         f.setPointSize(7);
@@ -639,10 +687,13 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                     SpriteWindow * target_sprite = spriteWindowAtGlobalPos(me->globalPosition().toPoint());
                     if (target_sprite && target_sprite != this)
                     {
-                        // Если курсор переведён на другое окно спрайта — возвращаем исходный порядок кадров в текущем спрайте
                         if (drag_initial_frame >= 0 && drag_source_frame != drag_initial_frame)
                         {
                             zx4_img.move(drag_source_frame, drag_initial_frame);
+                            if (thumb_cache.size() == zx4_img.count())
+                            {
+                                thumb_cache.move(drag_source_frame, drag_initial_frame);
+                            }
                             if (src_imp_img.count() == zx4_img.count())
                             {
                                 src_imp_img.move(drag_source_frame, drag_initial_frame);
@@ -663,6 +714,10 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                         if (target_idx >= 0 && target_idx < zx4_img.count() && target_idx != drag_source_frame)
                         {
                             zx4_img.move(drag_source_frame, target_idx);
+                            if (thumb_cache.size() == zx4_img.count())
+                            {
+                                thumb_cache.move(drag_source_frame, target_idx);
+                            }
                             if (src_imp_img.count() == zx4_img.count())
                             {
                                 src_imp_img.move(drag_source_frame, target_idx);
@@ -715,6 +770,10 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                     if (init_frame >= 0 && init_frame < zx4_img.count() && src_frame != init_frame)
                     {
                         zx4_img.move(src_frame, init_frame);
+                        if (thumb_cache.size() == zx4_img.count())
+                        {
+                            thumb_cache.move(src_frame, init_frame);
+                        }
                         if (src_imp_img.count() == zx4_img.count())
                         {
                             src_imp_img.move(src_frame, init_frame);
@@ -766,25 +825,43 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
             break;
         case QEvent::MouseButtonPress:
         case QEvent::MouseMove:
-            updateCanvasCursor();
-            on_change = nullptr;
+        {
+            QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
+            if (!me)
+            {
+                break;
+            }
+            if (ev->type() == QEvent::MouseButtonPress)
+            {
+                on_change = nullptr;
+                last_draw_pos = QPoint(-1, -1);
+                updateCanvasCursor();
+            }
+            else if (me->buttons() == Qt::NoButton)
+            {
+                break;
+            }
+
             if (!ui->actionAnimate->isChecked())
             {
-                QMouseEvent * me = dynamic_cast<QMouseEvent *>(ev);
-                if (!me)
-                {
-                    break;
-                }
-                int step = qMax(1, qMin(ui->canvas->width() / grid_x, ui->canvas->height() / grid_y));
+                int step = qMax(1, qMin((ui->canvas->width() - 1) / grid_x, (ui->canvas->height() - 1) / grid_y));
                 QPoint pt = me->position().toPoint();
                 int x = (pt.x() - 1) / step;
                 int y = (pt.y() - 1) / step;
+                if (ev->type() == QEvent::MouseMove && QPoint(x, y) == last_draw_pos)
+                {
+                    break;
+                }
+                last_draw_pos = QPoint(x, y);
+
+                bool modified = false;
                 if (me->buttons().testFlag(Qt::LeftButton))
                 {
                     if (acts[ActionPencil] && acts[ActionPencil]->isChecked())
                     {
                         drawDot(x, y);
-                        on_change = [=]()
+                        modified = true;
+                        on_change = [this]()
                         {
                             storeToHistory("Pixel draw");
                             emit undoRedoMenuUpdateIsNeeded();
@@ -793,7 +870,8 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                     else if (acts[ActionBrush] && acts[ActionBrush]->isChecked())
                     {
                         drawBrush(x, y);
-                        on_change = [=]()
+                        modified = true;
+                        on_change = [this]()
                         {
                             storeToHistory("Brush draw");
                             emit undoRedoMenuUpdateIsNeeded();
@@ -804,7 +882,8 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                         if (ev->type() == QEvent::MouseButtonPress)
                         {
                             floodFill(x, y);
-                            on_change = [=]()
+                            modified = true;
+                            on_change = [this]()
                             {
                                 storeToHistory("Flood fill");
                                 emit undoRedoMenuUpdateIsNeeded();
@@ -823,33 +902,47 @@ bool SpriteWindow::eventFilter(QObject * o, QEvent * ev)
                             int dx = old_grid_pos.x() - x;
                             int dy = old_grid_pos.y() - y;
                             moveImage(dx, dy);
-                            on_change = [=]()
+                            modified = true;
+                            on_change = [this]()
                             {
                                 storeToHistory("Sprite move");
                                 emit undoRedoMenuUpdateIsNeeded();
                             };
                         }
                     }
-                    QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
                 }
-                if (me->buttons().testFlag(Qt::RightButton) || (me->buttons().testFlag(Qt::LeftButton) && acts[ActionEraser] && acts[ActionEraser]->isChecked()))
+                if (me->buttons().testFlag(Qt::RightButton) ||
+                    (me->buttons().testFlag(Qt::LeftButton) && acts[ActionEraser] && acts[ActionEraser]->isChecked()))
                 {
                     eraseBrush(x, y);
-                    QMetaObject::invokeMethod(ui->canvas, "update", Qt::QueuedConnection);
-                    on_change = [=]()
+                    modified = true;
+                    on_change = [this]()
                     {
                         storeToHistory("Pixel erase");
                         emit undoRedoMenuUpdateIsNeeded();
                     };
                 }
+                if (modified)
+                {
+                    invalidateThumbnails(current_frame);
+                    ui->canvas->update();
+                    if (frame_strip)
+                    {
+                        frame_strip->update();
+                    }
+                    emit previewUpdateIsNeeded();
+                }
             }
             break;
+        }
         case QEvent::MouseButtonRelease:
+            last_draw_pos = QPoint(-1, -1);
             updateCanvasCursor();
             if (on_change)
             {
-                on_change();
+                auto fn = on_change;
                 on_change = nullptr;
+                fn();
             }
             break;
         default:
@@ -878,48 +971,68 @@ int SpriteWindow::colorIndex(const Zx4Image & img, int x, int y) const
 
 void SpriteWindow::drawPixels(QPainter * p, int step)
 {
-    for (int y = 0; y < grid_y; y++)
+    if (zx4_img.isEmpty() || grid_x <= 0 || grid_y <= 0)
     {
-        for (int x = 0; x < grid_x; x++)
+        return;
+    }
+    const Zx4Image & frame = *zx4_img[current_frame];
+    const QRgb c_rgb[4] = {
+        clrs[0].rgba(),
+        clrs[1].rgba(),
+        clrs[2].rgba(),
+        clrs[3].rgba()
+    };
+
+    QImage img(grid_x, grid_y, QImage::Format_ARGB32_Premultiplied);
+    img.fill(0);
+    for (int y = 0; y < grid_y; ++y)
+    {
+        QRgb * scan = reinterpret_cast<QRgb *>(img.scanLine(y));
+        for (int x = 0; x < grid_x; ++x)
         {
-            if (zx4_img[current_frame]->alpha_layer[x][y])
+            if (frame.alpha_layer[x][y])
             {
-                p->fillRect(x * step, y * step, step, step, clrs[colorIndex(*zx4_img[current_frame], x, y)]);
+                scan[x] = c_rgb[colorIndex(frame, x, y)];
             }
         }
     }
+    p->drawImage(QRect(0, 0, grid_x * step, grid_y * step), img);
 }
 
 void SpriteWindow::drawGrid()
 {
-    if (zx4_img.isEmpty())
+    if (zx4_img.isEmpty() || grid_x <= 0 || grid_y <= 0)
     {
         return;
     }
     current_frame = std::clamp(current_frame, 0, int(zx4_img.count() - 1));
     zx4_img[current_frame]->resize(grid_x, grid_y);
+
     int step = qMax(1, qMin((ui->canvas->width() - 1) / grid_x, (ui->canvas->height() - 1) / grid_y));
     int side_x = step * grid_x;
     int side_y = step * grid_y;
     QColor grid_color(55, 55, 55);
+
     QPainter p(ui->canvas);
     p.fillRect(ui->canvas->rect(), Qt::black);
-    p.fillRect(ui->canvas->rect(), QBrush(grid_color, Qt::Dense6Pattern));
+    p.fillRect(0, 0, side_x, side_y, QBrush(grid_color, Qt::Dense6Pattern));
     drawPixels(&p, step);
-    p.setPen(grid_color);
-    for (int y = 0; y <= grid_y; y++)
+
+    if (step >= 2)
     {
-        p.drawLine(0, y * step, side_x, y * step);
+        p.setPen(grid_color);
+        QVector<QLine> lines;
+        lines.reserve(grid_x + grid_y + 2);
+        for (int y = 0; y <= grid_y; ++y)
+        {
+            lines.append(QLine(0, y * step, side_x, y * step));
+        }
+        for (int x = 0; x <= grid_x; ++x)
+        {
+            lines.append(QLine(x * step, 0, x * step, side_y));
+        }
+        p.drawLines(lines);
     }
-    for (int x = 0; x <= grid_x; x++)
-    {
-        p.drawLine(x * step, 0, x * step, side_y);
-    }
-    if (frame_strip)
-    {
-        frame_strip->update();
-    }
-    QMetaObject::invokeMethod(this, "previewUpdateIsNeeded", Qt::QueuedConnection);
 }
 
 void SpriteWindow::drawDot(int x, int y)
@@ -1081,8 +1194,10 @@ void SpriteWindow::drawImage(QImage img)
         }
     }
     current_color_index = saved_color_index;
+    invalidateThumbnails(current_frame);
     updateFrameStrip();
     ui->canvas->update();
+    emit previewUpdateIsNeeded();
 }
 
 void SpriteWindow::invertColors()
@@ -1099,8 +1214,10 @@ void SpriteWindow::invertColors()
             zx4_img[current_frame]->color_layer1[x][y] = zx4_img[current_frame]->color_layer1[x][y] ? Zx4Image::BitOff : Zx4Image::BitOn;
         }
     }
+    invalidateThumbnails(current_frame);
     updateFrameStrip();
     ui->canvas->update();
+    emit previewUpdateIsNeeded();
     storeToHistory("Colors inversion");
     emit undoRedoMenuUpdateIsNeeded();
 }
@@ -1140,6 +1257,7 @@ void SpriteWindow::on_actionAddFrame_triggered()
         transformed_img.insert(insert_idx, transformed_img[current_frame]);
     }
 
+    invalidateThumbnails();
     selectFrame(insert_idx);
     storeToHistory("Add frame");
     emit undoRedoMenuUpdateIsNeeded();
@@ -1164,6 +1282,7 @@ void SpriteWindow::on_actionRemoveFrame_triggered()
         transformed_img.removeAt(current_frame);
     }
 
+    invalidateThumbnails();
     selectFrame(std::clamp(current_frame, 0, int(zx4_img.count() - 1)));
     storeToHistory("Delete frame");
     emit undoRedoMenuUpdateIsNeeded();

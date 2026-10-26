@@ -9,50 +9,34 @@
 #include <QDebug>
 #include <algorithm>
 #include <cstring>
-#include <cmath>
 #include "zx4pixelizer.h"
 #include "color_conversions.h"
 
 void Zx4Image::resize(int _w, int _h)
 {
+    if (w == _w && h == _h)
+    {
+        return;
+    }
     w = _w;
     h = _h;
-    Layer _color_layer0, _color_layer1, _alpha_layer;
-    for (int x = 0; x < w; x++)
-    {
-        for (int y = 0; y < h; y++)
-        {
-            _color_layer0[x][y] = color_layer0[x][y];
-            _color_layer1[x][y] = color_layer1[x][y];
-            _alpha_layer[x][y] = alpha_layer[x][y];
-        }
-    }
-    color_layer0 = _color_layer0;
-    color_layer1 = _color_layer1;
-    alpha_layer = _alpha_layer;
+    color_layer0.resize(w, h, BitOff);
+    color_layer1.resize(w, h, BitOff);
+    alpha_layer.resize(w, h, BitOff);
 }
 
 void Zx4Image::clear(int _w, int _h)
 {
     w = _w;
     h = _h;
-    color_layer0.clear();
-    color_layer1.clear();
-    alpha_layer.clear();
-    for (int x = 0; x < w; x++)
-    {
-        for (int y = 0; y < h; y++)
-        {
-            color_layer0[x][y] = BitOff;
-            color_layer1[x][y] = BitOff;
-            alpha_layer[x][y] = BitOff;
-        }
-    }
+    color_layer0.clear(w, h, BitOff);
+    color_layer1.clear(w, h, BitOff);
+    alpha_layer.clear(w, h, BitOff);
 }
 
 Zx4ImageWithAttributes::Zx4ImageWithAttributes(int _w, int _h) : Zx4Image()
 {
-    resize(_w, _h);
+    Zx4ImageWithAttributes::resize(_w, _h);
 }
 
 Zx4ImageWithAttributes::Zx4ImageWithAttributes(const Zx4Image & o, int p_index) : Zx4Image(o)
@@ -62,16 +46,12 @@ Zx4ImageWithAttributes::Zx4ImageWithAttributes(const Zx4Image & o, int p_index) 
 
 void Zx4ImageWithAttributes::resize(int _w, int _h)
 {
-    Zx4Image::resize(_w, _h);
-    Attr _attr;
-    for (int x = 0; x < (w + 7) / 8; x++)
+    if (w == _w && h == _h)
     {
-        for (int y = 0; y < (h + 7) / 8; y++)
-        {
-            _attr[x][y] = attr[x][y];
-        }
+        return;
     }
-    attr = _attr;
+    Zx4Image::resize(_w, _h);
+    attr.resize((w + 7) / 8, (h + 7) / 8, 0);
 }
 
 #define GetY(y)         (((y & 0xc0) << 5) | ((y & 0x07) << 8) | ((y & 0x38) << 2))
@@ -109,13 +89,7 @@ QPair<QByteArray, QByteArray> Zx4ImageWithAttributes::makeScreens(const Zx4Palet
 
 void Zx4ImageWithAttributes::makeAttr(int p_idx)
 {
-    for (int x = 0; x < (w + 7) / 8; x++)
-    {
-        for (int y = 0; y < (h + 7) / 8; y++)
-        {
-            attr[x][y] = p_idx;
-        }
-    }
+    attr.clear((w + 7) / 8, (h + 7) / 8, p_idx);
 }
 
 Zx4ImageWithAttributes & Zx4ImageWithAttributes::copy(const Zx4ImageWithAttributes & o, QPoint pt)
@@ -453,38 +427,59 @@ QVector<QRgb> Zx4Palette::colorTable(int p_idx) const
 
 QImage Zx4Processing::scaleImage(QImage img, int w, int h)
 {
+    if (img.isNull() || w <= 0 || h <= 0)
+    {
+        return QImage();
+    }
     img = img.convertToFormat(QImage::Format_ARGB32);
-    QImage out(img.scaled(w, h, Qt::KeepAspectRatio, Qt::FastTransformation).size(), QImage::Format_ARGB32);
-    out.fill(QColor(0, 0, 0, 0));
-    if (img.isNull() || out.isNull())
+    if (img.width() == w && img.height() == h)
+    {
+        return img;
+    }
+
+    // Предварительное быстрое уменьшение сверхкрупных исходников
+    if (img.width() > w * 4 || img.height() > h * 4)
+    {
+        img = img.scaled(w * 4, h * 4, Qt::KeepAspectRatio, Qt::SmoothTransformation)
+        .convertToFormat(QImage::Format_ARGB32);
+    }
+
+    QImage out = img.scaled(w, h, Qt::KeepAspectRatio, Qt::FastTransformation)
+                     .convertToFormat(QImage::Format_ARGB32);
+    if (out.isNull())
     {
         return out;
     }
-    for (int y = 0; y < img.height(); y++)
+
+    // При уменьшении выбираем наиболее насыщенный пиксель из попадающих в целевую клетку
+    if (img.width() > out.width() || img.height() > out.height())
     {
-        for (int x = 0; x < img.width(); x++)
+        for (int y = 0; y < img.height(); y++)
         {
-            int ix = x * out.width() / img.width();
-            int iy = y * out.height() / img.height();
-            QColor px;
-            QColor old_px_rgb = out.pixelColor(ix, iy);
-            QColor new_px_rgb = img.pixelColor(x, y);
-            QColor old_px_hsl = old_px_rgb.toHsl();
-            QColor new_px_hsl = new_px_rgb.toHsl();
-            if (new_px_hsl.hslHue() == -1 || old_px_hsl.hslHue() == -1)
+            for (int x = 0; x < img.width(); x++)
             {
-                px = new_px_rgb;
+                int ix = x * out.width() / img.width();
+                int iy = y * out.height() / img.height();
+                QColor px;
+                QColor old_px_rgb = out.pixelColor(ix, iy);
+                QColor new_px_rgb = img.pixelColor(x, y);
+                QColor old_px_hsl = old_px_rgb.toHsl();
+                QColor new_px_hsl = new_px_rgb.toHsl();
+                if (new_px_hsl.hslHue() == -1 || old_px_hsl.hslHue() == -1)
+                {
+                    px = new_px_rgb;
+                }
+                else
+                {
+                    px = new_px_hsl.hslSaturation() > old_px_hsl.hslSaturation() ? new_px_hsl : old_px_hsl;
+                    px.setHsl(
+                        px.hslHue(),
+                        px.hslSaturation(),
+                        px.lightness(),
+                        qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
+                }
+                out.setPixelColor(ix, iy, px.toRgb());
             }
-            else
-            {
-                px = new_px_hsl.hslSaturation() > old_px_hsl.hslSaturation() ? new_px_hsl : old_px_hsl;
-                px.setHsl(
-                    px.hslHue(),
-                    px.hslSaturation(),
-                    px.lightness(),
-                    qMax(new_px_hsl.alpha(), old_px_hsl.alpha()));
-            }
-            out.setPixelColor(ix, iy, px.toRgb());
         }
     }
     return out;
@@ -987,9 +982,11 @@ void Zx4BaseObject::setSourceImage(const QList<QImage> & i)
         zx4_img.removeLast();
     }
     current_frame = 0;
+    const int target_w = qMax(1, grid_x);
+    const int target_h = qMax(1, grid_y);
     for (int k = 0; k < i.count(); k++)
     {
-        zx4_img[k]->resize(i[k].width(), i[k].height());
+        zx4_img[k]->resize(target_w, target_h);
     }
     if (widget)
     {

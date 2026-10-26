@@ -14,6 +14,7 @@
 #include <QProgressDialog>
 #include <QMimeData>
 #include <QSignalBlocker>
+#include <QClipboard>
 #include <algorithm>
 #include <cmath>
 #ifdef _OPENMP
@@ -241,15 +242,17 @@ void MainWindow::importSprite(QList<QImage> src_imp_image, QString filename, QSi
         QMessageBox::critical(this, "Error", QString("Error occured while opening \"%1\"").arg(filename));
         return;
     }
-    ui->actionNew->trigger();
     if (!sz.isValid())
     {
-        ui->actionResize_canvas->trigger();
+        sz = QSize(std::clamp(src_imp_image[0].width(), 1, 255),
+                   std::clamp(src_imp_image[0].height(), 1, 192));
+        if (!askResizeSize("Resize canvas", sz))
+        {
+            return;
+        }
     }
-    else
-    {
-        current_sprite->setCanvasSize(sz);
-    }
+    ui->actionNew->trigger();
+    current_sprite->setCanvasSize(sz);
     current_sprite->setFileName(filename);
     current_sprite->setSourceImage(src_imp_image);
     reimport(current_sprite, p_idx);
@@ -619,11 +622,20 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
     }
     const bool use_dither = ui->ditherBox->isChecked();
     const bool use_alpha = ui->alphaBox->isChecked();
+    const QSize canvas_sz = _current_sprite->canvasSize();
 
     QProgressDialog * pd = createProgress(this, "Importing sprite\n" + ui->colorPickBox->currentText());
     pd->setRange(0, _current_sprite->framesCount() + 1);
     pd->setValue(0);
+    pd->repaint();
     qApp->processEvents();
+
+    // Масштабируем и трансформируем первый кадр (первый импортированный файл) для подбора палитры
+    QImage first_scaled = Zx4Processing::scaleImage(_current_sprite->sourceImage(0), canvas_sz.width(), canvas_sz.height());
+    if (!first_scaled.isNull())
+    {
+        first_scaled = applyTransforms(*_current_sprite, first_scaled);
+    }
 
     if (p_idx < 0)
     {
@@ -631,10 +643,11 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         p_idx = ui->palettes->currentRow();
         if (ui->wizardPaletteBox->currentIndex() == 0)
         {
-            p_idx = palettes.exactPalette(_current_sprite->sourceImage());
+            p_idx = palettes.exactPalette(_current_sprite->sourceImage(0));
             if (p_idx < 0)
             {
-                QMultiMap<double, int> dist = palettes.selectPalette(_current_sprite->sourceImage(), sel_method);
+                const QImage & pal_sample = !first_scaled.isNull() ? first_scaled : _current_sprite->sourceImage(0);
+                QMultiMap<double, int> dist = palettes.selectPalette(pal_sample, sel_method);
                 if (!dist.isEmpty())
                 {
                     ui->paletteNumberBox->setRange(1, dist.count());
@@ -648,8 +661,15 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         }
     }
     _current_sprite->setPaletteIndex(p_idx);
+    selectPalette(p_idx);
     pd->setValue(1);
     qApp->processEvents();
+
+    QVector<QRgb> color_table;
+    for (const QColor & color : palettes.palettes[p_idx])
+    {
+        color_table << color.rgb();
+    }
 
     int current_frame = _current_sprite->currentFrame();
     for (int k = 0; k < _current_sprite->framesCount(); k++)
@@ -657,18 +677,25 @@ void MainWindow::reimport(SpriteWindow * _current_sprite, int p_idx)
         _current_sprite->setCurrentFrame(k);
         if (!_current_sprite->sourceImage(k).isNull())
         {
-            QImage transformed = applyTransforms(*_current_sprite, _current_sprite->sourceImage(k).convertToFormat(QImage::Format_ARGB32));
+            QImage scaled = (k == 0 && !first_scaled.isNull())
+            ? first_scaled
+            : applyTransforms(*_current_sprite,
+                              Zx4Processing::scaleImage(_current_sprite->sourceImage(k),
+                                                        canvas_sz.width(),
+                                                        canvas_sz.height()));
             if (use_dither)
             {
-                transformed = transformed.convertToFormat(QImage::Format_Indexed8).convertToFormat(QImage::Format_ARGB32);
+                scaled = scaled.convertToFormat(QImage::Format_Indexed8).convertToFormat(QImage::Format_ARGB32);
             }
-            _current_sprite->drawImage(importImage(transformed, p_idx, use_alpha));
+            _current_sprite->drawImage(Zx4Processing::importImage(scaled, color_table, use_alpha));
         }
         pd->setValue(k + 2);
         qApp->processEvents();
     }
     _current_sprite->setCurrentFrame(current_frame);
+    _current_sprite->updateFrameStrip();
     _current_sprite->canvas()->update();
+    ui->preview->update();
     pd->hide();
     pd->deleteLater();
 }
@@ -774,6 +801,65 @@ void MainWindow::reimport(SceneWindow * _current_scene)
     pd->deleteLater();
 }
 
+QImage MainWindow::clipboardImage()
+{
+    const QClipboard * cb = QApplication::clipboard();
+    if (!cb)
+    {
+        return QImage();
+    }
+    const QMimeData * mime = cb->mimeData();
+    if (mime && mime->hasImage())
+    {
+        QImage img = qvariant_cast<QImage>(mime->imageData());
+        if (!img.isNull())
+        {
+            return img;
+        }
+    }
+    return cb->image();
+}
+
+void MainWindow::updateUndoRedoMenu(Zx4BaseObject * zbo)
+{
+    ui->actionUndo->setEnabled(false);
+    ui->actionRedo->setEnabled(false);
+    ui->actionUndo->setText(QString("Undo"));
+    ui->actionRedo->setText(QString("Redo"));
+
+    const bool has_sprite = (current_sprite != nullptr && current_sprite->framesCount() > 0);
+    const bool has_scene = (current_scene != nullptr && !current_scene->image().isNull());
+    const bool has_ext_image = !clipboardImage().isNull();
+
+    // Управление доступностью сохранения и экспорта в меню File в зависимости от типа документа
+    ui->actionSave->setEnabled(has_sprite);
+    ui->actionSave_as->setEnabled(has_sprite);
+    ui->actionExport->setEnabled(has_sprite);
+    ui->actionExport_scene->setEnabled(has_scene);
+
+    // Управление доступностью команд меню Edit
+    ui->actionCut->setEnabled(has_sprite);
+    ui->actionCopy->setEnabled(has_sprite);
+    ui->actionPaste->setEnabled((current_sprite != nullptr && !clipboard_frame.isNull()) || has_ext_image);
+    ui->actionClear->setEnabled(has_sprite);
+
+    if (!zbo)
+    {
+        return;
+    }
+    QString desc;
+    if (zbo->canUndo(&desc))
+    {
+        ui->actionUndo->setEnabled(true);
+        ui->actionUndo->setText(QString("Undo \"%1\"").arg(desc));
+    }
+    if (zbo->canRedo(&desc))
+    {
+        ui->actionRedo->setEnabled(true);
+        ui->actionRedo->setText(QString("Redo \"%1\"").arg(desc));
+    }
+}
+
 QProgressDialog * MainWindow::createProgress(QWidget * parent, QString text)
 {
     QProgressDialog * pd = new QProgressDialog(parent, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint);
@@ -783,10 +869,13 @@ QProgressDialog * MainWindow::createProgress(QWidget * parent, QString text)
     pd->setMinimumDuration(0);
     pd->setAutoClose(false);
     pd->setAutoReset(false);
-    pd->setRange(0, 100);
+    pd->setRange(0, 0);
     pd->setValue(0);
     pd->setCancelButton(nullptr);
     pd->show();
+    pd->repaint();
     qApp->processEvents();
     return pd;
 }
+
+

@@ -3,6 +3,7 @@
 
 #include <QPainter>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QResizeEvent>
 #include <QFileInfo>
 #include <QDebug>
@@ -28,15 +29,20 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
 {
     if (ev->type() == QEvent::KeyPress || ev->type() == QEvent::KeyRelease)
     {
-        if (current_sprite)
+        auto * ke = static_cast<QKeyEvent *>(ev);
+        if (ke->key() == Qt::Key_Control || ke->key() == Qt::Key_Shift)
         {
-            current_sprite->updateCanvasCursor();
-        }
-        if (current_scene)
-        {
-            current_scene->updateCanvasCursor();
+            if (current_sprite)
+            {
+                current_sprite->updateCanvasCursor();
+            }
+            if (current_scene)
+            {
+                current_scene->updateCanvasCursor();
+            }
         }
     }
+
     if (o == ui->preview)
     {
         switch (ev->type())
@@ -88,22 +94,16 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     const QImage & src_frame = current_sprite->sourceImage(current_sprite->currentFrame());
                     if (!src_frame.isNull())
                     {
-                        int src_w = side_x;
-                        int src_h = side_y;
-                        if (src_frame.width() < src_frame.height())
-                        {
-                            src_w = src_frame.width() * side_x / qMax(1, src_frame.height());
-                        }
-                        else
-                        {
-                            src_h = src_frame.height() * side_y / qMax(1, src_frame.width());
-                        }
-                        QImage transformed_src = applyTransforms(
-                            *current_sprite,
-                            src_frame.convertToFormat(QImage::Format_ARGB32));
+                        const QSize target_sz = src_frame.size().scaled(side_x, side_y, Qt::KeepAspectRatio);
+                        const int src_w = qMax(1, target_sz.width());
+                        const int src_h = qMax(1, target_sz.height());
+
+                        QImage scaled_src = src_frame.convertToFormat(QImage::Format_ARGB32)
+                                                .scaled(src_w, src_h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+                        QImage transformed_src = applyTransforms(*current_sprite, scaled_src);
                         p.drawImage((side_x - src_w) / 2,
                                     (side_y - src_h) / 2,
-                                    transformed_src.scaled(qMax(1, src_w), qMax(1, src_h)));
+                                    transformed_src);
                     }
                     else
                     {
@@ -111,9 +111,9 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                         QImage pattern(4 * step, 4 * step, QImage::Format_RGB32);
                         QPainter pp(&pattern);
                         QList<int> idx = { 0, 3, 2, 1,
-                                          1, 0, 3, 2,
-                                          2, 1, 0, 3,
-                                          3, 2, 1, 0 };
+                                           1, 0, 3, 2,
+                                           2, 1, 0, 3,
+                                           3, 2, 1, 0 };
                         for (int i = 0; i < idx.count(); i++)
                         {
                             pp.fillRect((i % 4) * step, (i / 4) * step, step, step, c[idx[i]]);
@@ -124,7 +124,6 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     p.restore();
                 }
 
-                // Правая часть ("Стало" — результирующий спрайт)
                 if (split_x < side_x)
                 {
                     p.save();
@@ -145,7 +144,6 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     p.restore();
                 }
 
-                // Вертикальный разделитель
                 p.setPen(QPen(Qt::black, 3));
                 p.drawLine(split_x, 0, split_x, side_y);
                 p.setPen(QPen(Qt::white, 1));
@@ -160,7 +158,6 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
 
                 QPainter p(ui->preview);
 
-                // Левая часть ("Было" — исходное изображение сцены)
                 if (split_x > 0 && !current_scene->sourceImage().isNull())
                 {
                     QImage before_img = applyTransforms(*current_scene, current_scene->sourceImage())
@@ -171,7 +168,6 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     p.restore();
                 }
 
-                // Правая часть ("Стало" — сконвертированная сцена)
                 if (split_x < side_x)
                 {
                     p.save();
@@ -180,7 +176,6 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                     p.restore();
                 }
 
-                // Вертикальный разделитель
                 p.setPen(QPen(Qt::black, 3));
                 p.drawLine(split_x, 0, split_x, side_y);
                 p.setPen(QPen(Qt::white, 1));
@@ -192,14 +187,15 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
             break;
         }
     }
-    else if (o == ui->mdiArea)
+    else if (o == ui->mdiArea || o == ui->mdiArea->viewport())
     {
         switch (ev->type())
         {
         case QEvent::DragEnter:
+        case QEvent::DragMove:
         {
-            auto *de = dynamic_cast<QDragEnterEvent *>(ev);
-            if (de && de->mimeData() && de->mimeData()->hasUrls())
+            auto *de = dynamic_cast<QDragMoveEvent *>(ev);
+            if (de && de->mimeData() && (de->mimeData()->hasUrls() || de->mimeData()->hasImage()))
             {
                 de->acceptProposedAction();
                 return true;
@@ -209,9 +205,17 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
         case QEvent::Drop:
         {
             auto *de = dynamic_cast<QDropEvent *>(ev);
-            if (de && de->mimeData() && de->mimeData()->hasUrls())
+            if (!de || !de->mimeData())
             {
-                for (const auto & url : de->mimeData()->urls())
+                break;
+            }
+
+            const QMimeData * mime = de->mimeData();
+            QImage fallback_img = mime->hasImage() ? qvariant_cast<QImage>(mime->imageData()) : QImage();
+
+            if (mime->hasUrls() && !mime->urls().isEmpty())
+            {
+                for (const auto & url : mime->urls())
                 {
                     if (url.isLocalFile())
                     {
@@ -251,22 +255,67 @@ bool MainWindow::eventFilter(QObject * o, QEvent * ev)
                             importScene(QImage(filename), filename);
                         }
                     }
+                    else if (url.scheme().compare("data", Qt::CaseInsensitive) == 0)
+                    {
+                        const QString raw = url.toString();
+                        const int comma = raw.indexOf(',');
+                        QImage img;
+                        if (comma > 0)
+                        {
+                            const QByteArray payload = raw.mid(comma + 1).toLatin1();
+                            const QByteArray decoded = raw.left(comma).contains("base64", Qt::CaseInsensitive)
+                                                           ? QByteArray::fromBase64(payload)
+                                                           : QByteArray::fromPercentEncoding(payload);
+                            img = QImage::fromData(decoded);
+                        }
+                        if (img.isNull() && !fallback_img.isNull())
+                        {
+                            img = fallback_img;
+                        }
+                        if (!img.isNull())
+                        {
+                            importScene(img, "data_url");
+                        }
+                    }
                     else
                     {
                         auto net = new QNetworkAccessManager(this);
-                        auto reply = net->get(QNetworkRequest(url));
-                        connect(reply, &QNetworkReply::finished, this, [=]()
+                        QNetworkRequest req(url);
+                        req.setHeader(QNetworkRequest::UserAgentHeader,
+                                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZX4Pixelizer");
+                        req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                                         QNetworkRequest::NoLessSafeRedirectPolicy);
+
+                        auto reply = net->get(req);
+                        connect(reply, &QNetworkReply::finished, this, [this, reply, net, url, fallback_img]()
                                 {
-                                    importScene(QImageReader(reply).read(), url.fileName());
+                                    QByteArray data = reply->readAll();
+                                    QImage img = QImage::fromData(data);
+                                    if (img.isNull() && !fallback_img.isNull())
+                                    {
+                                        img = fallback_img;
+                                    }
+                                    QString name = url.fileName();
+                                    if (name.isEmpty())
+                                    {
+                                        name = "url_image";
+                                    }
+                                    importScene(img, name);
                                     reply->deleteLater();
                                     net->deleteLater();
                                 });
-                        connect(reply, &QNetworkReply::errorOccurred, this, [=](QNetworkReply::NetworkError err)
+                        connect(reply, &QNetworkReply::errorOccurred, this, [](QNetworkReply::NetworkError err)
                                 {
-                                    qDebug() << err << reply->errorString();
+                                    qDebug() << "Network drop error:" << err;
                                 });
                     }
                 }
+                de->acceptProposedAction();
+                return true;
+            }
+            else if (!fallback_img.isNull())
+            {
+                importScene(fallback_img, "dropped_image");
                 de->acceptProposedAction();
                 return true;
             }

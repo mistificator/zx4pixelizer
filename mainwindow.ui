@@ -886,6 +886,10 @@
    <property name="checkable">
     <bool>true</bool>
    </property>
+   <property name="icon">
+    <iconset resource="resource.qrc">
+     <normaloff>:/fill.png</normaloff>:/fill.png</iconset>
+   </property>
    <property name="text">
     <string>Fill</string>
    </property>

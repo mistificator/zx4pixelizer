@@ -12,6 +12,8 @@
 #include <QCursor>
 #include <QSharedPointer>
 #include <QHashFunctions>
+#include <algorithm>
+#include <cstring>
 #include <functional>
 
 enum ZxColorEnum {
@@ -39,10 +41,97 @@ inline size_t qHash(const QColor &t, size_t seed = 0) noexcept
     return ::qHash(t.rgba(), seed);
 }
 
+template <typename T>
+struct Zx4Layer
+{
+    int w = 0;
+    int h = 0;
+    QVector<T> data;
+
+    struct ColumnRef
+    {
+        T * col_ptr;
+        int h;
+        T & operator[](int y)
+        {
+            static T dummy{};
+            if (col_ptr && y >= 0 && y < h)
+            {
+                return col_ptr[y];
+            }
+            dummy = T{};
+            return dummy;
+        }
+        const T & operator[](int y) const
+        {
+            static const T dummy{};
+            return (col_ptr && y >= 0 && y < h) ? col_ptr[y] : dummy;
+        }
+    };
+
+    struct ConstColumnRef
+    {
+        const T * col_ptr;
+        int h;
+        const T & operator[](int y) const
+        {
+            static const T dummy{};
+            return (col_ptr && y >= 0 && y < h) ? col_ptr[y] : dummy;
+        }
+    };
+
+    void resize(int new_w, int new_h, T fill_val = T{})
+    {
+        new_w = qMax(0, new_w);
+        new_h = qMax(0, new_h);
+        if (w == new_w && h == new_h)
+        {
+            return;
+        }
+        QVector<T> new_data(new_w * new_h, fill_val);
+        const int copy_w = qMin(w, new_w);
+        const int copy_h = qMin(h, new_h);
+        if (copy_w > 0 && copy_h > 0)
+        {
+            const T * src = data.constData();
+            T * dst = new_data.data();
+            for (int x = 0; x < copy_w; ++x)
+            {
+                std::memcpy(dst + x * new_h, src + x * h, copy_h * sizeof(T));
+            }
+        }
+        w = new_w;
+        h = new_h;
+        data.swap(new_data);
+    }
+
+    void clear(int new_w = 0, int new_h = 0, T fill_val = T{})
+    {
+        w = qMax(0, new_w);
+        h = qMax(0, new_h);
+        data.assign(w * h, fill_val);
+    }
+
+    bool isEmpty() const
+    {
+        return data.isEmpty();
+    }
+
+    ColumnRef operator[](int x)
+    {
+        return ColumnRef{ (x >= 0 && x < w) ? (data.data() + x * h) : nullptr, h };
+    }
+
+    ConstColumnRef operator[](int x) const
+    {
+        return ConstColumnRef{ (x >= 0 && x < w) ? (data.constData() + x * h) : nullptr, h };
+    }
+};
+
 struct Zx4Image
 {
-    enum Bit {BitOff = 0, BitOn = 1};
-    typedef QMap<int, QMap<int, Bit>> Layer; // x, y, bit
+    enum Bit : unsigned char {BitOff = 0, BitOn = 1};
+    typedef Zx4Layer<Bit> Layer; // x, y, bit
     Layer color_layer0, color_layer1, alpha_layer;
 
     virtual ~Zx4Image() = default;
@@ -63,7 +152,7 @@ struct Zx4ImageWithAttributes : public Zx4Image
 {
     Zx4ImageWithAttributes(int _w = 0, int _h = 0);
     Zx4ImageWithAttributes(const Zx4Image & o, int p_index);
-    typedef QMap<int, QMap<int, int>> Attr; // x, y, palette index
+    typedef Zx4Layer<int> Attr; // x, y, palette index
     Attr attr; // 32x24
 
     void resize(int _w, int _h) override;
